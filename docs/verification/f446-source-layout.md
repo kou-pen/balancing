@@ -128,3 +128,32 @@ CubeIDEで`firmware/f446/balancing_f446`をプロジェクトとして取り込�
 
 この手順の成功までは「CubeIDE管理ビルドPASS」とは記録しない。ただし、IDE同梱GNU ArmコンパイラによるDebug/Release実クロスリンクの阻害要因は今回の検証で見つからなかった。
 
+## CubeIDE自身によるMakefile再生成を一括実行する手順
+
+**追加日：2026-11-10／結果：スクリプトのdry-runと回帰試験PASS。CubeIDE本体の実行は、リモート操作ゲートにより未実施。**
+
+`tools/regenerate_cubeide_f446.py` を追加した。これは一時修正済みMakefileを再利用するスクリプトではなく、**STM32CubeIDEの公式headless-build.shを直接呼び出す**ための運用用エントリーポイントである。実行時の処理は次の順序で固定している。
+
+1. `sync_cubeide_cpp.py`で追跡中のEclipse/C++設定を監査する。
+2. Debug/Releaseを**別のEclipseワークスペース**へインポートし、それぞれDebug・Releaseに対応する `-cleanBuild` を実行する。これによりCubeIDE管理ビルドの生成物更新を要求する。
+3. 実行ログを `build/cubeide-managed-pr16/debug.log`、`release.log` に保存する。
+4. 既知の手動補正コメント `Temporary additions to verify moved C sources` が生成Makefileに残っていたら**失敗扱い**にする。
+5. `verify_f446_build.py`で両構成の`App/Src`全C/C++ソース、オブジェクト、ARM ELF32、鮮度を検証する。いずれかが失敗したらPASSと表示しない。
+
+VMの**通常ターミナル**から実行するコマンド：
+
+```sh
+cd /home/dev-admin/chatgpt-workspace/balancing
+python3 tools/regenerate_cubeide_f446.py
+```
+
+実際の起動前にコマンドだけ確認する場合：
+
+```sh
+python3 tools/regenerate_cubeide_f446.py --dry-run
+```
+
+**リモート実行ゲートの制限：** 接続済み`ooedo-vm-mcp`の`run_command`で`/opt/st/stm32cubeide_1.19.0/headless-build.sh`を指定すると`SecurityError: Executable must be a bare command name`。裸の`headless-build.sh`でも`SecurityError: Executable is not allowed: headless-build.sh`。したがってこの環境のリモート操作ではCubeIDEのプロセス自体を起動できていない。**Python経由で無理に起動するなど実行制限を迂回せず**、許可された実行環境・通常VMターミナルで上記のコマンドを実行するまでは未検証とする。
+
+スクリプトが完走し`PASS: CubeIDE managed regeneration and both cross-builds completed.`を表示したときに限り、CubeIDE自身が生成したDebug/Release成果物の検証成功とする。従来のGNU Arm手動補正MakefileによるPASSとは明確に区別する。
+
