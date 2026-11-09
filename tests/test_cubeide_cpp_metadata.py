@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 import re
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -160,6 +162,34 @@ class CubeIdeBuildArtifactTests(unittest.TestCase):
         self.assertTrue(
             any("ELF is older" in error for error in verify_configuration(self.project, "Debug"))
         )
+
+
+class CubeIdeManagedRegenerationTests(unittest.TestCase):
+    def test_dry_run_generates_two_clean_build_commands_without_launching(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            launcher = root / "headless-build.sh"
+            launcher.write_text("#!/bin/sh\\nexit 99\\n", encoding="utf-8")
+            workspace = root / "workspaces"
+            script = Path(__file__).resolve().parents[1] / "tools" / "regenerate_cubeide_f446.py"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    "--dry-run",
+                    "--headless",
+                    str(launcher),
+                    "--workspace-root",
+                    str(workspace),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            self.assertIn("-cleanBuild balancing_f446/Debug", result.stdout)
+            self.assertIn("-cleanBuild balancing_f446/Release", result.stdout)
+            self.assertIn("DRY RUN: CubeIDE not started", result.stdout)
+            self.assertFalse(workspace.exists())
 
 
 if __name__ == "__main__":
