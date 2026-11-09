@@ -29,9 +29,7 @@ class CubeIdeMetadataTests(unittest.TestCase):
         self.assertEqual(cxx_metadata(self.project, self.cproject)[1], self.cproject)
 
     def test_missing_app_include_is_repaired(self) -> None:
-        stale = self.cproject.replace(
-            '<listOptionValue builtIn="false" value="../App/Inc"/>', ""
-        )
+        stale = self.cproject.replace('<listOptionValue builtIn="false" value="../App/Inc"/>', "")
         repaired = cxx_metadata(self.project, stale)[1]
         self.assertEqual(repaired.count('value="../App/Inc"'), 2)
         self.assertEqual(cxx_metadata(self.project, repaired)[1], repaired)
