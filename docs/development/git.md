@@ -1,7 +1,7 @@
-# GitHubリポジトリ運用（準備段階）
+# GitHubリポジトリ運用・初回登録履歴
 
 **更新日:** 2026-11-09  
-**方針:** balancing の単一リポジトリ（モノレポ）。ローカルGitはmasterブランチで初期化・初回コミット済み。originは https://github.com/kou-pen/balancing.git に登録済み。GitHubへのpushはVMからの認証設定待ち。GitHub ActionsとセルフホストCIは導入しない。
+**方針:** balancing の単一リポジトリ（モノレポ）。ローカルGitはmasterブランチで初期化・初回コミット済み。originは git@github.com:kou-pen/balancing.git に登録済み。masterへの初回pushは完了。GitHub ActionsとセルフホストCIは導入しない。
 
 ## リポジトリの範囲
 
@@ -13,7 +13,7 @@
 - tools/：検証・CubeIDE再生成後の整合チェック
 - hardware/、simulation/：将来、KiCadや制御シミュレーションを同じリポジトリで管理するための推奨配置先（現時点で移動や空ディレクトリ作成はしない）
 
-**正本:** 基板や通信仕様とファームウェアは、可能なら同じ変更単位で更新する。現段階ではAGENTS.mdとdocs/todo/のルールを優先する。
+**正本:** 基板や通信仕様とファームウェアは、可能なら同じ変更単位で更新する。技術要求はAGENTS.mdとdocs/specs/のルールを優先する。GitHub運用はCONTRIBUTING.mdとgithub-governance.mdを参照する。
 
 ## Gitに含めるファイル
 
@@ -31,9 +31,9 @@ Drivers/は現在のSTM32Cube F4ライブラリと同じ版で再ビルドでき
 
 詳細はルートの.gitignoreと.gitattributesを参照。**.gitignoreは既に追跡されたファイルを削除・秘匿するものではない**ため、最初の登録前に中身を点検する。
 
-## 初回GitHub公開までの手順
+## 初回GitHub登録時の確認履歴
 
-現在のVMでは、このディレクトリをローカルGitリポジトリとして扱う。登録対象179ファイルを確認し、初回コミットを作成済み。**GitHubへのpushはまだ未実施**（GitHubプラグインの認証はVMのgitコマンドには共有されない）。
+現在のVMでは、このディレクトリをローカルGitリポジトリとして扱う。登録対象179ファイルを確認し、初回コミットを作成済み。**初回コミット `70c82fe` はGitHubの `master` へpush済み**。
 
 ```sh
 cd /home/dev-admin/chatgpt-workspace/balancing
@@ -61,23 +61,26 @@ git status --short
 git commit -m "Initial balancing firmware and design docs"
 ```
 
-GitHub側にはbalancingという空リポジトリを作成（初回作成時のREADME/.gitignore/Licenseの自動追加は**避ける**）。リポジトリの公開範囲はそのとき判断する。
+GitHub側にはbalancingというリポジトリを作成し、初回pushを実施した。
 
 ```sh
 git remote -v
-# VMにGitHub用のSSH鍵またはHTTPS用のGit認証を設定した後で実行する
-# git push -u origin master
+# 初回pushは完了。以後は新規ブランチからPRを作成する。
 ```
 
-originは https://github.com/kou-pen/balancing.git を登録済み。リポジトリはPublicであり、pushすると公開される。GitHub側にコードが未反映の間は、コミットはVMのローカルにのみ存在する。
+originは git@github.com:kou-pen/balancing.git を登録済み。リポジトリはPublicであり、pushした変更は一般公開される。
 
 ## 実装とブランチ
 
 - master：少なくともホストテストが通った版を置く。実機確認済みという意味にはしない。
-- 機能開発：feature/f446-can、feature/lqr-simなど短命なブランチで進める。
+- 機能開発：feat/f446-can、feat/lqr-simなど短命なブランチで進める。1 PRにつき1ブランチ。
 - 仕様・コード・TODOは可能な限り一緒に更新する。
 - ファームウェアのCubeMX生成ファイルはUSER CODE以外を直接書き換えず、再生成後にpython3 tools/sync_cubeide_cpp.pyで整合を検査。
 - リポジトリ全体のgit reset --hard、git clean -fd、履歴のforce-pushなど破壊的操作を自動化しない。
+
+## GitHubの運用ルール
+
+Issue・PRの命名、ラベル、AIの権限、承認条件は `CONTRIBUTING.md`、`docs/development/github-governance.md`、`docs/development/github-setup.md`を参照する。
 
 ## CIについて
 
