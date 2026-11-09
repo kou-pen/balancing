@@ -7,12 +7,12 @@
 
 ## 設定反映状況（2026-11-09確認）
 
-- GitHub API照合：`.github/labels.json` の18ラベルが名称・色・説明まで一致。既定ラベル10件は残置。
+- GitHub API照合：.github/labels.json の18ラベルが名称・色・説明まで一致。既定ラベル10件は残置。
 - GitHubのリポジトリ設定：Squash mergeのみ有効、Merge commit / Rebase merge / auto-mergeは無効。
-- GitHub Ruleset `protect-master`（ID: `26837140`）は`active`、対象は`refs/heads/master`、ルールは`deletion`と`non_fast_forward`。PR必須・必須CIは設定しない。GitHub APIでも`master`の`protected=true`を確認。
+- GitHub Ruleset protect-master（ID: 26837140）はActive、対象はmaster、ルールは削除禁止とforce-push禁止。PR必須・必須CIは設定しない。GitHub APIでもmasterが保護対象であることを確認。
 - **Automatically delete head branches は2026-11-09にユーザーがGitHubのWeb設定画面でONを確認**。接続APIからこの値を独立検証できないため、ユーザー確認として記録する。
-- Issue・PRテンプレートは`master`へ配置済み。実際の作成画面の目視確認は未実施。
-- `.github/workflows/` は未配置。GitHub Actionsは導入しない。
+- Issue・PRテンプレートはmasterへ配置済み。実際の作成画面の目視確認は未実施。
+- .github/workflows/ は未配置。GitHub Actionsは導入しない。
 
 ## Labels
 定義の正本は `.github/labels.json`。type（原則1）、area（複数可）、priority（原則1）、補助statusを作成する。

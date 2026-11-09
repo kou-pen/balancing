@@ -1,0 +1,47 @@
+"""Regression tests for STM32CubeIDE-generated C++ build metadata."""
+
+from __future__ import annotations
+
+import re
+import unittest
+
+from tools.sync_cubeide_cpp import PROJECT, cxx_metadata
+
+
+class CubeIdeMetadataTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.project = (PROJECT / ".project").read_text(encoding="utf-8")
+        cls.cproject = (PROJECT / ".cproject").read_text(encoding="utf-8")
+
+    def test_both_configurations_explicitly_select_gnupp17(self) -> None:
+        self.assertEqual(
+            self.cproject.count(
+                "com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler."
+                "option.languagestandard.value.gnupp17"
+            ),
+            2,
+        )
+        self.assertEqual(cxx_metadata(self.project, self.cproject)[1], self.cproject)
+
+    def test_regeneration_loss_is_repaired(self) -> None:
+        option_pattern = (
+            r"\s*<option\b(?=[^>]*superClass=\""
+            r"com\.st\.stm32cube\.ide\.mcu\.gnu\.managedbuild\.tool\.cpp\."
+            r"compiler\.option\.languagestandard\")[^>]*/>"
+        )
+        regenerated, count = re.subn(option_pattern, "", self.cproject)
+        self.assertEqual(count, 2)
+        repaired = cxx_metadata(self.project, regenerated)[1]
+        self.assertEqual(repaired.count("value.gnupp17"), 2)
+        self.assertEqual(cxx_metadata(self.project, repaired)[1], repaired)
+
+    def test_previous_gnupp14_setting_is_repaired(self) -> None:
+        stale = self.cproject.replace("value.gnupp17", "value.gnupp14")
+        self.assertNotEqual(stale, self.cproject)
+        repaired = cxx_metadata(self.project, stale)[1]
+        self.assertEqual(repaired, self.cproject)
+
+
+if __name__ == "__main__":
+    unittest.main()

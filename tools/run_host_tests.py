@@ -2,6 +2,7 @@
 """実機非依存の制御コアをホスト環境でビルド・試験する。"""
 
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -106,4 +107,20 @@ for label, flags in [
     subprocess.run(cpp_common + flags + ["-o", str(path)], check=True, cwd=ROOT, timeout=30)
     print(f"[{label}] 実行", flush=True)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
+print("[CubeIDE C++設定回帰試験] 実行", flush=True)
+subprocess.run(
+    [
+        sys.executable,
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-p",
+        "test_cubeide_cpp_metadata.py",
+    ],
+    check=True,
+    cwd=ROOT,
+    timeout=30,
+)
 print("ホスト試験：全件合格")
