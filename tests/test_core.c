@@ -382,6 +382,138 @@ static void test_rs_enable_dispatch_confirmation(void)
     assert(output.drive_allowed && output.mode == B_MODE_BALANCING);
 }
 
+static void test_fault_clear_requires_a_separate_arm_event(void)
+{
+    const uint64_t t = UINT64_C(5000000);
+    BModeMachine machine;
+    BModeInput input = all_guards_ready(t);
+    BModeOutput output;
+    unsigned i;
+
+    b_mode_init(&machine);
+    input.arm_edge = true;
+    output = b_mode_step(&machine, &input, t);
+    assert(output.request_rs_enable && !output.drive_allowed);
+
+    input.arm_edge = false;
+    for (i = 0; i < 4; ++i) {
+        input.rs_operational[i] = true;
+        input.rs_enable_sent[i] = stamp(t + 200u);
+        input.rs_reply[i] = stamp(t + 400u);
+    }
+    output = b_mode_step(&machine, &input, t + 400u);
+    assert(output.mode == B_MODE_BALANCING && output.drive_allowed);
+
+    input.estop_active = true;
+    output = b_mode_step(&machine, &input, t + 1000u);
+    assert(output.mode == B_MODE_FAULT && !output.drive_allowed);
+    assert(output.request_rs_disable && output.request_power_off);
+
+    input.estop_active = false;
+    input.clear_fault_edge = true;
+    input.arm_edge = true; /* CLEAR_FAULT と同時ARMは許可しない。 */
+    output = b_mode_step(&machine, &input, t + 2000u);
+    assert(output.mode == B_MODE_FAULT && !output.request_rs_enable);
+
+    input.clear_authorized = true;
+    output = b_mode_step(&machine, &input, t + 3000u);
+    assert(output.mode == B_MODE_DISARMED && !output.drive_allowed);
+    assert(!output.request_rs_enable && !machine.arm_pending);
+
+    input.arm_edge = false;
+    input.clear_fault_edge = false;
+    output = b_mode_step(&machine, &input, t + 4000u);
+    assert(output.mode == B_MODE_DISARMED && !output.request_rs_enable);
+
+    /* 復帰後は独立した新しいARM立上りと4台の新しい応答が必要。 */
+    input.arm_edge = true;
+    output = b_mode_step(&machine, &input, t + 5000u);
+    assert(output.mode == B_MODE_DISARMED && !output.drive_allowed);
+    assert(output.request_rs_enable && machine.arm_pending);
+}
+
+static void test_arm_handshake_timestamp_strictness(void)
+{
+    const uint64_t t = UINT64_C(6000000);
+    BModeMachine machine;
+    BModeInput input = all_guards_ready(t);
+    BModeOutput output;
+    unsigned i;
+
+    b_mode_init(&machine);
+    input.arm_edge = true;
+    output = b_mode_step(&machine, &input, t);
+    assert(output.request_rs_enable);
+    input.arm_edge = false;
+
+    for (i = 0; i < 4; ++i) {
+        input.rs_operational[i] = true;
+        input.rs_enable_sent[i] = stamp(t + 1000u);
+        input.rs_reply[i] = stamp(t + 1000u); /* 送信と同時は新規応答ではない。 */
+    }
+    output = b_mode_step(&machine, &input, t + 1000u);
+    assert(!output.drive_allowed && machine.arm_pending);
+
+    input.rs_enable_sent[0] = stamp(t + 3000u); /* 未来の送信証跡は拒否。 */
+    output = b_mode_step(&machine, &input, t + 2000u);
+    assert(!output.drive_allowed && machine.arm_pending);
+
+    input.rs_enable_sent[0] = stamp(t + 1000u);
+    for (i = 0; i < 4; ++i) {
+        input.rs_reply[i] = stamp(t + 2000u);
+    }
+    input.rs_reply[3].valid = false; /* 3/4台だけではARMしない。 */
+    output = b_mode_step(&machine, &input, t + 2000u);
+    assert(!output.drive_allowed && machine.arm_pending);
+
+    input.rs_reply[3] = stamp(t + 2000u);
+    output = b_mode_step(&machine, &input, t + 2000u);
+    assert(output.mode == B_MODE_BALANCING && output.drive_allowed);
+}
+
+static void test_scheduler_boundary_and_null_input_fail_closed(void)
+{
+    const uint64_t t = UINT64_C(7000000);
+    BModeMachine machine;
+    BModeInput input = all_guards_ready(t);
+    BModeOutput output;
+    unsigned i;
+
+    b_mode_init(&machine);
+    /* DISARMEDの処理間隔は駆動中のスケジューラFAULT条件に含めない。 */
+    output = b_mode_step(&machine, &input, t);
+    output = b_mode_step(&machine, &input, t + 20000u);
+    assert(output.mode == B_MODE_DISARMED && !output.drive_allowed);
+
+    input.arm_edge = true;
+    output = b_mode_step(&machine, &input, t + 22000u);
+    assert(output.request_rs_enable);
+    input.arm_edge = false;
+    for (i = 0; i < 4; ++i) {
+        input.rs_operational[i] = true;
+        input.rs_enable_sent[i] = stamp(t + 22500u);
+        input.rs_reply[i] = stamp(t + 23000u);
+    }
+    output = b_mode_step(&machine, &input, t + 23000u);
+    assert(output.drive_allowed);
+
+    output = b_mode_step(&machine, &input, t + 28999u);
+    assert(output.mode == B_MODE_BALANCING && output.drive_allowed);
+    output = b_mode_step(&machine, &input, t + 34999u);
+    assert(output.mode == B_MODE_FAULT && !output.drive_allowed);
+    assert(output.fault_cause == B_FAULT_SCHEDULER);
+    assert(output.request_rs_disable);
+
+    b_mode_init(&machine);
+    output = b_mode_step(&machine, NULL, t);
+    assert(output.mode == B_MODE_FAULT && !output.drive_allowed);
+    assert(output.fault_cause == B_FAULT_GUARD && output.request_rs_disable);
+
+    output = b_mode_step(NULL, &input, t);
+    assert(output.mode == B_MODE_FAULT && !output.drive_allowed);
+    assert(output.fault_cause == B_FAULT_GUARD && output.request_rs_disable);
+}
+
 int main(void)
 {
     test_freshness();
@@ -394,6 +526,9 @@ int main(void)
     test_lqr_named_state_mapping();
     test_scheduler_delay_and_clock_regression();
     test_rs_enable_dispatch_confirmation();
+    test_fault_clear_requires_a_separate_arm_event();
+    test_arm_handshake_timestamp_strictness();
+    test_scheduler_boundary_and_null_input_fail_closed();
     puts("合格：鮮度監視、ARM応答、FAULT、目標制限、車輪配分、LQR数学処理");
     return 0;
 }
