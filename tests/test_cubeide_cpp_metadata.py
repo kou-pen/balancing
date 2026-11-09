@@ -45,7 +45,7 @@ class CubeIdeMetadataTests(unittest.TestCase):
             "firmware/examples",
         ):
             with self.subTest(old_path=old_path):
-                self.assertFalse((root / old_path).exists())
+                self.assertFalse(any(item.is_file() for item in (root / old_path).rglob("*")))
 
         for filename in (
             "balancing_core.c",
