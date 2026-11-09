@@ -1,0 +1,58 @@
+/* Mermaid図の可読性：Doxygenが暗色テーマでも図は常に白背景に固定する。 */
+pre.mermaid,
+.mermaid {
+  box-sizing: border-box;
+  display: block;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 22px 26px;
+  margin: 1.2rem 0;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 8px;
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  text-align: center;
+  line-height: 1.4;
+  color-scheme: light;
+}
+
+/* Mermaidが生成するSVG自体にも背景を持たせ、透過を防止する。 */
+pre.mermaid svg,
+.mermaid svg {
+  display: block;
+  margin: 0 auto;
+  max-width: none !important;
+  min-width: min(100%, 680px);
+  width: auto;
+  height: auto;
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  color-scheme: light;
+}
+
+/* Doxygen側のダークモードがSVG文字色を上書きしないよう固定する。 */
+pre.mermaid svg text,
+.mermaid svg text,
+pre.mermaid svg .messageText,
+.mermaid svg .messageText,
+pre.mermaid svg .loopText,
+.mermaid svg .loopText,
+pre.mermaid svg .noteText,
+.mermaid svg .noteText,
+pre.mermaid svg .labelText,
+.mermaid svg .labelText {
+  fill: #111827 !important;
+  color: #111827 !important;
+}
+
+/* シーケンス図の線が白背景に埋もれないようにする。 */
+pre.mermaid svg .actor-line,
+.mermaid svg .actor-line,
+pre.mermaid svg .messageLine0,
+.mermaid svg .messageLine0,
+pre.mermaid svg .messageLine1,
+.mermaid svg .messageLine1 {
+  stroke: #475569 !important;
+}

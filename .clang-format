@@ -1,0 +1,12 @@
+# 配列の添字・改行・インデントをチームで統一するための最小設定。
+BasedOnStyle: LLVM
+Language: Cpp
+Standard: c++17
+IndentWidth: 4
+ContinuationIndentWidth: 4
+ColumnLimit: 100
+BreakBeforeBraces: Allman
+PointerAlignment: Right
+AlignAfterOperator: Align
+SortIncludes: false
+AllowShortFunctionsOnASingleLine: None

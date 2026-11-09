@@ -1,0 +1,92 @@
+# Balancing monorepo
+# Generated outputs only. Keep CubeMX .ioc, Core/, Drivers/, App/,
+# linker scripts, .project/.cproject/.mxproject and KiCad design sources.
+
+# Host builds, Doxygen, CMake, test outputs
+/build/
+/CMakeFiles/
+/CMakeCache.txt
+/Testing/
+/compile_commands.json
+/cmake_install.cmake
+/Makefile
+**/Debug/
+**/Release/
+**/RelWithDebInfo/
+**/MinSizeRel/
+**/cmake-build-*/
+*.o
+*.obj
+*.a
+*.so
+*.dll
+*.exe
+*.elf
+*.hex
+*.bin
+*.map
+*.list
+*.lst
+*.su
+*.gcda
+*.gcno
+*.gcov
+
+# STM32CubeIDE/Eclipse local workspace and generated index
+**/.metadata/
+**/.settings/
+**/.recommenders/
+**/*.pdom
+**/*.launch
+**/*.launch.json
+
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Credentials and private keys: never commit
+*.pem
+*.p12
+*.pfx
+*.key
+id_rsa*
+id_ed25519*
+.ssh/
+
+# KiCad local configuration, temporary/automatic backups
+*.kicad_prl
+*.kicad_lck
+*.lck
+*-backups/
+*-rescue.lib
+*-cache.lib
+fp-info-cache
+
+# Historical local snapshots; Git history replaces these
+/backups/
+
+# Editor/OS temporary files
+# Shared VS Code settings are tracked; editor-local files are ignored.
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/tasks.json
+.idea/
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+*.tmp
+*.temp
+*.bak
+*.orig
+*.log

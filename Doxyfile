@@ -1,0 +1,32 @@
+# バランシングロボットのC/C++ API・仕様書のHTML化設定
+# プロジェクトルートで doxygen Doxyfile を実行する。
+PROJECT_NAME           = "バランシングロボット制御FW"
+PROJECT_BRIEF          = "仕様IDと公開APIの対応を示す技術資料"
+OUTPUT_LANGUAGE        = Japanese
+OUTPUT_DIRECTORY       = build/docs
+INPUT                  = README.md AGENTS.md docs firmware
+FILE_PATTERNS          = *.c *.cpp *.h *.hpp *.md
+# CubeMXとHAL/CMSISの自動生成コードはAPIの正本ではない。
+EXCLUDE                = firmware/f446/balancing_f446/Drivers firmware/f446/balancing_f446/Core
+RECURSIVE              = YES
+USE_MDFILE_AS_MAINPAGE = README.md
+MARKDOWN_SUPPORT       = YES
+OPTIMIZE_OUTPUT_FOR_C  = NO
+EXTRACT_ALL            = NO
+EXTRACT_STATIC         = YES
+JAVADOC_AUTOBRIEF      = YES
+GENERATE_HTML          = YES
+HTML_FOOTER            = docs/assets/mermaid-footer.html
+HTML_EXTRA_FILES       = docs/assets/mermaid.min.js docs/assets/mermaid-init.js
+HTML_EXTRA_STYLESHEET  = docs/assets/diagrams.css
+GENERATE_LATEX         = NO
+GENERATE_XML           = NO
+QUIET                  = YES
+WARN_IF_DOC_ERROR      = YES
+WARN_IF_UNDOCUMENTED   = NO
+WARN_AS_ERROR          = YES
+HAVE_DOT               = NO
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = NO
+# @spec{CTRL-LQR-001} をDoxygenの「関連仕様」一覧へ収集する。
+ALIASES               += "spec{1}=\xrefitem spec \"関連仕様\" \"仕様への参照一覧\" \1"

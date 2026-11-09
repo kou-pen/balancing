@@ -1,0 +1,16 @@
+# Shared clangd settings. Compile flags are generated into build/compile_commands.json
+# by the VS Code task "clangd: include STM32 Core".
+CompileFlags:
+  CompilationDatabase: build
+Index:
+  Background: Build
+Diagnostics:
+  ClangTidy:
+    Add: [bugprone-*, performance-*]
+    Remove: [bugprone-easily-swappable-parameters]
+---
+# Avoid indexing all of the vendor HAL/CMSIS code in the background.
+If:
+  PathMatch: firmware/f446/balancing_f446/Drivers/.*
+Index:
+  Background: Skip

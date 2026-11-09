@@ -1,0 +1,49 @@
+{
+  "editor.rulers": [
+    100
+  ],
+  "files.eol": "\n",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    }
+  },
+  "[c]": {
+    "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd",
+    "editor.formatOnSave": false
+  },
+  "[cpp]": {
+    "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd",
+    "editor.formatOnSave": true
+  },
+  "clangd.arguments": [
+    "--background-index",
+    "--clang-tidy",
+    "--completion-style=detailed"
+  ],
+  "ruff.importStrategy": "useBundled",
+  "cmake.buildDirectory": "${workspaceFolder}/build",
+  "cmake.configureSettings": {
+    "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+  },
+  "files.watcherExclude": {
+    "**/build/**": true,
+    "**/.metadata/**": true,
+    "**/Debug/**": true,
+    "**/Release/**": true,
+    "**/__pycache__/**": true
+  },
+  "search.exclude": {
+    "**/build": true,
+    "**/.metadata": true,
+    "**/Debug": true,
+    "**/Release": true,
+    "**/.venv": true,
+    "**/Drivers/CMSIS": true
+  }
+}
