@@ -102,8 +102,24 @@ def cxx_metadata(project: str, cproject: str) -> tuple[str, str]:
             'valueType="enumerated"/>'
         )
         body = match.group("body")
-        if existing_standard.search(body):
-            body = existing_standard.sub(option, body)
+        found = existing_standard.search(body)
+        if found:
+            existing = found.group(0)
+            # CubeIDE managed builds add scanner/input metadata and may reorder
+            # option attributes. Keep a semantically correct GNU++17 option
+            # intact instead of rewriting it on every audit.
+            if f'value="{standard_value}"' in existing:
+                return match.group(0)
+            # Repair GNU++14 (or other explicit standard) without discarding
+            # CubeIDE's additional option attributes.
+            value_attr = ' value="'
+            if value_attr in existing:
+                start = existing.index(value_attr) + len(value_attr)
+                end = existing.index('"', start)
+                repaired = existing[:start] + standard_value + existing[end:]
+            else:
+                repaired = option
+            body = body[: found.start()] + repaired + body[found.end() :]
         else:
             body = "\n\t\t\t\t\t\t\t\t" + option + body
         return match.group("open") + body + "</tool>"

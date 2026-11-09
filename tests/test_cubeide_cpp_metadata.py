@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 import re
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -114,6 +116,23 @@ class CubeIdeBuildArtifactTests(unittest.TestCase):
     def test_complete_fresh_arm_build_is_accepted(self) -> None:
         self.assertEqual(verify_configuration(self.project, "Debug"), [])
 
+    def test_future_app_c_source_cannot_be_silently_omitted(self) -> None:
+        new_source = self.project / "App" / "Src" / "future_scheduler.c"
+        new_source.write_text("/* new C implementation */", encoding="utf-8")
+        errors = verify_configuration(self.project, "Debug")
+        self.assertTrue(
+            any("generated makefile omits future_scheduler.c" in error for error in errors)
+        )
+        self.assertTrue(any("objects.list omits future_scheduler.o" in error for error in errors))
+
+    def test_future_cpp_source_cannot_be_silently_omitted(self) -> None:
+        new_source = self.project / "App" / "Src" / "future_adapter.cpp"
+        new_source.write_text("/* new C++ implementation */", encoding="utf-8")
+        errors = verify_configuration(self.project, "Debug")
+        self.assertTrue(
+            any("generated makefile omits future_adapter.cpp" in error for error in errors)
+        )
+
     def test_stale_makefile_is_detected_even_with_elf(self) -> None:
         mk = self.project / "Debug" / "App" / "Src" / "subdir.mk"
         mk.write_text("../App/Src/application.cpp\n", encoding="utf-8")
@@ -143,6 +162,34 @@ class CubeIdeBuildArtifactTests(unittest.TestCase):
         self.assertTrue(
             any("ELF is older" in error for error in verify_configuration(self.project, "Debug"))
         )
+
+
+class CubeIdeManagedRegenerationTests(unittest.TestCase):
+    def test_dry_run_generates_two_clean_build_commands_without_launching(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            launcher = root / "headless-build.sh"
+            launcher.write_text("#!/bin/sh\\nexit 99\\n", encoding="utf-8")
+            workspace = root / "workspaces"
+            script = Path(__file__).resolve().parents[1] / "tools" / "regenerate_cubeide_f446.py"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    "--dry-run",
+                    "--headless",
+                    str(launcher),
+                    "--workspace-root",
+                    str(workspace),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            self.assertIn("-cleanBuild balancing_f446/Debug", result.stdout)
+            self.assertIn("-cleanBuild balancing_f446/Release", result.stdout)
+            self.assertIn("DRY RUN: CubeIDE not started", result.stdout)
+            self.assertFalse(workspace.exists())
 
 
 if __name__ == "__main__":
