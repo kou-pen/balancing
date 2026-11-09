@@ -37,9 +37,29 @@ CubeIDEのDebug/Releaseクロスビルドは[旧測定記録](f446-crossbuild-20
 
 | 項目 | 判定 |
 |---|---|
-| Git上のパス移動 | コミットされたGitオブジェクトとして確認 |
-| 新配置のホストテスト、UBSan、CMake | **NOT RUN** |
-| 新配置のCubeIDE Debug/Releaseクロスビルド | **NOT RUN** |
+| Git上のパス移動 | **PASS**：9ファイルの100%同一リネーム、旧パスの追跡ファイルなし |
+| ホストC11/C++（通常・UBSan） | **PASS**：制御、CAN、HAL模擬、C++入口 |
+| CubeIDE設定回帰テスト | **PASS**：8件 |
+| CMake / CTest | **PASS**：CMakeビルド、CTest 4/4（`cmake --build build/host-cmake --target test`） |
+| 仕様検証・CubeIDE設定監査 | **PASS**：`validate_specs.py`、`sync_cubeide_cpp.py` |
+| Ruff / git diff --check | **PASS**：lint、format、空白差分 |
+| Doxygen | **PASS**：既知の日本語翻訳警告のみ |
+| 新配置のCubeIDE Debug/Releaseクロスビルド | **NOT RUN**：リモート実行ゲートがheadless-build.shの起動を拒否。コンパイル不合格を示すものではない |
 | 実機書込み/通電/CAN駆動 | **NOT RUN** |
 
 実機動作を新たに可能にしたことは意味しない。関連Issue #5の通信・スケジューラ検証と別管理する。
+
+## 実行済み検証の記録（2026-11-09）
+
+- 実行場所：Balancing Development VM（`/home/dev-admin/chatgpt-workspace/balancing`）
+- 確認コミット：`f5f2b70b89080246540383829d76aa97c7f2eea6`
+- `python3 tools/run_host_tests.py`：通常・UBSanの制御コア、モータCAN、HALスタブ、C++の全群PASS。CubeIDEメタデータ回帰8件PASS
+- `cmake -S . -B build/host-cmake`、`cmake --build build/host-cmake -j 4`：PASS
+- `cmake --build build/host-cmake --target test`：CTest 4/4 PASS
+- `python3 tools/validate_specs.py`：仕様12件、TODO 7件、Markdown 39件、API参照40件、PASS
+- `python3 tools/sync_cubeide_cpp.py`：設定整合性PASS
+- `python3 tools/dev_lint.py ruff-check` と `ruff-format-check`：PASS
+- `git diff --check origin/master...HEAD`：PASS
+- `doxygen Doxyfile`：終了コード0。Doxygen日本語翻訳データの既知警告のみ
+
+**クロスビルドの残件：** リモートMCPのコマンド実行ゲートでは、`/opt/st/stm32cubeide_1.19.0/headless-build.sh` を直接起動できなかった。CubeIDEによるコンパイル・リンクの成否は未判定。任意の代替コマンドでゲートを迂回せず、正規の実行経路でDebug/Release両方のELF生成と、`m`のリンク、警告・サイズを確認する。確認後にこの表へ実測値を追記する。
