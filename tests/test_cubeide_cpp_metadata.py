@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import os
 import re
+import tempfile
 import unittest
+from pathlib import Path
 
 from tools.sync_cubeide_cpp import PROJECT, cxx_metadata
+from tools.verify_f446_build import SOURCES, verify_configuration
 
 
 class CubeIdeMetadataTests(unittest.TestCase):
@@ -81,6 +85,64 @@ class CubeIdeMetadataTests(unittest.TestCase):
         self.assertNotEqual(stale, self.cproject)
         repaired = cxx_metadata(self.project, stale)[1]
         self.assertEqual(repaired, self.cproject)
+
+
+class CubeIdeBuildArtifactTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.project = Path(self.temp.name)
+        app_src = self.project / "App" / "Src"
+        generated = self.project / "Debug" / "App" / "Src"
+        app_src.mkdir(parents=True)
+        generated.mkdir(parents=True)
+        (self.project / ".cproject").write_text("metadata", encoding="utf-8")
+        for name in SOURCES:
+            (app_src / name).write_text("/* simulated source */", encoding="utf-8")
+            (generated / f"{Path(name).stem}.o").write_bytes(b"test object")
+        (generated / "subdir.mk").write_text(
+            "\n".join(f"../App/Src/{name}" for name in SOURCES),
+            encoding="utf-8",
+        )
+        (self.project / "Debug" / "objects.list").write_text(
+            "\n".join(f"./App/Src/{Path(name).stem}.o" for name in SOURCES),
+            encoding="utf-8",
+        )
+        self.elf = self.project / "Debug" / "balancing_f446.elf"
+        self.elf.write_bytes(b"\x7fELF\x01\x01" + bytes(12) + b"\x28\x00")
+
+    def test_complete_fresh_arm_build_is_accepted(self) -> None:
+        self.assertEqual(verify_configuration(self.project, "Debug"), [])
+
+    def test_stale_makefile_is_detected_even_with_elf(self) -> None:
+        mk = self.project / "Debug" / "App" / "Src" / "subdir.mk"
+        mk.write_text("../App/Src/application.cpp\n", encoding="utf-8")
+        errors = verify_configuration(self.project, "Debug")
+        self.assertTrue(any("omits balancing_core.c" in error for error in errors))
+
+    def test_stale_object_is_rejected(self) -> None:
+        obj = self.project / "Debug" / "App" / "Src" / "balancing_core.o"
+        os.utime(obj, ns=(1, 1))
+        self.assertTrue(
+            any(
+                "stale object balancing_core.o" in error
+                for error in verify_configuration(self.project, "Debug")
+            )
+        )
+
+    def test_non_arm_elf_is_rejected(self) -> None:
+        self.elf.write_bytes(b"not an ARM ELF")
+        self.assertTrue(
+            any(
+                "not an ARM ELF32" in error for error in verify_configuration(self.project, "Debug")
+            )
+        )
+
+    def test_stale_elf_is_rejected(self) -> None:
+        os.utime(self.elf, ns=(1, 1))
+        self.assertTrue(
+            any("ELF is older" in error for error in verify_configuration(self.project, "Debug"))
+        )
 
 
 if __name__ == "__main__":

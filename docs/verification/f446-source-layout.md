@@ -35,6 +35,16 @@ doxygen Doxyfile
 
 CubeIDEのDebug/Releaseクロスビルドは[旧測定記録](f446-crossbuild-20261109.md)のヘッドレスコマンドを新規ワークスペースで再実行する。
 
+**再生成の必須条件:** 既存の`Debug/App/Src/subdir.mk`と`Release/App/Src/subdir.mk`は、配置変更前に生成されたものであり、`application.cpp`しか収録していない。古いMakefileをそのまま実行しても今回の構成を検証したことにはならない。CubeIDEへプロジェクトを再インポートし、`Refresh`と`Build`で生成Makefileを作り直す必要がある。生成した`Debug`/`Release`はバージョン管理しない。
+
+ビルド後に、**5ファイルすべてがコンパイル・リンク対象であり、成果物が新しいこと**を次のコマンドで確認する。
+
+```sh
+python3 tools/verify_f446_build.py
+```
+
+この確認はビルドコマンド自体を実行せず、生成`subdir.mk`・`objects.list`・オブジェクトファイル・ARM ELF32形式・ソース／ビルド設定からの更新時刻を検査する。古い生成物では`NOT VERIFIED`と終了コード1を返す。**出力がPASSでも実機動作・タイミング・安全性の検証にはならない。**
+
 | 項目 | 判定 |
 |---|---|
 | Git上のパス移動 | **PASS**：9ファイルの100%同一リネーム、旧パスの追跡ファイルなし |
@@ -63,3 +73,10 @@ CubeIDEのDebug/Releaseクロスビルドは[旧測定記録](f446-crossbuild-20
 - `doxygen Doxyfile`：終了コード0。Doxygen日本語翻訳データの既知警告のみ
 
 **クロスビルドの残件：** リモートMCPのコマンド実行ゲートでは、`/opt/st/stm32cubeide_1.19.0/headless-build.sh` を直接起動できなかった。CubeIDEによるコンパイル・リンクの成否は未判定。任意の代替コマンドでゲートを迂回せず、正規の実行経路でDebug/Release両方のELF生成と、`m`のリンク、警告・サイズを確認する。確認後にこの表へ実測値を追記する。
+
+## 追加したビルド成果物ガード
+
+`tools/verify_f446_build.py` により、CubeIDEの古い生成Makefile/ELFを誤って新構成のPASSと扱うことを防止する。現在のVMで実行すると、**Debug/Releaseとも期待どおりNOT VERIFIED（終了コード1）**：各生成Makefile・`objects.list`から4つのCソース/オブジェクトが欠落し、ELFも旧成果物であった。
+
+スクリプト単体の模擬フィクスチャ試験（新しいARM ELF32、古い生成Makefile、古い.o、古いELF、非ARMバイナリ）を`tests/test_cubeide_cpp_metadata.py`に追加し、回帰テストは **13/13 PASS**。このPASSは検証スクリプト自体の試験結果であり、実機向けクロスビルド完了を意味しない。
+
