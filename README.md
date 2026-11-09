@@ -30,7 +30,7 @@
 | `docs/specs/behavior/` | ロボット操作と状態遷移 |
 | `docs/todo/` | P0/P1/P2の未実装・未検証事項（`roadmap.md`が入口） |
 | `firmware/f446/`、`firmware/f303/` | F446のCubeIDEプロジェクトは生成済み。C++アプリ骨組みとHAL接続層は作成済み（STM32実機用ビルド・書込みは未確認）。F303は未実装 |
-| `firmware/examples/` | Doxygenコメントの書式例 |
+| `firmware/f446/balancing_f446/App/Examples/` | Doxygenコメントの書式例 |
 | `Doxyfile` | HTMLリファレンス生成設定 |
 | .gitignore・.gitattributes | Gitの除外設定と改行コード統一。GitHub Actionsは当面使用しない |
 | .vscode・.clangd・ruff.toml | Ruff・clangd・clang-formatの共有エディタ設定 |
