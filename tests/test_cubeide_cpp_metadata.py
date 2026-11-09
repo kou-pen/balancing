@@ -114,6 +114,23 @@ class CubeIdeBuildArtifactTests(unittest.TestCase):
     def test_complete_fresh_arm_build_is_accepted(self) -> None:
         self.assertEqual(verify_configuration(self.project, "Debug"), [])
 
+    def test_future_app_c_source_cannot_be_silently_omitted(self) -> None:
+        new_source = self.project / "App" / "Src" / "future_scheduler.c"
+        new_source.write_text("/* new C implementation */", encoding="utf-8")
+        errors = verify_configuration(self.project, "Debug")
+        self.assertTrue(
+            any("generated makefile omits future_scheduler.c" in error for error in errors)
+        )
+        self.assertTrue(any("objects.list omits future_scheduler.o" in error for error in errors))
+
+    def test_future_cpp_source_cannot_be_silently_omitted(self) -> None:
+        new_source = self.project / "App" / "Src" / "future_adapter.cpp"
+        new_source.write_text("/* new C++ implementation */", encoding="utf-8")
+        errors = verify_configuration(self.project, "Debug")
+        self.assertTrue(
+            any("generated makefile omits future_adapter.cpp" in error for error in errors)
+        )
+
     def test_stale_makefile_is_detected_even_with_elf(self) -> None:
         mk = self.project / "Debug" / "App" / "Src" / "subdir.mk"
         mk.write_text("../App/Src/application.cpp\n", encoding="utf-8")

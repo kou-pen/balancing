@@ -3,7 +3,8 @@
 
 The generated makefiles and ELF files are ignored build artifacts. This is a
 post-build check: run CubeIDE headless/IDE builds before invoking it. It never
-launches a build or flashes a device.
+launches a build or flashes a device. It verifies the generated artifacts but
+cannot attest whether CubeIDE or another tool produced the makefiles.
 """
 
 from __future__ import annotations
@@ -21,10 +22,22 @@ SOURCES = (
 )
 
 
+def app_sources(project: Path) -> list[Path]:
+    """Include future C/C++ additions, not only the original five files."""
+    app_src = project / "App" / "Src"
+    names = set(SOURCES)
+    if app_src.is_dir():
+        names.update(
+            path.name
+            for path in app_src.iterdir()
+            if path.is_file() and path.suffix in (".c", ".cpp")
+        )
+    return [app_src / name for name in sorted(names)]
+
+
 def verify_configuration(project: Path, configuration: str) -> list[str]:
     """Return reasons why the generated build cannot be accepted as verified."""
     build = project / configuration
-    app_src = project / "App" / "Src"
     subdir = build / "App" / "Src" / "subdir.mk"
     objects_list = build / "objects.list"
     elf = build / "balancing_f446.elf"
@@ -32,7 +45,7 @@ def verify_configuration(project: Path, configuration: str) -> list[str]:
 
     errors: list[str] = []
     inputs = [metadata, subdir, objects_list]
-    sources = [app_src / name for name in SOURCES]
+    sources = app_sources(project)
     for path in [*inputs, *sources, elf]:
         if not path.is_file():
             errors.append(f"missing: {path.relative_to(project)}")
@@ -85,7 +98,10 @@ def main() -> None:
                 print(f"  - {error}")
             failures.extend(errors)
         else:
-            print(f"PASS: {name} has all {len(SOURCES)} sources, objects and a fresh ARM ELF32")
+            print(
+                f"PASS: {name} has all {len(app_sources(PROJECT))} sources, "
+                "objects and a fresh ARM ELF32 (artifact checks only)"
+            )
     if failures:
         raise SystemExit(1)
 
