@@ -55,9 +55,7 @@ class CubeIdeMetadataTests(unittest.TestCase):
                 self.assertTrue((PROJECT / "App" / "Src" / filename).is_file())
 
     def test_both_cpp_linkers_explicitly_link_math_library(self) -> None:
-        self.assertEqual(
-            self.cproject.count('<listOptionValue builtIn="false" value="m"/>'), 2
-        )
+        self.assertEqual(self.cproject.count('<listOptionValue builtIn="false" value="m"/>'), 2)
         self.assertEqual(cxx_metadata(self.project, self.cproject)[1], self.cproject)
 
     def test_regeneration_loss_of_math_library_is_repaired(self) -> None:

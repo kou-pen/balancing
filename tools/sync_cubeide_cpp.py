@@ -120,7 +120,7 @@ def cxx_metadata(project: str, cproject: str) -> tuple[str, str]:
         r' name="MCU/MPU G\+\+ Linker"'
         r' superClass="com\.st\.stm32cube\.ide\.mcu\.gnu\.'
         r'managedbuild\.tool\.cpp\.linker">)'
-        r'(?P<body>.*?)</tool>',
+        r"(?P<body>.*?)</tool>",
         re.DOTALL,
     )
     existing_math_lib = '<listOptionValue builtIn="false" value="m"/>'
