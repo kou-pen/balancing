@@ -68,8 +68,6 @@ hal_common = [
     str(ROOT / "tests" / "stubs"),
     "-I",
     str(ROOT / "firmware" / "f446" / "balancing_f446" / "App" / "Inc"),
-    "-I",
-    str(ROOT / "firmware" / "f446" / "balancing_f446" / "App" / "Inc"),
     str(ROOT / "firmware" / "f446" / "balancing_f446" / "App" / "Src" / "balancing_motor_can.c"),
     str(ROOT / "firmware" / "f446" / "balancing_f446" / "App" / "Src" / "balancing_motor_bench.c"),
     str(ROOT / "firmware" / "f446" / "balancing_f446" / "App" / "Src" / "balancing_f446_motor_bench_port.c"),
