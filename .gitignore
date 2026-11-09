@@ -90,3 +90,6 @@ Thumbs.db
 *.bak
 *.orig
 *.log
+
+# AI local handoff files (not authoritative; Issue/PR remains the source of truth)
+/local/handoff/

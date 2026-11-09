@@ -1,0 +1,33 @@
+name: 機能追加
+description: 新機能や既存機能の改善を目的・受入条件で定義する
+title: ""
+body:
+  - type: textarea
+    id: background
+    attributes:
+      label: 背景・目的
+      description: 何を解決し、どのような状態を実現するか
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 対象範囲
+      description: 関連する基板、モジュール、仕様ID、依存Issue
+    validations:
+      required: false
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 完了条件
+      description: 結果を観測できる具体的な受入条件を列挙する
+      placeholder: "- [ ] ...\n- [ ] ..."
+    validations:
+      required: true
+  - type: textarea
+    id: risk
+    attributes:
+      label: 安全・実機検証の考慮事項
+      description: 重要変更時は危険、保護動作、実機確認条件を記録
+    validations:
+      required: false

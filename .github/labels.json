@@ -1,0 +1,92 @@
+[
+  {
+    "name": "type:bug",
+    "color": "B42318",
+    "description": "不具合・再現可能な問題"
+  },
+  {
+    "name": "type:feature",
+    "color": "1F6FEB",
+    "description": "機能追加・仕様に沿った改善"
+  },
+  {
+    "name": "type:research",
+    "color": "8250DF",
+    "description": "調査・比較・検証"
+  },
+  {
+    "name": "type:refactor",
+    "color": "59636E",
+    "description": "動作を維持する構造改善"
+  },
+  {
+    "name": "type:docs",
+    "color": "0E8A16",
+    "description": "ドキュメント変更"
+  },
+  {
+    "name": "area:f446",
+    "color": "0E8A16",
+    "description": "STM32F446制御基板・FW"
+  },
+  {
+    "name": "area:f303",
+    "color": "0E8A16",
+    "description": "STM32F303電源基板・FW"
+  },
+  {
+    "name": "area:control",
+    "color": "0E8A16",
+    "description": "制御・推定・計算"
+  },
+  {
+    "name": "area:hardware",
+    "color": "0E8A16",
+    "description": "基板・電源・実装"
+  },
+  {
+    "name": "area:simulation",
+    "color": "0E8A16",
+    "description": "シミュレーション"
+  },
+  {
+    "name": "area:docs",
+    "color": "0E8A16",
+    "description": "仕様書・手順書"
+  },
+  {
+    "name": "area:tooling",
+    "color": "0E8A16",
+    "description": "開発環境・ツール"
+  },
+  {
+    "name": "priority:P0",
+    "color": "B42318",
+    "description": "緊急・重大安全問題または致命的ブロッカー"
+  },
+  {
+    "name": "priority:P1",
+    "color": "D97706",
+    "description": "高優先度・主要機能や重大不具合"
+  },
+  {
+    "name": "priority:P2",
+    "color": "1F6FEB",
+    "description": "通常の計画開発"
+  },
+  {
+    "name": "priority:P3",
+    "color": "59636E",
+    "description": "低優先度・将来改善"
+  },
+  {
+    "name": "status:in-progress",
+    "color": "F9D0C4",
+    "description": "現在作業中"
+  },
+  {
+    "name": "status:blocked",
+    "color": "D4C5F9",
+    "description": "作業停止・依存待ち"
+  }
+]

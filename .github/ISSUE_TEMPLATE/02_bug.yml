@@ -1,0 +1,39 @@
+name: バグ報告
+description: 再現可能な不具合、実機・シミュレーションの異常を記録する
+title: ""
+body:
+  - type: textarea
+    id: symptoms
+    attributes:
+      label: 事象と期待動作
+      description: 実際の挙動、期待した挙動、影響範囲
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 再現条件と手順
+      description: ハードウェアRevision、コミットID、設定、手順。再現不能ならその旨を記載
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: ログ・測定結果
+      description: 計測値と推測を区別し、巨大ファイルは外部参照先を記載
+    validations:
+      required: false
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 修正完了条件
+      placeholder: "- [ ] 再発を検知するテスト\n- [ ] ..."
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: 安全上の影響と暫定対策
+      description: 危険がない場合は対象外と記載
+    validations:
+      required: false

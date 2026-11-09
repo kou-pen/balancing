@@ -59,3 +59,9 @@ doxygen Doxyfile
 - MOTOR-151により**初期姿勢・脚長範囲はARM許可ゲートとしない**。ただし機械的可動限界と危険な指令への保護は維持する。
 - `../balancing-spec/`は以前の資料として保存。**このディレクトリを以後の編集上の正本**とする。
 - 一部のVM版文書は過去のv0.2資料から要約・再構成している。完全な原文一致は保証しない。
+
+## 開発・GitHub運用
+
+- `CONTRIBUTING.md`：Issue、PR、ブランチ、テスト、レビューの手順
+- `docs/development/github-governance.md`：合意した23項目
+- `docs/development/github-setup.md`：ラベル・Squash merge・master保護

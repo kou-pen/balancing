@@ -1,0 +1,30 @@
+name: 技術調査
+description: 設計判断に必要な調査・比較・測定を記録する
+title: ""
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: 調査目的・判断したいこと
+    validations:
+      required: true
+  - type: textarea
+    id: candidates
+    attributes:
+      label: 仮説・候補・参考資料
+      description: 確認済み事実と未検証の仮説を区別する
+    validations:
+      required: false
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 調査完了条件
+      placeholder: "- [ ] 比較結果を記録\n- [ ] 次の判断または実験を提案"
+    validations:
+      required: true
+  - type: textarea
+    id: followups
+    attributes:
+      label: 想定する検証・後続作業
+    validations:
+      required: false
