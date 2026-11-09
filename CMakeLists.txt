@@ -8,13 +8,15 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
+set(F446_APP firmware/f446/balancing_f446/App)
+
 add_library(balancing_core STATIC
-    firmware/core/src/balancing_core.c
-    firmware/core/src/balancing_motor_can.c
-    firmware/core/src/balancing_motor_bench.c
+    ${F446_APP}/Src/balancing_core.c
+    ${F446_APP}/Src/balancing_motor_can.c
+    ${F446_APP}/Src/balancing_motor_bench.c
 )
 target_include_directories(balancing_core PUBLIC
-    firmware/core/include
+    ${F446_APP}/Inc
 )
 target_compile_options(balancing_core PRIVATE
     -Wall -Wextra -Wpedantic
@@ -32,11 +34,11 @@ add_test(NAME balancing_motor_can_tests COMMAND balancing_motor_can_tests)
 # This does not replace a real STM32CubeMX build or an MCU hardware test.
 add_executable(balancing_motor_hal_port_tests
     tests/test_motor_hal_port.c
-    firmware/f446/src/balancing_f446_motor_bench_port.c
+    ${F446_APP}/Src/balancing_f446_motor_bench_port.c
 )
 target_include_directories(balancing_motor_hal_port_tests PRIVATE
     tests/stubs
-    firmware/f446/include
+    ${F446_APP}/Inc
 )
 target_link_libraries(balancing_motor_hal_port_tests PRIVATE balancing_core m)
 target_compile_options(balancing_motor_hal_port_tests PRIVATE -Wall -Wextra -Wpedantic)
@@ -44,10 +46,10 @@ add_test(NAME balancing_motor_hal_port_tests COMMAND balancing_motor_hal_port_te
 # C++ entry bridge is kept outside CubeMX-owned Core/Src. Host test only.
 add_executable(balancing_cpp_app_tests
     tests/test_cpp_app.cpp
-    firmware/f446/balancing_f446/App/Src/application.cpp
+    ${F446_APP}/Src/application.cpp
 )
 target_include_directories(balancing_cpp_app_tests PRIVATE
-    firmware/f446/balancing_f446/App/Inc
+    ${F446_APP}/Inc
 )
 target_compile_options(balancing_cpp_app_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_cpp_app_tests COMMAND balancing_cpp_app_tests)

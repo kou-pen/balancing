@@ -2,7 +2,7 @@
 """Audit/repair STM32CubeIDE C++ metadata without modifying generated HAL code.
 
 The .ioc remains user-owned by CubeIDE. Use --check after each CubeMX regeneration;
-use --fix only if project metadata dropped the C++ nature/source directory/link script.
+use --fix if project metadata dropped the C++ nature/source directory/link script or App include path.
 """
 
 from __future__ import annotations
@@ -32,6 +32,20 @@ def cxx_metadata(project: str, cproject: str) -> tuple[str, str]:
         cproject = cproject.replace(driver_entry, driver_entry + "\n\t\t\t\t\t\t" + app_entry)
     elif cproject.count(app_entry) != 2:
         raise ValueError("App source configuration is inconsistent")
+
+    # C files moved into App/Src include the hand-written App/Inc headers.
+    # CubeMX may remove this setting during regeneration; --fix restores it.
+    core_include = '<listOptionValue builtIn="false" value="../Core/Inc"/>'
+    app_include = '<listOptionValue builtIn="false" value="../App/Inc"/>'
+    if cproject.count(core_include) != 2:
+        raise ValueError("Expected two C compiler Core/Inc include paths")
+    if cproject.count(app_include) == 0:
+        cproject = cproject.replace(
+            core_include,
+            core_include + "\n\t\t\t\t\t\t\t\t\t" + app_include,
+        )
+    elif cproject.count(app_include) != 2:
+        raise ValueError("App/Inc C include path configuration is inconsistent")
 
     linker = re.compile(
         r'<tool id="(com\.st\.stm32cube\.ide\.mcu\.gnu\.managedbuild\.tool\.cpp\.linker\.\d+)"'
@@ -88,8 +102,24 @@ def cxx_metadata(project: str, cproject: str) -> tuple[str, str]:
             'valueType="enumerated"/>'
         )
         body = match.group("body")
-        if existing_standard.search(body):
-            body = existing_standard.sub(option, body)
+        found = existing_standard.search(body)
+        if found:
+            existing = found.group(0)
+            # CubeIDE managed builds add scanner/input metadata and may reorder
+            # option attributes. Keep a semantically correct GNU++17 option
+            # intact instead of rewriting it on every audit.
+            if f'value="{standard_value}"' in existing:
+                return match.group(0)
+            # Repair GNU++14 (or other explicit standard) without discarding
+            # CubeIDE's additional option attributes.
+            value_attr = ' value="'
+            if value_attr in existing:
+                start = existing.index(value_attr) + len(value_attr)
+                end = existing.index('"', start)
+                repaired = existing[:start] + standard_value + existing[end:]
+            else:
+                repaired = option
+            body = body[: found.start()] + repaired + body[found.end() :]
         else:
             body = "\n\t\t\t\t\t\t\t\t" + option + body
         return match.group("open") + body + "</tool>"
@@ -97,6 +127,47 @@ def cxx_metadata(project: str, cproject: str) -> tuple[str, str]:
     cproject, compiler_count = compiler.subn(require_cpp17, cproject)
     if compiler_count != 2 or cproject.count(f'value="{standard_value}"') != 2:
         raise ValueError("Expected two C++ compiler configurations using GNU++17")
+    # The F446 C11 core now lives inside the CubeIDE App source path and uses
+    # lround/lroundf/fminf/fmaxf from libm. Retain the library through regeneration.
+    math_key = "com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.linker.option.libraries"
+    cpp_linker = re.compile(
+        r'(?P<open><tool id="(?P<id>com\.st\.stm32cube\.ide\.mcu\.gnu\.'
+        r'managedbuild\.tool\.cpp\.linker\.\d+)"'
+        r' name="MCU/MPU G\+\+ Linker"'
+        r' superClass="com\.st\.stm32cube\.ide\.mcu\.gnu\.'
+        r'managedbuild\.tool\.cpp\.linker">)'
+        r"(?P<body>.*?)</tool>",
+        re.DOTALL,
+    )
+    existing_math_lib = '<listOptionValue builtIn="false" value="m"/>'
+    existing_lib_option = re.compile(
+        rf'<option\b(?=[^>]*superClass="{re.escape(math_key)}")[^>]*>.*?</option>',
+        re.DOTALL,
+    )
+
+    def require_cpp_math_link(match: re.Match[str]) -> str:
+        body = match.group("body")
+        found = existing_lib_option.search(body)
+        if found:
+            option = found.group(0)
+            if existing_math_lib not in option:
+                updated_option = option.replace("</option>", existing_math_lib + "</option>")
+                body = body[: found.start()] + updated_option + body[found.end() :]
+        else:
+            option = (
+                f'<option id="{match.group("id")}.libraries" name="Libraries (-l)" '
+                f'superClass="{math_key}" valueType="libs">'
+                f"{existing_math_lib}</option>"
+            )
+            body += "\n\t\t\t\t\t\t\t\t" + option
+        return match.group("open") + body + "</tool>"
+
+    cproject, linker_count = cpp_linker.subn(require_cpp_math_link, cproject)
+    if linker_count != 2 or cproject.count(f'superClass="{math_key}"') != 2:
+        raise ValueError("Expected two C++ linkers explicitly linking libm")
+    if cproject.count(existing_math_lib) != 2:
+        raise ValueError("Missing C++ libm on Debug or Release")
+
     return project, cproject
 
 

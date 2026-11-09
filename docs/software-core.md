@@ -16,7 +16,7 @@
 | 校正とパラメータ | 実測K_300、電流上限、機械原点 | 未確定 |
 | MCU統合 | F446／F303動作、500 Hz実測、CANバス負荷 | 未検証 |
 
-実装ファイルは`firmware/core/include/balancing_core.h`と`firmware/core/src/balancing_core.c`。HAL、ROS、MCU固有ライブラリに依存しない。
+実装ファイルは`firmware/f446/balancing_f446/App/Inc/balancing_core.h`と`firmware/f446/balancing_f446/App/Src/balancing_core.c`。HAL、ROS、MCU固有ライブラリに依存しない。
 
 ## データ構造の原則
 

@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "build" / "host"
+F446_APP = ROOT / "firmware" / "f446" / "balancing_f446" / "App"
 OUT.mkdir(parents=True, exist_ok=True)
 
 common = [
@@ -17,8 +18,8 @@ common = [
     "-Werror",
     "-pedantic",
     "-I",
-    str(ROOT / "firmware" / "core" / "include"),
-    str(ROOT / "firmware" / "core" / "src" / "balancing_core.c"),
+    str(F446_APP / "Inc"),
+    str(F446_APP / "Src" / "balancing_core.c"),
     str(ROOT / "tests" / "test_core.c"),
     "-lm",
 ]
@@ -41,9 +42,9 @@ motor_common = [
     "-Werror",
     "-pedantic",
     "-I",
-    str(ROOT / "firmware" / "core" / "include"),
-    str(ROOT / "firmware" / "core" / "src" / "balancing_motor_can.c"),
-    str(ROOT / "firmware" / "core" / "src" / "balancing_motor_bench.c"),
+    str(F446_APP / "Inc"),
+    str(F446_APP / "Src" / "balancing_motor_can.c"),
+    str(F446_APP / "Src" / "balancing_motor_bench.c"),
     str(ROOT / "tests" / "test_motor_can.c"),
     "-lm",
 ]
@@ -67,12 +68,10 @@ hal_common = [
     "-I",
     str(ROOT / "tests" / "stubs"),
     "-I",
-    str(ROOT / "firmware" / "core" / "include"),
-    "-I",
-    str(ROOT / "firmware" / "f446" / "include"),
-    str(ROOT / "firmware" / "core" / "src" / "balancing_motor_can.c"),
-    str(ROOT / "firmware" / "core" / "src" / "balancing_motor_bench.c"),
-    str(ROOT / "firmware" / "f446" / "src" / "balancing_f446_motor_bench_port.c"),
+    str(F446_APP / "Inc"),
+    str(F446_APP / "Src" / "balancing_motor_can.c"),
+    str(F446_APP / "Src" / "balancing_motor_bench.c"),
+    str(F446_APP / "Src" / "balancing_f446_motor_bench_port.c"),
     str(ROOT / "tests" / "test_motor_hal_port.c"),
     "-lm",
 ]
@@ -94,8 +93,8 @@ cpp_common = [
     "-Werror",
     "-pedantic",
     "-I",
-    str(ROOT / "firmware" / "f446" / "balancing_f446" / "App" / "Inc"),
-    str(ROOT / "firmware" / "f446" / "balancing_f446" / "App" / "Src" / "application.cpp"),
+    str(F446_APP / "Inc"),
+    str(F446_APP / "Src" / "application.cpp"),
     str(ROOT / "tests" / "test_cpp_app.cpp"),
 ]
 for label, flags in [

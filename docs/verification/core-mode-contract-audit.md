@@ -1,7 +1,7 @@
 # 制御コア状態機械の仕様差分監査
 
 **検証日:** 2026-11-09  
-**対象:** `firmware/core/include/balancing_core.h`、`firmware/core/src/balancing_core.c`、`tests/test_core.c`  
+**対象:** `firmware/f446/balancing_f446/App/Inc/balancing_core.h`、`firmware/f446/balancing_f446/App/Src/balancing_core.c`、`tests/test_core.c`  
 **仕様:** `BEHAV-001`、`CTRL-LQR-001`、`CTRL-EST-001`。関連Issue #4。  
 **範囲:** C11純粋ロジックとホストテストのみ。STM32書込み・CAN実通信・モータ駆動は実施していない。
 
@@ -29,8 +29,8 @@
 ```sh
 mkdir -p build/host
 gcc -std=c11 -Wall -Wextra -Werror -pedantic \
-  -Ifirmware/core/include \
-  firmware/core/src/balancing_core.c tests/spec_gap_core_mode.c \
+  -Ifirmware/f446/balancing_f446/App/Inc \
+  firmware/f446/balancing_f446/App/Src/balancing_core.c tests/spec_gap_core_mode.c \
   -lm -o build/host/spec_gap_core_mode
 build/host/spec_gap_core_mode
 ```
