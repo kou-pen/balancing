@@ -90,6 +90,9 @@ typedef struct {
  * @brief HALに触れず送信スケジューラを初期化する。
  * @spec{BOARD-F446-001}
  * @return 有効な設定ならtrue。実機駆動は一切有効化しない。
+ * @warning 現場のCANメールボックスをキャンセルするAPIではない。初期化は
+ *          CAN送信開始前か、外側で完全に送信停止・回復した後に限る。
+ *          configはscheduler内のconfig領域を指してはならない。
  */
 bool b_sched_init(BTxScheduler *scheduler, const BSchedConfig *config);
 
@@ -114,6 +117,9 @@ bool b_sched_next(const BTxScheduler *scheduler, BSchedBus bus, BSchedIntent *in
  * @spec{PROTO-RS06-001}
  * @param[in] mailbox 0..2。失敗／BUSYの場合は呼ばない。
  * @return 要求が現行世代でメールボックスが空ならtrue。
+ * @pre b_sched_nextで取得した要求を使用する。古い世代や占有競合は再検査して拒否する。
+ * @warning 将来HALへ接続する場合、HAL受付から本APIまでにIRQが割り込まない設計とし、
+ *          falseでも実HALが受付済みなら無追跡フレームを残さずFAULT/中止処理へ移す。
  */
 bool b_sched_accepted(BTxScheduler *scheduler, const BSchedIntent *intent,
                       uint8_t mailbox, uint64_t now_us);

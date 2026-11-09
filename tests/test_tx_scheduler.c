@@ -308,6 +308,144 @@ static void test_manual_disarm_and_fault_latch(void)
     puts("PASS disarm: RS06 stopped, fault stays latched without auto-clear");
 }
 
+static void test_cached_intents_cannot_bypass_inflight_gate(void)
+{
+    BTxScheduler s = fresh_scheduler((BSchedConfig){30000u, 30000u});
+    BSchedIntent old, cached;
+
+    b_sched_tick(&s, 0u, true);
+    assert(b_sched_next(&s, B_SCHED_CAN1_RS06, &old));
+    assert(b_sched_accepted(&s, &old, 0u, 0u));
+    b_sched_tick(&s, 2000u, true);
+    b_sched_tick(&s, 4000u, true);
+    /* API利用者がnext()を無視し現世代の要求を直接組み立てても拒否すべき。 */
+    cached = (BSchedIntent){B_SCHED_CAN1_RS06, 0u, s.rs_generation, false};
+    assert(!b_sched_next(&s, B_SCHED_CAN1_RS06, &old));
+    assert(!b_sched_accepted(&s, &cached, 1u, 4000u));
+    assert(!s.mail[0][1].active);
+
+    s = fresh_scheduler((BSchedConfig){30000u, 30000u});
+    b_sched_tick(&s, 0u, false);
+    assert(b_sched_next(&s, B_SCHED_CAN2_C620, &old));
+    assert(b_sched_accepted(&s, &old, 0u, 0u));
+    b_sched_tick(&s, 2000u, false);
+    cached = (BSchedIntent){B_SCHED_CAN2_C620, 0xffu,
+                            s.wheel_generation, true};
+    assert(!b_sched_next(&s, B_SCHED_CAN2_C620, &old));
+    assert(!b_sched_accepted(&s, &cached, 1u, 2000u));
+    assert(!s.mail[1][1].active);
+    puts("PASS cached intent cannot bypass per-bus hardware backpressure");
+}
+
+static void test_previous_arm_tx_completion_never_recovers_freshness(void)
+{
+    BTxScheduler s = fresh_scheduler((BSchedConfig){30000u, 30000u});
+    BSchedIntent intent;
+
+    b_sched_tick(&s, 0u, true);
+    assert(b_sched_next(&s, B_SCHED_CAN1_RS06, &intent));
+    assert(b_sched_accepted(&s, &intent, 0u, 0u));
+    b_sched_tick(&s, 2000u, false); /* 停止時にHAL受理済みの旧Type1が残る。 */
+    b_sched_tick(&s, 3000u, true);  /* 位相が4msに進む前の再ARM。 */
+    assert(!s.rs_tx_valid[0]);
+    complete_one(&s, B_SCHED_CAN1_RS06, 0u, 3500u);
+    assert(!s.rs_tx_valid[0]);       /* 旧ARMの完了を新しいARMへ流用しない。 */
+    assert(s.rs_late_completions == 1u);
+    puts("PASS late previous-ARM TX completion cannot refresh new session");
+}
+
+static void test_late_c620_completion_does_not_mask_new_generation(void)
+{
+    BTxScheduler s = fresh_scheduler((BSchedConfig){30000u, 30000u});
+    BSchedIntent old, current;
+    b_sched_tick(&s, 0u, true);
+    assert(b_sched_next(&s, B_SCHED_CAN2_C620, &old));
+    assert(b_sched_accepted(&s, &old, 0u, 0u));
+    b_sched_tick(&s, 2000u, true);
+    complete_one(&s, B_SCHED_CAN2_C620, 0u, 2100u);
+    assert(!s.wheel_tx_valid); /* 前の2ms世代の完了を最新扱いしない。 */
+    assert(b_sched_next(&s, B_SCHED_CAN2_C620, &current));
+    assert(current.generation != old.generation);
+    assert(b_sched_accepted(&s, &current, 0u, 2100u));
+    complete_one(&s, B_SCHED_CAN2_C620, 0u, 2200u);
+    assert(s.wheel_tx_valid && s.wheel_tx_done_us == 2200u);
+    puts("PASS C620: previous-generation TX completion is not freshness");
+}
+
+static void test_duplicate_control_tick_is_idempotent(void)
+{
+    BTxScheduler s = fresh_scheduler((BSchedConfig){30000u, 30000u});
+    b_sched_tick(&s, 0u, true);
+    const uint32_t rs_generation = s.rs_generation;
+    const uint32_t wheel_generation = s.wheel_generation;
+    b_sched_tick(&s, 0u, true); /* タイマ通知の重複を故障注入。 */
+    assert(!s.fault_requested);
+    assert(s.rs_generation == rs_generation);
+    assert(s.wheel_generation == wheel_generation);
+    assert(s.wheel_pending);
+    puts("PASS duplicate tick: one timestamp creates at most one command set");
+}
+
+static void test_same_timestamp_disarm_is_not_ignored(void)
+{
+    BTxScheduler s = fresh_scheduler((BSchedConfig){30000u, 30000u});
+    BSchedIntent intent;
+    b_sched_tick(&s, 0u, true);
+    assert(s.drive_active);
+    b_sched_tick(&s, 0u, false); /* 同一時刻でも安全停止の要求は優先。 */
+    assert(!s.drive_active);
+    assert(!b_sched_next(&s, B_SCHED_CAN1_RS06, &intent));
+    assert(b_sched_next(&s, B_SCHED_CAN2_C620, &intent));
+    assert(intent.zero_current);
+    b_sched_tick(&s, 0u, true); /* 同一時刻での自動再ARMは許可しない。 */
+    assert(!s.drive_active);
+    puts("PASS duplicate timestamp: DISARM wins; no same-time rearm");
+}
+
+static void test_tx_deadlines_are_injected_not_hardcoded(void)
+{
+    const uint64_t wheel_deadlines[] = {4000u, 8000u};
+    for (unsigned test = 0; test < 2u; ++test) {
+        const uint64_t wheel_limit = wheel_deadlines[test];
+        BTxScheduler s = fresh_scheduler((BSchedConfig){30000u, wheel_limit});
+        b_sched_tick(&s, 0u, true);
+        for (uint64_t t = 2000u; t <= wheel_limit; t += 2000u) {
+            for (uint8_t i = 0u; i < 4u; ++i) {
+                assert(b_sched_feedback(&s, B_SCHED_CAN1_RS06, i, t));
+            }
+            for (uint8_t i = 0u; i < 2u; ++i) {
+                assert(b_sched_feedback(&s, B_SCHED_CAN2_C620, i, t));
+            }
+            b_sched_tick(&s, t, true);
+            if (t < wheel_limit) {
+                assert(!s.fault_requested);
+            } else {
+                assert(s.fault_flags & B_SCHED_FAULT_C620_TX);
+                assert(!(s.fault_flags & B_SCHED_FAULT_RS_TX));
+            }
+        }
+    }
+
+    BTxScheduler s = fresh_scheduler((BSchedConfig){4000u, 30000u});
+    b_sched_tick(&s, 0u, true);
+    for (uint64_t t = 2000u; t <= 4000u; t += 2000u) {
+        for (uint8_t i = 0u; i < 4u; ++i) {
+            assert(b_sched_feedback(&s, B_SCHED_CAN1_RS06, i, t));
+        }
+        for (uint8_t i = 0u; i < 2u; ++i) {
+            assert(b_sched_feedback(&s, B_SCHED_CAN2_C620, i, t));
+        }
+        b_sched_tick(&s, t, true);
+        if (t < 4000u) {
+            assert(!s.fault_requested);
+        } else {
+            assert(s.fault_flags & B_SCHED_FAULT_RS_TX);
+            assert(!(s.fault_flags & B_SCHED_FAULT_C620_TX));
+        }
+    }
+    puts("PASS injected TX deadlines: independent inclusive thresholds");
+}
+
 int main(void)
 {
     test_periods_and_three_mailboxes();
@@ -322,6 +460,12 @@ int main(void)
     test_invalid_initialization_never_reuses_drive_state();
     test_c620_backpressure_and_generation();
     test_manual_disarm_and_fault_latch();
+    test_cached_intents_cannot_bypass_inflight_gate();
+    test_previous_arm_tx_completion_never_recovers_freshness();
+    test_late_c620_completion_does_not_mask_new_generation();
+    test_duplicate_control_tick_is_idempotent();
+    test_same_timestamp_disarm_is_not_ignored();
+    test_tx_deadlines_are_injected_not_hardcoded();
     puts("PASS: issue #5 host CAN scheduler model");
     return 0;
 }

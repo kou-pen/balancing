@@ -112,6 +112,12 @@ void b_sched_tick(BTxScheduler *s, uint64_t now_us, bool drive_allowed)
     if (!s || !s->initialized || !note_time(s, now_us)) {
         return;
     }
+    /* 重複タイマ通知は冪等。ただし駆動許可の立下がりは同時刻でも優先し、
+     * 旧トルク要求を即座に無効化する。立上がりは次の正式ティックまで待つ。 */
+    if (s->tick_valid && now_us == s->last_tick_us &&
+        !(s->drive_active && !drive_allowed)) {
+        return;
+    }
     if (s->tick_valid && s->drive_active &&
         expired(now_us, s->last_tick_us, CONTROL_GAP_FAULT_US)) {
         request_fault(s, B_SCHED_FAULT_CONTROL_GAP);
@@ -124,6 +130,10 @@ void b_sched_tick(BTxScheduler *s, uint64_t now_us, bool drive_allowed)
 
     const bool activate = drive_allowed && !s->fault_requested;
     if (!activate) {
+        if (s->drive_active) {
+            /* HAL受付済みの旧ARM世代が後で完了しても鮮度を回復させない。 */
+            ++s->rs_generation;
+        }
         s->drive_active = false;
         for (unsigned i = 0; i < 4u; ++i) {
             if (s->rs_pending[i]) {
@@ -167,6 +177,29 @@ void b_sched_tick(BTxScheduler *s, uint64_t now_us, bool drive_allowed)
     check_freshness(s, now_us);
 }
 
+/* next()とaccepted()に同じ占有条件を適用する。
+ * accepted()は呼出し側が古いIntentを保持している場合でも再検証する。 */
+static bool rs_previous_generation_inflight(const BTxScheduler *s)
+{
+    for (unsigned m = 0; m < 3u; ++m) {
+        if (s->mail[0][m].active &&
+            s->mail[0][m].intent.generation != s->rs_generation) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool wheel_inflight(const BTxScheduler *s)
+{
+    for (unsigned m = 0; m < 3u; ++m) {
+        if (s->mail[1][m].active) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool b_sched_next(const BTxScheduler *s, BSchedBus bus, BSchedIntent *intent)
 {
     if (!s || !s->initialized || !intent) {
@@ -174,11 +207,8 @@ bool b_sched_next(const BTxScheduler *s, BSchedBus bus, BSchedIntent *intent)
     }
     if (bus == B_SCHED_CAN1_RS06 && s->drive_active && !s->fault_requested) {
         /* 前世代が実メールボックスに残る間は新しい世代を重ねない。 */
-        for (unsigned m = 0; m < 3u; ++m) {
-            if (s->mail[0][m].active &&
-                s->mail[0][m].intent.generation != s->rs_generation) {
-                return false;
-            }
+        if (rs_previous_generation_inflight(s)) {
+            return false;
         }
         for (unsigned i = 0; i < 4u; ++i) {
             if (s->rs_pending[i]) {
@@ -189,10 +219,8 @@ bool b_sched_next(const BTxScheduler *s, BSchedBus bus, BSchedIntent *intent)
         }
     } else if (bus == B_SCHED_CAN2_C620 && s->wheel_pending) {
         /* CAN2の旧共通電流指令との同時滞留も避ける。 */
-        for (unsigned m = 0; m < 3u; ++m) {
-            if (s->mail[1][m].active) {
-                return false;
-            }
+        if (wheel_inflight(s)) {
+            return false;
         }
         *intent = (BSchedIntent){B_SCHED_CAN2_C620, 0xffu,
                                  s->wheel_generation, s->wheel_zero};
@@ -214,12 +242,14 @@ bool b_sched_accepted(BTxScheduler *s, const BSchedIntent *intent,
     if (bus == 0) {
         if (!s->drive_active || s->fault_requested || intent->axis >= 4u ||
             intent->generation != s->rs_generation ||
-            !s->rs_pending[intent->axis] || intent->zero_current) {
+            !s->rs_pending[intent->axis] || intent->zero_current ||
+            rs_previous_generation_inflight(s)) {
             return false;
         }
     } else if (intent->axis != 0xffu ||
                intent->generation != s->wheel_generation ||
-               !s->wheel_pending || intent->zero_current != s->wheel_zero) {
+               !s->wheel_pending || intent->zero_current != s->wheel_zero ||
+               wheel_inflight(s)) {
         return false;
     }
     if (!note_time(s, now_us)) {
