@@ -2,7 +2,7 @@
 """Audit/repair STM32CubeIDE C++ metadata without modifying generated HAL code.
 
 The .ioc remains user-owned by CubeIDE. Use --check after each CubeMX regeneration;
-use --fix only if project metadata dropped the C++ nature/source directory/link script.
+use --fix if project metadata dropped the C++ nature/source directory/link script or App include path.
 """
 
 from __future__ import annotations
@@ -32,6 +32,20 @@ def cxx_metadata(project: str, cproject: str) -> tuple[str, str]:
         cproject = cproject.replace(driver_entry, driver_entry + "\n\t\t\t\t\t\t" + app_entry)
     elif cproject.count(app_entry) != 2:
         raise ValueError("App source configuration is inconsistent")
+
+    # C files moved into App/Src include the hand-written App/Inc headers.
+    # CubeMX may remove this setting during regeneration; --fix restores it.
+    core_include = '<listOptionValue builtIn="false" value="../Core/Inc"/>'
+    app_include = '<listOptionValue builtIn="false" value="../App/Inc"/>'
+    if cproject.count(core_include) != 2:
+        raise ValueError("Expected two C compiler Core/Inc include paths")
+    if cproject.count(app_include) == 0:
+        cproject = cproject.replace(
+            core_include,
+            core_include + "\n\t\t\t\t\t\t\t\t\t" + app_include,
+        )
+    elif cproject.count(app_include) != 2:
+        raise ValueError("App/Inc C include path configuration is inconsistent")
 
     linker = re.compile(
         r'<tool id="(com\.st\.stm32cube\.ide\.mcu\.gnu\.managedbuild\.tool\.cpp\.linker\.\d+)"'

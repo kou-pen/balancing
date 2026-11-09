@@ -9,12 +9,12 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
 add_library(balancing_core STATIC
-    firmware/core/src/balancing_core.c
-    firmware/core/src/balancing_motor_can.c
-    firmware/core/src/balancing_motor_bench.c
+    firmware/f446/balancing_f446/App/Src/balancing_core.c
+    firmware/f446/balancing_f446/App/Src/balancing_motor_can.c
+    firmware/f446/balancing_f446/App/Src/balancing_motor_bench.c
 )
 target_include_directories(balancing_core PUBLIC
-    firmware/core/include
+    firmware/f446/balancing_f446/App/Inc
 )
 target_compile_options(balancing_core PRIVATE
     -Wall -Wextra -Wpedantic
@@ -32,11 +32,11 @@ add_test(NAME balancing_motor_can_tests COMMAND balancing_motor_can_tests)
 # This does not replace a real STM32CubeMX build or an MCU hardware test.
 add_executable(balancing_motor_hal_port_tests
     tests/test_motor_hal_port.c
-    firmware/f446/src/balancing_f446_motor_bench_port.c
+    firmware/f446/balancing_f446/App/Src/balancing_f446_motor_bench_port.c
 )
 target_include_directories(balancing_motor_hal_port_tests PRIVATE
     tests/stubs
-    firmware/f446/include
+    firmware/f446/balancing_f446/App/Inc
 )
 target_link_libraries(balancing_motor_hal_port_tests PRIVATE balancing_core m)
 target_compile_options(balancing_motor_hal_port_tests PRIVATE -Wall -Wextra -Wpedantic)

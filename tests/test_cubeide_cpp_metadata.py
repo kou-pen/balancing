@@ -24,6 +24,18 @@ class CubeIdeMetadataTests(unittest.TestCase):
         )
         self.assertEqual(cxx_metadata(self.project, self.cproject)[1], self.cproject)
 
+    def test_c_compilers_have_app_headers(self) -> None:
+        self.assertEqual(self.cproject.count('value="../App/Inc"'), 2)
+        self.assertEqual(cxx_metadata(self.project, self.cproject)[1], self.cproject)
+
+    def test_missing_app_include_is_repaired(self) -> None:
+        stale = self.cproject.replace(
+            '<listOptionValue builtIn="false" value="../App/Inc"/>', ""
+        )
+        repaired = cxx_metadata(self.project, stale)[1]
+        self.assertEqual(repaired.count('value="../App/Inc"'), 2)
+        self.assertEqual(cxx_metadata(self.project, repaired)[1], repaired)
+
     def test_regeneration_loss_is_repaired(self) -> None:
         option_pattern = (
             r"\s*<option\b(?=[^>]*superClass=\""

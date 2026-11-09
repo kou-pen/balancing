@@ -20,8 +20,7 @@ INCLUDES = [
     MCU / "Drivers" / "STM32F4xx_HAL_Driver" / "Inc" / "Legacy",
     MCU / "Drivers" / "CMSIS" / "Device" / "ST" / "STM32F4xx" / "Include",
     MCU / "Drivers" / "CMSIS" / "Include",
-    ROOT / "firmware" / "core" / "include",
-    ROOT / "firmware" / "f446" / "include",
+    MCU / "App" / "Inc",
 ]
 
 
@@ -34,10 +33,10 @@ def main() -> None:
     commands = json.loads(DB_PATH.read_text(encoding="utf-8"))
     if not isinstance(commands, list):
         raise SystemExit("Invalid CMake compilation database format")
-    # Host CMake retains real build flags for firmware/core and App C++ sources.
+    # Host CMake retains real build flags for App C++ sources.
     sources = sorted((MCU / "Core" / "Src").glob("*.c"))
     # The HAL port has its own host-stub entry. Replace it with real STM32 HAL flags.
-    sources += sorted((ROOT / "firmware" / "f446" / "src").glob("*.c"))
+    sources += sorted((MCU / "App" / "Src").glob("*.c"))
     if not sources:
         raise SystemExit("No generated MCU Core/Src found")
     source_keys = {str(source.resolve()) for source in sources}
