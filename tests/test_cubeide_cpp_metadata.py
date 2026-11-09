@@ -54,6 +54,18 @@ class CubeIdeMetadataTests(unittest.TestCase):
             with self.subTest(filename=filename):
                 self.assertTrue((PROJECT / "App" / "Src" / filename).is_file())
 
+    def test_both_cpp_linkers_explicitly_link_math_library(self) -> None:
+        self.assertEqual(
+            self.cproject.count('<listOptionValue builtIn="false" value="m"/>'), 2
+        )
+        self.assertEqual(cxx_metadata(self.project, self.cproject)[1], self.cproject)
+
+    def test_regeneration_loss_of_math_library_is_repaired(self) -> None:
+        stale = self.cproject.replace('<listOptionValue builtIn="false" value="m"/>', "")
+        repaired = cxx_metadata(self.project, stale)[1]
+        self.assertEqual(repaired.count('value="m"'), 2)
+        self.assertEqual(cxx_metadata(self.project, repaired)[1], repaired)
+
     def test_regeneration_loss_is_repaired(self) -> None:
         option_pattern = (
             r"\s*<option\b(?=[^>]*superClass=\""

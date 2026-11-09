@@ -111,6 +111,47 @@ def cxx_metadata(project: str, cproject: str) -> tuple[str, str]:
     cproject, compiler_count = compiler.subn(require_cpp17, cproject)
     if compiler_count != 2 or cproject.count(f'value="{standard_value}"') != 2:
         raise ValueError("Expected two C++ compiler configurations using GNU++17")
+    # The F446 C11 core now lives inside the CubeIDE App source path and uses
+    # lround/lroundf/fminf/fmaxf from libm. Retain the library through regeneration.
+    math_key = "com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.linker.option.libraries"
+    cpp_linker = re.compile(
+        r'(?P<open><tool id="(?P<id>com\.st\.stm32cube\.ide\.mcu\.gnu\.'
+        r'managedbuild\.tool\.cpp\.linker\.\d+)"'
+        r' name="MCU/MPU G\+\+ Linker"'
+        r' superClass="com\.st\.stm32cube\.ide\.mcu\.gnu\.'
+        r'managedbuild\.tool\.cpp\.linker">)'
+        r'(?P<body>.*?)</tool>',
+        re.DOTALL,
+    )
+    existing_math_lib = '<listOptionValue builtIn="false" value="m"/>'
+    existing_lib_option = re.compile(
+        rf'<option\b(?=[^>]*superClass="{re.escape(math_key)}")[^>]*>.*?</option>',
+        re.DOTALL,
+    )
+
+    def require_cpp_math_link(match: re.Match[str]) -> str:
+        body = match.group("body")
+        found = existing_lib_option.search(body)
+        if found:
+            option = found.group(0)
+            if existing_math_lib not in option:
+                updated_option = option.replace("</option>", existing_math_lib + "</option>")
+                body = body[: found.start()] + updated_option + body[found.end() :]
+        else:
+            option = (
+                f'<option id="{match.group("id")}.libraries" name="Libraries (-l)" '
+                f'superClass="{math_key}" valueType="libs">'
+                f"{existing_math_lib}</option>"
+            )
+            body += "\n\t\t\t\t\t\t\t\t" + option
+        return match.group("open") + body + "</tool>"
+
+    cproject, linker_count = cpp_linker.subn(require_cpp_math_link, cproject)
+    if linker_count != 2 or cproject.count(f'superClass="{math_key}"') != 2:
+        raise ValueError("Expected two C++ linkers explicitly linking libm")
+    if cproject.count(existing_math_lib) != 2:
+        raise ValueError("Missing C++ libm on Debug or Release")
+
     return project, cproject
 
 
