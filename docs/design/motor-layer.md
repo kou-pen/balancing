@@ -5,6 +5,8 @@
 
 対象仕様：[RS06](../specs/protocols/rs06_can1.md)、[C620](../specs/protocols/c620_can2.md)、[F446](../specs/boards/f446_control.md)、[安全・操作](../specs/behavior/robot_operation.md)。
 
+通常運転向けのHAL非依存スケジューラは、単軸ベンチ試運転とは別の責務として [CAN送信スケジューラの設計・保守資料](can-scheduler.md) に記載する。Issue #5 のモデルは2/4 ms要求と送信完了監視をホストで検証するもので、実機向けCAN送信・ARM機構へは未接続。
+
 ## ファイルと責務
 
 | ファイル | 役割 |

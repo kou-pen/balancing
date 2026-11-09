@@ -1,0 +1,116 @@
+# CAN送信スケジューラ：責務・時系列・保守手順（Issue #5）
+
+**実装範囲：** ホスト実行できるC11の送信要求モデル。HAL、実機CAN、モータ駆動、ARM処理、既存の安全状態機械には接続していない。  
+**仕様：** `BOARD-F446-001`、`PROTO-RS06-001`、`PROTO-C620-001`、MOTOR-189〜195。  
+**依存：** PR #16 の `firmware/f446/balancing_f446/App` 一元配置に基づく。PR #16 は現時点で未マージ。
+
+## 1. 目的と禁止事項
+
+F446で実行する500 Hz制御ティックを基準に、CAN1のRS06×4へ250 Hz、CAN2のC620共通フレームへ500 Hzの**送信要求**を発行する。CAN送信の受付と完了、各モータの新しい受信報告は**別々の事象**である。外部HALが割り込んでも最新世代のみを扱い、古いトルクをソフトウェアに蓄積しないことを確認する。
+
+実装は `App/Inc/balancing_tx_scheduler.h` と `App/Src/balancing_tx_scheduler.c`。テストは `tests/test_tx_scheduler.c`。このAPIはモータを動かす機能を**持たない**。実際のトルク生成、CAN-ID符号化、HAL割込み接続、ドライバ許可、非常停止の保証を含めない。
+
+## 2. 時系列：何が2 ms / 4 msなのか
+
+| 仮想時刻 | 500 Hz control tick | CAN2 0x200（C620共通） | CAN1 RS06（4台） |
+|---|---|---|---|
+| 0 ms | 1回目 | 最新値1件要求 | 世代1として4台分要求 |
+| 2 ms | 2回目 | 最新値1件要求 | 新規要求なし |
+| 4 ms | 3回目 | 最新値1件要求 | 世代2として4台分要求 |
+| 6 ms | 4回目 | 最新値1件要求 | 新規要求なし |
+| 8 ms | 5回目 | 最新値1件要求 | 世代3として4台分要求 |
+
+この表は**要求時刻**を示し、実バスでの完了時刻や250 Hz達成を保証しない。0 msは起動後最初のモデル制御ティックに相当する。4 ms周期は初回ティックの時刻から位相固定し、遅延しても過去周期の分を「まとめ送り」しない。
+
+### CAN1 3メールボックスで4台を扱う
+
+```mermaid
+sequenceDiagram
+    participant T as 制御ティック
+    participant S as C11 Scheduler
+    participant H as HAL（将来の接続先）
+    participant I as CAN1 TX完了IRQ
+    T->>S: tick(t=0), 4件の最新要求を生成
+    S->>H: next(axis0), HAL受付成功
+    H-->>S: accepted(axis0, mailbox0)
+    S->>H: next(axis1), HAL受付成功
+    H-->>S: accepted(axis1, mailbox1)
+    S->>H: next(axis2), HAL受付成功
+    H-->>S: accepted(axis2, mailbox2)
+    Note over S,H: axis3は未受付の1件だけ保持（FIFOに積まない）
+    H-->>I: mailbox0のCAN送信完了
+    I->>S: completed(mailbox0)
+    S->>H: next(axis3), 空いたmailbox0へ
+    H-->>S: accepted(axis3, mailbox0)
+    I->>S: completed(mailbox0)
+    Note over S,H: 4 ms境界で未受付の古い要求は破棄
+```
+
+- **送信要求：** `b_sched_next()` は対象と世代を提示するだけ。HAL BUSYなら `b_sched_accepted()` を呼ばない。
+- **受付：** `b_sched_accepted()` は0〜2の実メールボックス占有を記録する。**完了時刻は更新しない**。
+- **送信完了：** 対応する `b_sched_completed()` で占有を解除し、その世代が現在でも有効な場合だけ対象軸のTX完了時刻を記録する。
+- **新世代：** 4 ms後、古い未受付の要求は破棄。**HALに受け付けられた旧フレームは物理的に取り消したことにならない**。旧世代がメールボックスに残る間は新世代のRS06要求を進めない。旧世代の遅い完了は最新のTX監視時刻として使用しない。
+- **CAN2：** 2 ms周期で最新の共通電流要求へ置換。実メールボックス内の旧CAN2指令が完了するまでは次を重ねない。DISARMED/FAULT時は`zero_current=true`。これはまだ**0 A CANフレームではなく抽象的な要求**である。
+
+## 3. 実装の所有権
+
+| データ | 所有者 | 不変条件 |
+|---|---|---|
+| `rs_pending[4]`、`wheel_pending` | Scheduler | 未受付の最新世代のみ。古い待ち行列を保持しない |
+| `rs_generation`、`wheel_generation` | Scheduler | 要求が更新された世代を識別。旧世代のHAL受付は拒否 |
+| `mail[2][3]` | Scheduler（HAL模擬） | 送信完了まで占有。バスごとに最大3件 |
+| `rs_tx_done_us[4]`、`wheel_tx_done_us` | Scheduler | **送信完了通知時のみ**更新 |
+| `rs_rx_us[4]`、`wheel_rx_us[2]` | Scheduler | 有効な**新規**フィードバック時のみ更新 |
+| `fault_requested`、`fault_flags` | Scheduler | 検出したFAULT要求をラッチ。自動解除しない |
+| DISARMED/BALANCING/FAULT | 既存の`BModeMachine` | **SchedulerはBModeMachineを変更しない** |
+| 駆動許可、電流・トルク上限 | 上位Safety／制御／配分器 | Schedulerは設定・ゲート・符号化を行わない |
+
+## 4. FAULT判定：既定値と未確定値を分ける
+
+| 事象 | ホストモデルの処理 | 根拠 |
+|---|---|---|
+| 500 Hz制御更新の差が**6 ms以上**（駆動許可中） | `B_SCHED_FAULT_CONTROL_GAP` | MOTOR決定、既存状態機械と同条件 |
+| 単調時刻の逆行（駆動許可中） | `B_SCHED_FAULT_CLOCK` | 時計の一貫性 |
+| RS06一軸の受信鮮度**30 ms以上** | `B_SCHED_FAULT_RS_RX` | `PROTO-RS06-001` |
+| C620一軸の受信鮮度**20 ms以上** | `B_SCHED_FAULT_WHEEL_RX` | `PROTO-C620-001` |
+| RS06各軸のTX完了が未到達／一定時間停止 | `B_SCHED_FAULT_RS_TX` | 時間閾値は**未決定** |
+| C620共通指令のTX完了が未到達／一定時間停止 | `B_SCHED_FAULT_C620_TX` | 時間閾値は**未決定** |
+| CANバスオフ通知 | `B_SCHED_FAULT_BUS_OFF` | 安全仕様 |
+
+`BSchedConfig` の `rs_tx_timeout_us` と `c620_tx_timeout_us` は0を拒否する。**ホストテストで使用する9,000 µs / 6,000 µsなどは仮想故障注入専用であり、実機の安全閾値ではない。** 実機バス負荷・CAN競合・HAL callback遅延を確認して、安全担当の承認を受けてから固定する。
+
+FAULT検出時にはRS06の新規送信要求を無効化し、CAN2にゼロ要求を残す。ただしこのコードはHAL送信・RS06 Type4停止要求を生成せず、既にHWに受け付けられた非ゼロ指令を停止できない。**本モデル単独に安全停止を任せてはいけない。** 既存の安全状態機械、物理非常停止、電源系の停止手段を後で接続する必要がある。
+
+## 5. 将来HALに接続するときのレビュー順序
+
+1. `main.c` / `application.cpp` の2 ms TIM7通知を1つの単調増加µs時刻に変換する。**HAL_GetTickのms値をそのまま渡さない**。割込みと制御ループで同じ時間基準・イベント順序を維持する。
+2. `b_mode_step()` が出す `drive_allowed` と安全な検証済みパラメータだけを入力する。ARM待機中は`drive_allowed=false`。受信はフレームの新規性を確認してから `b_sched_feedback()` に渡す。
+3. `b_sched_next()` の抽象要求を、上位で検証済みの目標トルク/電流と既存codecでCANフレームに変換する。**モデル自身に電流・トルク値を追加しない**。
+4. 実HALがメールボックス番号を返した場合に限り `b_sched_accepted()` を呼ぶ。**HAL受付直後にIRQが先行する競合を防ぐため、HAL受付とモデルの記録を原子的にするかIRQ実行順序を制御する**。ここは実機接続時の設計レビュー必須項目。
+**設計上の要注意点：** 実際のCAN1はRS06のType1トルクだけでなく、Type3有効化・Type4停止なども使用する。これらの送信が別経路でメールボックスを占有すると、現行モデルの`mail[0][0..2]`管理と実HALの状態が食い違う。**実HAL接続前に、CAN1の全送信フレームを1つの調停者で管理するか、緊急停止を優先できる明示的な占有・キャンセル手順を設計すること。** 未完了Type1が残っているとき、単にソフトウェアの要求を破棄してもType4が先に届く保証はない。
+
+5. HAL CAN TX mailbox0/1/2 complete callbackから `b_sched_completed()` に実メールボックス番号と同じ単調時刻を渡す。Tx abort/error/Bus-offやCANバス占有の実挙動を別途設計する。
+6. `fault_requested` は上位Safetyへ伝播して`BModeMachine`のFAULT要求へ結合する（**現段階では未接続**）。独立した物理非常停止を維持する。
+7. 実機のロジックアナライザ/CANログで、各軸の**要求／HAL受付／実送信完了／新規受信**の時間差、CAN1 3メールボックス滞留、CAN2 0 A周期、Bus-off時の停止手段を計測する。
+
+## 6. 再現テスト
+
+```sh
+python3 tools/run_host_tests.py
+cmake -S . -B build/host-cmake
+cmake --build build/host-cmake
+ctest --test-dir build/host-cmake --output-on-failure
+```
+
+`tests/test_tx_scheduler.c` が検証する点：2/4 ms要求時刻、3枠と4件目、次世代への古い要求の引き継ぎ禁止、CAN2単一in-flight、受信正常時のTX完了欠落、RS06各軸TX監視、20/30 ms受信断、6 ms停止、時刻逆行、通常DISARM、FAULTラッチ、Bus-off。
+
+ログのPASSは**仮想時計・模擬メールボックスでの論理挙動のみ**。CubeIDEによる更新後のARMクロスビルド、実バスでの期限、割込みレース、MCU CPU負荷、物理停止能力、実機の安全な出力はまだ未検証。
+
+## 7. レビュー時の打ち返し（未決定事項）
+
+**確認している判断は「RS06／C620のTX完了監視閾値を今ここで固定するか」です。** 本Issueの実装とテストでは閾値を外部入力としたため、数値を決めなくてもホスト検証は進められる。
+
+- **A（推奨）**：現時点で数値を固定しない。実CAN測定後にRS06/C620を別々に決める。今のモデルを実機接続せず検証を続ける。
+- **B**：今、暫定閾値を仮定して実機FWの候補値まで設計する。ただしこれは実測がなく、実機駆動許可には使用しない。
+
+期待する返答例：**「Aで進めて」**。Bの場合は、根拠と適用範囲を明記して再検討する。回答まではAを前提に安全なホスト作業のみ進める。
