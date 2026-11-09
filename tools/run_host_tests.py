@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "build" / "host"
-F446_APP = F446_APP
+F446_APP = ROOT / "firmware" / "f446" / "balancing_f446" / "App"
 OUT.mkdir(parents=True, exist_ok=True)
 
 common = [
