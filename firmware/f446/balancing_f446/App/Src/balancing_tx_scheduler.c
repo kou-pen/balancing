@@ -58,13 +58,18 @@ static bool expired(uint64_t now_us, uint64_t since_us, uint64_t limit_us)
 
 bool b_sched_init(BTxScheduler *s, const BSchedConfig *config)
 {
-    if (!s || !config || config->rs_tx_timeout_us == 0u ||
+    if (!s) {
+        return false;
+    }
+    /* 以前の有効設定が残っても、再初期化失敗時には必ず無効状態にする。 */
+    memset(s, 0, sizeof(*s));
+    if (!config || config->rs_tx_timeout_us == 0u ||
         config->c620_tx_timeout_us == 0u) {
         return false;
     }
-    memset(s, 0, sizeof(*s));
     s->config = *config;
     s->wheel_zero = true;
+    s->initialized = true;
     return true;
 }
 
@@ -104,7 +109,7 @@ static void check_freshness(BTxScheduler *s, uint64_t now_us)
 
 void b_sched_tick(BTxScheduler *s, uint64_t now_us, bool drive_allowed)
 {
-    if (!s || !note_time(s, now_us)) {
+    if (!s || !s->initialized || !note_time(s, now_us)) {
         return;
     }
     if (s->tick_valid && s->drive_active &&
@@ -164,7 +169,7 @@ void b_sched_tick(BTxScheduler *s, uint64_t now_us, bool drive_allowed)
 
 bool b_sched_next(const BTxScheduler *s, BSchedBus bus, BSchedIntent *intent)
 {
-    if (!s || !intent) {
+    if (!s || !s->initialized || !intent) {
         return false;
     }
     if (bus == B_SCHED_CAN1_RS06 && s->drive_active && !s->fault_requested) {
@@ -199,7 +204,7 @@ bool b_sched_next(const BTxScheduler *s, BSchedBus bus, BSchedIntent *intent)
 bool b_sched_accepted(BTxScheduler *s, const BSchedIntent *intent,
                       uint8_t mailbox, uint64_t now_us)
 {
-    if (!s || !intent || mailbox >= 3u) {
+    if (!s || !s->initialized || !intent || mailbox >= 3u) {
         return false;
     }
     const int bus = bus_slot(intent->bus);
@@ -235,7 +240,7 @@ bool b_sched_completed(BTxScheduler *s, BSchedBus bus,
                        uint8_t mailbox, uint64_t now_us)
 {
     const int slot = bus_slot(bus);
-    if (!s || slot < 0 || mailbox >= 3u || !s->mail[slot][mailbox].active ||
+    if (!s || !s->initialized || slot < 0 || mailbox >= 3u || !s->mail[slot][mailbox].active ||
         !note_time(s, now_us)) {
         return false;
     }
@@ -261,7 +266,7 @@ bool b_sched_feedback(BTxScheduler *s, BSchedBus bus,
                       uint8_t axis, uint64_t now_us)
 {
     const int slot = bus_slot(bus);
-    if (!s || slot < 0 || (slot == 0 && axis >= 4u) ||
+    if (!s || !s->initialized || slot < 0 || (slot == 0 && axis >= 4u) ||
         (slot == 1 && axis >= 2u) || !note_time(s, now_us)) {
         return false;
     }
@@ -283,7 +288,7 @@ bool b_sched_feedback(BTxScheduler *s, BSchedBus bus,
 
 void b_sched_bus_off(BTxScheduler *s, uint64_t now_us)
 {
-    if (s && note_time(s, now_us)) {
+    if (s && s->initialized && note_time(s, now_us)) {
         request_fault(s, B_SCHED_FAULT_BUS_OFF);
     }
 }

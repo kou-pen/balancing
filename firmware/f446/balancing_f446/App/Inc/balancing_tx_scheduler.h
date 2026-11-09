@@ -57,6 +57,7 @@ typedef struct {
 /** @brief 静的に配置する送信要求モデル。1バス3メールボックス。 */
 typedef struct {
     BSchedConfig config;
+    bool initialized; /**< 設定が有効な初期化完了までは送信要求を拒否する。 */
     bool tick_valid;
     bool event_valid;
     bool drive_active;

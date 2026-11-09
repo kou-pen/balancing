@@ -231,6 +231,21 @@ static void test_control_gap_and_clock_regression(void)
     puts("PASS control faults: exact 6ms gap and clock regression");
 }
 
+static void test_invalid_initialization_never_reuses_drive_state(void)
+{
+    BTxScheduler s = fresh_scheduler(TEST_CONFIG);
+    b_sched_tick(&s, 0u, true);
+    assert(s.drive_active && s.initialized);
+    assert(!b_sched_init(&s, &(BSchedConfig){0u, 9000u}));
+    assert(!s.initialized && !s.drive_active);
+    b_sched_tick(&s, 2000u, true); /* 初期化失敗後の要求は無効。 */
+    BSchedIntent send;
+    assert(!b_sched_next(&s, B_SCHED_CAN1_RS06, &send));
+    assert(!b_sched_next(&s, B_SCHED_CAN2_C620, &send));
+    assert(!b_sched_feedback(&s, B_SCHED_CAN1_RS06, 0u, 2000u));
+    puts("PASS fail closed: invalid re-init disables scheduling");
+}
+
 static void test_disarmed_zero_and_busoff(void)
 {
     BTxScheduler s;
@@ -304,6 +319,7 @@ int main(void)
     test_rx_timeout_separate_from_tx();
     test_control_gap_and_clock_regression();
     test_disarmed_zero_and_busoff();
+    test_invalid_initialization_never_reuses_drive_state();
     test_c620_backpressure_and_generation();
     test_manual_disarm_and_fault_latch();
     puts("PASS: issue #5 host CAN scheduler model");
