@@ -59,6 +59,44 @@ def cxx_metadata(project: str, cproject: str) -> tuple[str, str]:
         != 2
     ):
         raise ValueError("Both C++ linkers must explicitly use the FLASH linker script")
+
+    # Without an explicit setting CubeIDE currently invokes GNU++14, even though
+    # the application contract requires GNU++17. Keep both build configurations
+    # stable across CubeMX metadata regeneration.
+    standard_key = (
+        "com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.option.languagestandard"
+    )
+    standard_value = standard_key + ".value.gnupp17"
+    compiler = re.compile(
+        r'(?P<open><tool id="(?P<id>com\.st\.stm32cube\.ide\.mcu\.gnu\.'
+        r'managedbuild\.tool\.cpp\.compiler\.\d+)"'
+        r' name="MCU/MPU G\+\+ Compiler"'
+        r' superClass="com\.st\.stm32cube\.ide\.mcu\.gnu\.'
+        r'managedbuild\.tool\.cpp\.compiler">)'
+        r"(?P<body>.*?)</tool>",
+        re.DOTALL,
+    )
+    existing_standard = re.compile(
+        rf'<option\b(?=[^>]*superClass="{re.escape(standard_key)}")[^>]*/>'
+    )
+
+    def require_cpp17(match: re.Match[str]) -> str:
+        option = (
+            f'<option id="{match.group("id")}.languagestandard" '
+            'name="Language standard" '
+            f'superClass="{standard_key}" value="{standard_value}" '
+            'valueType="enumerated"/>'
+        )
+        body = match.group("body")
+        if existing_standard.search(body):
+            body = existing_standard.sub(option, body)
+        else:
+            body = "\n\t\t\t\t\t\t\t\t" + option + body
+        return match.group("open") + body + "</tool>"
+
+    cproject, compiler_count = compiler.subn(require_cpp17, cproject)
+    if compiler_count != 2 or cproject.count(f'value="{standard_value}"') != 2:
+        raise ValueError("Expected two C++ compiler configurations using GNU++17")
     return project, cproject
 
 

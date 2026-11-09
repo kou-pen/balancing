@@ -2,7 +2,7 @@
 
 **更新日：** 2026-11-09  
 **適用：** F446制御基板、`firmware/f446/balancing_f446`。  
-**状態：** CubeMX再生成済みのmain.cへC++入口とTIM7の500 Hzイベント処理を追加済み（2026-11-09）。.project/.cprojectにC++ nature、AppソースパスとC++リンクスクリプトを反映。ホスト試験合格。**STM32向けクロスビルドと実機書込みは未実施。**
+**状態：** CubeMX再生成済みのmain.cへC++入口とTIM7の500 Hzイベント処理を追加済み（2026-11-09）。.project/.cprojectにC++ nature、Appソースパス、GNU++17設定とC++リンクスクリプトを反映。**CubeIDE 1.19.0のヘッドレスF446 DebugクロスビルドでELF生成PASS（0エラー・0警告）**。実機書込み・CAN駆動層統合は未実施。
 
 ## 設計方針
 
@@ -23,9 +23,9 @@ balancing/firmware/f446/balancing_f446/
 
 ## CubeIDE側の操作
 
-1. `.ioc`から最初の`Generate Code`を実行する。**現在の`.ioc`はピン／周辺機能未設定なので、その設定と生成が先。**
+1. `.ioc`には現状HSE 16 MHz、CAN1/2各1 Mbps、I2C1、TIM7、USB Host等の設定がありコード生成済み。変更時はピン配置と実基板の整合を確認し、CubeMXの`Generate Code`を実行する。**CAN開始/フィルタ/通知は未実装のまま。**
 2. 新規プロジェクト作成時は**Targeted Language: C++**。すでにCで作成した場合はProject Explorerでプロジェクト右クリック→**Convert to C++**（画面・バージョンにより表示が異なる）。
-3. `Project → Properties → C/C++ Build → Settings`でC++コンパイラを有効にし、`-std=c++17`を設定する。Cソースは従来どおりC11でビルドする。**リンクにarm-none-eabi-g++を使用**する。
+3. `Project → Properties → C/C++ Build → Settings`でC++コンパイラを有効にし、Debug/Releaseともに**GNU++17（`-std=gnu++17`）**を設定する。現行`.cproject`には明示設定済みで、`tools/sync_cubeide_cpp.py --fix`でも再生成後に復元できる。CソースはGNU11、リンクには`arm-none-eabi-g++`を使用する。
 4. IDEでプロジェクトをRefresh（F5）。`App/Src/application.cpp`がプロジェクト内に見えていてビルド対象であることを確認する。現在はソースに相対インクルードを指定したため、App/Incの追加インクルードパスは不要。
 5. 後でモータCANレイヤーを結合する時は、`firmware/core/include`と`firmware/f446/include`をInclude Pathsに追加する。`firmware/core/src`と`firmware/f446/src`の既存コードは重複コピーせずにリンク元として登録する。現状はC++の非駆動骨組みのみがMCUプロジェクトのビルド対象。
 6. `main.c`はリネームしない。**以下は現在の生成済みmain.cのUSER CODEへ適用済み**。今後の再生成で残っていることを確認する。
@@ -108,7 +108,17 @@ python3 tools/run_host_tests.py
 python3 tools/validate_specs.py
 ```
 
-上記ではC++17アプリがCリンケージのAPIから呼び出せることを検証する。**ホストテストの成功はCubeIDEが生成したMCUプロジェクトのビルド成功を意味しない**。
+上記ではC++17アプリがCリンケージのAPIから呼び出せることを検証する。これに加えて次の**STM32CubeIDEヘッドレスビルドを実際に実施しPASS**した（2026-11-09、CubeIDE 1.19.0）。ホスト試験とクロスビルドは別々の合否として扱う。
+
+```sh
+cd /home/dev-admin/chatgpt-workspace/balancing
+/opt/st/stm32cubeide_1.19.0/headless-build.sh \
+  -data "$PWD/build/cubeide-headless-workspace" \
+  -import "$PWD/firmware/f446/balancing_f446" \
+  -build balancing_f446/Debug
+```
+
+ビルド結果はELF生成、0エラー・0警告、`text=15708 B`、`data=12 B`、`bss=2820 B`。`application.cpp`は`-std=gnu++17`でコンパイルされた。ビルド対象は**非駆動アプリ骨組み**であり、RS06/C620のモータCAN層・実機CAN受信/送信経路はまだリンクしていない。詳細は `docs/verification/f446-crossbuild-20261109.md`。
 
 ## 再生成時の運用
 
@@ -129,4 +139,4 @@ python3 tools/sync_cubeide_cpp.py --fix   # .project/.cprojectのC++構成だけ
 
 現在の`main.c`はCANの受信フィルタ／CAN Start／モータ制御ポートを**まだ有効化していない**。500 HzのC++アプリ呼び出しだけが動作する段階。GPIO `EMS_OUT_N`の有効極性・USBのVBUS方式は基板実物で確認すること。
 
-CubeIDEでの`Project → Build Project`はまだ実施されていない。IDEを開いたままプロジェクト設定を変更した場合は、プロジェクトをRefresh（F5）し、必要ならいったん閉じて開き直して設定を読み込ませる。
+CubeIDE 1.19.0のヘッドレスF446 DebugビルドはPASS。GUIの`Project → Build Project`と実機ビルド/書込みは未実施。IDEを開いたままプロジェクト設定を変更した場合は、プロジェクトをRefresh（F5）し、必要ならいったん閉じて開き直して設定を読み込ませる。
