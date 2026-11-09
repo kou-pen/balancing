@@ -36,6 +36,26 @@ class CubeIdeMetadataTests(unittest.TestCase):
         self.assertEqual(repaired.count('value="../App/Inc"'), 2)
         self.assertEqual(cxx_metadata(self.project, repaired)[1], repaired)
 
+    def test_firmware_sources_live_inside_cubeide_project(self) -> None:
+        root = PROJECT.parents[2]
+        for old_path in (
+            "firmware/core",
+            "firmware/f446/include",
+            "firmware/f446/src",
+            "firmware/examples",
+        ):
+            with self.subTest(old_path=old_path):
+                self.assertFalse((root / old_path).exists())
+
+        for filename in (
+            "balancing_core.c",
+            "balancing_motor_can.c",
+            "balancing_motor_bench.c",
+            "balancing_f446_motor_bench_port.c",
+        ):
+            with self.subTest(filename=filename):
+                self.assertTrue((PROJECT / "App" / "Src" / filename).is_file())
+
     def test_regeneration_loss_is_repaired(self) -> None:
         option_pattern = (
             r"\s*<option\b(?=[^>]*superClass=\""
