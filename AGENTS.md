@@ -33,7 +33,7 @@
 - **公開APIの宣言**に`/** ... */`形式で記述する。単純な非公開補助関数に冗長なコメントを付けない。
 - `@brief`、必要に応じて`@param`、`@return`、`@pre`、`@warning`を使用し、説明文は**日本語**とする。
 - 公開APIには最低1つの`@spec{仕様ID}`を記述する。仕様本文をコードコメントへ丸ごと複写しない。
-- 記述例：`firmware/examples/documentation_example.h`。
+- 記述例：`firmware/f446/balancing_f446/App/Examples/documentation_example.h`。
 - **C識別子、Doxygenコマンド、SI単位、通信フレームの識別子は原表記を維持**する。訳すのは人間向けの説明文。
 
 ## 図表の更新

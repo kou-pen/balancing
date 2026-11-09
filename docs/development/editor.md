@@ -61,7 +61,7 @@ python3 tools/prepare_clangd.py
 
 コンパイルDBは生成物なのでbuild/とともにGit管理しない。生成元CMake設定と追加スクリプトを管理する。
 
-**注意:** STM32Cube生成物のCore/とDrivers/はCubeMXが管理し、手動編集はUSER CODEブロックの範囲に限定する。clang-formatの保存時整形がUSER CODE外の自動生成部分に作用するおそれがあるため、**生成コードの整形は無効**にし、利用者が管理するApp/とfirmware/core/を整形する。
+**注意:** STM32Cube生成物のCore/とDrivers/はCubeMXが管理し、手動編集はUSER CODEブロックの範囲に限定する。clang-formatの保存時整形がUSER CODE外の自動生成部分に作用するおそれがあるため、**生成コードの整形は無効**にし、利用者が管理する`firmware/f446/balancing_f446/App/`を整形する。
 
 ## VS Codeタスク
 

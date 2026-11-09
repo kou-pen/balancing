@@ -5,8 +5,8 @@
 
 ## リポジトリの範囲
 
-- firmware/core/：STM32Cubeに依存しないC11制御・CAN層
-- firmware/f446/：制御基板のSTM32CubeIDEプロジェクトとC++アプリケーション
+- firmware/f446/balancing_f446/App/：C11制御・CAN層、HAL接続、C++アプリを含むユーザー管理コード
+- firmware/f446/balancing_f446/Core/・Drivers/：CubeMX生成コードとHAL/CMSIS
 - firmware/f303/：電源基板の開発領域（現時点では未完成）
 - docs/：仕様・設計決定・TODO・試運転手順
 - tests/：ホスト側の単体・回帰テスト

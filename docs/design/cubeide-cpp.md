@@ -6,7 +6,7 @@
 
 ## 設計方針
 
-CubeMXは`main.c`や`can.c`などCソースを生成する。**これらを`.cpp`にリネームしない**。機能クラス・モータ制御・LQR/VMC・状態推定は自動生成外の`App/Src/*.cpp`に作成する。
+CubeMXは`main.c`や`can.c`などCソースを生成する。**これらを`.cpp`にリネームしない**。機能クラスは自動生成外の`App/Src/*.cpp`に、C11制御コアとCAN処理は`App/Src/*.c`に置く。公開ヘッダーは`App/Inc`へ集約する。
 
 ```text
 balancing/firmware/f446/balancing_f446/
@@ -14,9 +14,20 @@ balancing/firmware/f446/balancing_f446/
 ├── Core/Inc/main.h             ← CubeMXが生成
 ├── Core/Src/main.c             ← Cのまま：USER CODE節からC++入口へ
 ├── Drivers/                    ← HAL C（CubeMX生成）
-└── App/                        ← 自分で管理するC++。自動生成対象外
-    ├── Inc/balancing_app_bridge.h
-    └── Src/application.cpp
+└── App/                        ← 人が管理するC/C++（自動生成対象外）
+    ├── Inc/
+    │   ├── balancing_app_bridge.h
+    │   ├── balancing_core.h
+    │   ├── balancing_motor_can.h
+    │   ├── balancing_motor_bench.h
+    │   └── balancing_f446_motor_bench_port.h
+    ├── Src/
+    │   ├── application.cpp
+    │   ├── balancing_core.c
+    │   ├── balancing_motor_can.c
+    │   ├── balancing_motor_bench.c
+    │   └── balancing_f446_motor_bench_port.c
+    └── Examples/documentation_example.h
 ```
 
 **同じファイルの`USER CODE BEGIN/END`マーカー内だけを手修正**する。C++側の`application.cpp`は再生成せず保持する。Cの公開関数は`extern "C"`で名前修飾を防ぐ。
@@ -26,8 +37,8 @@ balancing/firmware/f446/balancing_f446/
 1. `.ioc`には現状HSE 16 MHz、CAN1/2各1 Mbps、I2C1、TIM7、USB Host等の設定がありコード生成済み。変更時はピン配置と実基板の整合を確認し、CubeMXの`Generate Code`を実行する。**CAN開始/フィルタ/通知は未実装のまま。**
 2. 新規プロジェクト作成時は**Targeted Language: C++**。すでにCで作成した場合はProject Explorerでプロジェクト右クリック→**Convert to C++**（画面・バージョンにより表示が異なる）。
 3. `Project → Properties → C/C++ Build → Settings`でC++コンパイラを有効にし、Debug/Releaseともに**GNU++17（`-std=gnu++17`）**を設定する。現行`.cproject`には明示設定済みで、`tools/sync_cubeide_cpp.py --fix`でも再生成後に復元できる。CソースはGNU11、リンクには`arm-none-eabi-g++`を使用する。
-4. IDEでプロジェクトをRefresh（F5）。`App/Src/application.cpp`がプロジェクト内に見えていてビルド対象であることを確認する。現在はソースに相対インクルードを指定したため、App/Incの追加インクルードパスは不要。
-5. 後でモータCANレイヤーを結合する時は、`firmware/core/include`と`firmware/f446/include`をInclude Pathsに追加する。`firmware/core/src`と`firmware/f446/src`の既存コードは重複コピーせずにリンク元として登録する。現状はC++の非駆動骨組みのみがMCUプロジェクトのビルド対象。
+4. IDEでプロジェクトをRefresh（F5）。`App/Src/application.cpp`がプロジェクト内に見えていてビルド対象であることを確認する。再配置したCソースのため`App/Inc`をCコンパイラのInclude Paths（Debug/Release両方）に登録済み。C++ブリッジは従来の相対includeのまま。
+5. C11制御コア・CAN codec・HAL試運転アダプタは`App/Src`へ集約した。CubeIDEでは`App`ソースパス配下がビルド対象になるため、**移動前とビルド対象が異なる**。ただしアプリからモータ駆動処理は呼ばず、CANの開始/フィルタ/割込みは未接続。構成変更後のCubeIDEクロスビルドは未検証。
 6. `main.c`はリネームしない。**以下は現在の生成済みmain.cのUSER CODEへ適用済み**。今後の再生成で残っていることを確認する。
 
 ## main.cへの最小限の追加
@@ -95,8 +106,8 @@ balancing_app_poll();
 |---|---|
 | `App/Inc/balancing_app_bridge.h` | Cの`main.c`が呼べる入口API |
 | `App/Src/application.cpp` | 静的なC++ Applicationクラスと入口の実装 |
-| `firmware/core/src/balancing_motor_can.c` | 既存のRS06/C620 CAN codec（C11のまま利用） |
-| `firmware/f446/src/balancing_f446_motor_bench_port.c` | 既存のHAL接続（CubeMXへ後で結合） |
+| `firmware/f446/balancing_f446/App/Src/balancing_motor_can.c` | 既存のRS06/C620 CAN codec（C11のまま利用） |
+| `firmware/f446/balancing_f446/App/Src/balancing_f446_motor_bench_port.c` | 既存のHAL接続（配置済み・呼出し未接続） |
 
 現在のC++ Applicationは**非駆動の骨組み**で、初期化、500 Hz制御周期の受け口、非ブロッキングポーリングだけを持つ。モータ出力はまだ接続しない。検証済みのC11モジュールを先に不要な書換えはしない。
 
@@ -140,3 +151,7 @@ python3 tools/sync_cubeide_cpp.py --fix   # .project/.cprojectのC++構成だけ
 現在の`main.c`はCANの受信フィルタ／CAN Start／モータ制御ポートを**まだ有効化していない**。500 HzのC++アプリ呼び出しだけが動作する段階。GPIO `EMS_OUT_N`の有効極性・USBのVBUS方式は基板実物で確認すること。
 
 CubeIDE 1.19.0のヘッドレスF446 DebugビルドはPASS。GUIの`Project → Build Project`と実機ビルド/書込みは未実施。IDEを開いたままプロジェクト設定を変更した場合は、プロジェクトをRefresh（F5）し、必要ならいったん閉じて開き直して設定を読み込ませる。
+
+## 2026-11-09のソース統合後の検証境界
+
+以前のCubeIDEクロスビルドPASSは**ソース統合前**の記録。移動後のホスト試験・CubeIDE Debug/Releaseビルドは**NOT RUN**。新構成で再実行し、モータ駆動コードが自動実行されていないことを確認する。[検証手順](../verification/f446-source-layout.md)を参照。
