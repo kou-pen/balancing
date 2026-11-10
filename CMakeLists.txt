@@ -60,6 +60,12 @@ target_link_libraries(balancing_operator_input_tests PRIVATE balancing_core m)
 target_compile_options(balancing_operator_input_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_operator_input_tests COMMAND balancing_operator_input_tests)
 
+# ACCGYRO static calibration and pitch/roll complementary math, no real I2C.
+add_executable(balancing_attitude_filter_tests tests/test_attitude_filter.c)
+target_link_libraries(balancing_attitude_filter_tests PRIVATE balancing_core m)
+target_compile_options(balancing_attitude_filter_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME balancing_attitude_filter_tests COMMAND balancing_attitude_filter_tests)
+
 # F446 HAL adapter is host-compiled with an explicit test-only HAL shim.
 # This does not replace a real STM32CubeMX build or an MCU hardware test.
 add_executable(balancing_motor_hal_port_tests
