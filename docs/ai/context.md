@@ -31,6 +31,7 @@ routing:
     - docs/design/motor-layer.md
     - docs/design/can-scheduler.md
     - docs/verification/issue5-can-scheduler-host.md
+    - docs/verification/can-contract-audit.md
   stm32:
     - docs/design/cubeide-cpp.md
     - docs/verification/f446-module-layout.md
@@ -44,6 +45,7 @@ routing:
     - docs/development/github-governance.md
 validation:
   spec_links: python3 tools/validate_specs.py
+  can_contract: python3 tools/check_can_contract.py
   host_and_ubsan: python3 tools/run_host_tests.py
   cubeide_metadata: python3 tools/sync_cubeide_cpp.py
   host_cmake: cmake -S . -B build/host-cmake

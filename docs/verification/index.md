@@ -8,6 +8,7 @@
 |---|---|---|
 | 最新のF446ファイル配置 | [機能別配置・6ソースビルド](f446-module-layout.md) | CubeIDE Debug/Release、全6ソース、ARM ELF32 |
 | CAN周期と送信調停 | [Issue #5ホスト試験](issue5-can-scheduler-host.md) | 仮想時刻・3メールボックス・故障注入 |
+| CAN仕様の整合とID重複 | [Issue #6 CAN静的照合](can-contract-audit.md) | RS06/C620の既知フレーム、F303/Piの未確定項目 |
 | ARM・FAULT判定の差分 | [状態機械の監査](core-mode-contract-audit.md) | ホスト回帰PASSと既知の仕様不一致 |
 | 過去のCubeIDE配置 | [5ソース配置の検証](f446-source-layout.md) | PR #16時点の構成と再生成結果 |
 | 初期のF446クロスビルド | [2026-11-09の記録](f446-crossbuild-20261109.md) | 統合前のC++骨組み |
