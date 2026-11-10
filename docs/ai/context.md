@@ -56,6 +56,17 @@ validation:
   host_ctest: cmake --build build/host-cmake --target test
   documentation: doxygen Doxyfile
   cubeide_artifacts: python3 tools/verify_f446_build.py
+commit_policy:
+  split_by_change_class: true
+  default_order: [implementation, tests, documentation]
+  source_files: [".c", ".cpp", ".h", "relevant build configuration"]
+  test_files: ["tests/", "test runner scripts"]
+  documentation_files: [".md", "verification evidence"]
+  no_mixed_source_test_markdown_commit: true
+  no_force_push: true
+  source_comment_focus: [algorithm_reason, invariants, units, rejection_conditions, safety_boundary]
+  test_comment_focus: [fixture_purpose, boundary_rationale, expected_failure]
+  exception: "If technically inseparable, justify mixed files in PR body"
 status_vocabulary:
   - PASS
   - FAIL
