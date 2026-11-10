@@ -218,6 +218,12 @@ bool b_attitude_update(BAttitudeFilter *filter, const BImuSample *sample,
     next.valid = true;
     next.accel_fused = accel_ok;
     next.stamp_us = stamp_us;
+    /*
+     * ここに格納する値はセンサ軸を機体軸へ回したbody angular rate。
+     * Euler角微分は一般にRoll/Pitch/Yawの姿勢に依存するため、
+     * body X=Roll微分、body Y=Pitch微分、body Z=Yaw微分が成立するのは
+     * 小角・結合無視の近似領域に限る。実機で大姿勢へ適用してはいけない。
+     */
     next.roll_rate_rad_s = corrected[0];
     next.pitch_rate_rad_s = corrected[1];
     next.yaw_rate_rad_s = corrected[2];

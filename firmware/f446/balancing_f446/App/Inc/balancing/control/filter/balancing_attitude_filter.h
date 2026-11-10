@@ -39,9 +39,9 @@ typedef struct {
     uint64_t stamp_us; /**< 元の新規センササンプル時刻 [us]。 */
     float pitch_rad; /**< 機体X前・Y左・Z上のfixture角 [rad]。 */
     float roll_rad; /**< 同じ座標系での角 [rad]。 */
-    float pitch_rate_rad_s; /**< ジャイロバイアス除去後 [rad/s]。 */
-    float roll_rate_rad_s; /**< ジャイロバイアス除去後 [rad/s]。 */
-    float yaw_rate_rad_s; /**< ジャイロバイアス除去後 [rad/s]。Yaw積分角ではない。 */
+    float pitch_rate_rad_s; /**< ジャイロ機体Y軸 [rad/s]。厳密なEuler Pitch微分ではない。 */
+    float roll_rate_rad_s; /**< ジャイロ機体X軸 [rad/s]。厳密なEuler Roll微分ではない。 */
+    float yaw_rate_rad_s; /**< ジャイロ機体Z軸 [rad/s]。絶対Yaw角や厳密なYaw微分ではない。 */
 } BAttitudeEstimate;
 
 /** @brief 単一所有者が保持するバイアス累積と相補フィルタ状態。 */
@@ -94,6 +94,8 @@ bool b_attitude_add_static_sample(BAttitudeFilter *filter, const BImuSample *sam
  * @param[out] out 成功時の推定。失敗時はゼロ化。
  * @return サンプルを正しく受理できたらtrue。
  * @warning 新規測定間隔が大きいときは推測で再初期化せずfalseを返す。
+ *          ジャイロ機体X/Y/ZをEuler角速度に近似する小角モデルである。
+ *          大きな傾き・Yaw結合でのEuler角微分として使用しない。
  *          Yaw角の絶対方位は計算しない。実機姿勢制御には未接続。
  */
 bool b_attitude_update(BAttitudeFilter *filter, const BImuSample *sample,
