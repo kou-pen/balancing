@@ -1,7 +1,7 @@
 # Balancing — 二輪脚ロボット
 
 **設計基準日：** 2026-10-27（仕様・TODO最終更新：2026-11-09）  
-**状態：** MOTOR-146〜224の設計を仕様へ反映。C++17アプリケーション骨組みとC/C++ブリッジを追加しホスト検証済み。**RS06/C620のCAN符号化・復号と単軸短時間試運転モジュールを追加し、ホスト試験済み（2026-11-09）**。F446 HAL接続コードは未クロスコンパイル。基板への書込み・実機回転・F446/F303統合・倒立は未実施。
+**状態：** MOTOR-146〜224の設計を仕様へ反映。C++17アプリケーション骨組みとC/C++ブリッジを追加しホスト検証済み。**RS06/C620のCAN符号化・復号と単軸短時間試運転、Issue #5の周期要求モデルをホスト試験済み**。PR #16のF446 HAL接続ソースはクロスコンパイル済みだが、HAL送受信への実行時接続は未実装。基板への書込み・実機回転・F446/F303統合・倒立は未実施。
 
 ## まず読む文書
 
@@ -29,8 +29,8 @@
 | `docs/specs/control/` | 状態推定、LQR、VMC |
 | `docs/specs/behavior/` | ロボット操作と状態遷移 |
 | `docs/todo/` | P0/P1/P2の未実装・未検証事項（`roadmap.md`が入口） |
-| `firmware/f446/balancing_f446/` | F446のCubeIDEプロジェクト。`App/`に制御コア・CAN・HAL接続・C++入口を集約。統合後のCubeIDEクロスビルド・書込みは未検証。F303用ファームウェアは未実装 |
-| `firmware/f446/balancing_f446/App/Examples/` | Doxygenコメントの書式例 |
+| `firmware/f446/balancing_f446/` | F446のCubeIDEプロジェクト。自作ソースを`App/{Inc,Src}/balancing/`へ機能別に配置。PR #16の旧5ソースCubeIDEビルドPASS。新6ソース配置のCubeIDE管理ビルドと実機書込みは未検証。F303用FWは未実装 |
+| `firmware/f446/balancing_f446/App/Inc/balancing/`・`App/Src/balancing/` | 自作C11/C++の公開ヘッダーと実装を機能別にミラー配置。詳しくは[配置検証](docs/verification/f446-module-layout.md) |\n| `firmware/f446/balancing_f446/App/Examples/` | Doxygenコメントの書式例 |
 | `Doxyfile` | HTMLリファレンス生成設定 |
 | .gitignore・.gitattributes | Gitの除外設定と改行コード統一。GitHub Actionsは当面使用しない |
 | .vscode・.clangd・ruff.toml | Ruff・clangd・clang-formatの共有エディタ設定 |
