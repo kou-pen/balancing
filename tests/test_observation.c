@@ -19,7 +19,10 @@ static void nearf(float actual, float expected, float tolerance)
     }
 }
 
-/* Artificial wheel dimensions; these are NOT verified M3508/C620 dimensions. */
+/*
+ * 車輪半径0.1m、モータ/車輪10:1、左右符号は数値試験のための人工値。
+ * 実機のM3508内部減速や外部伝達、左右エンコーダ符号を検証した値ではない。
+ */
 static BWheelObservationConfig test_wheel(float sign)
 {
     const BWheelObservationConfig config = {
@@ -37,6 +40,9 @@ static BImuSample test_imu(float rate)
     return sample;
 }
 
+/* 500 Hzのコピー回数は測定更新回数とは無関係。
+ * 2回freezeしても測定時刻は進まず、既存値の再読出しは新規扱いしない。
+ * IMU鮮度50msの境界ちょうどは有効、1us超過した時点で無効となる。 */
 static void test_freeze_and_sample_freshness(void)
 {
     BObservationStore store;
@@ -77,6 +83,7 @@ static void test_freeze_and_sample_freshness(void)
     assert(!snapshot.stamps.imu.valid);
 }
 
+/* IMUの一軸でもNaNならストア全体を保持し、最終新規時刻も進まない。 */
 static void test_invalid_imu_never_refreshes(void)
 {
     BObservationStore store;
@@ -92,6 +99,11 @@ static void test_invalid_imu_never_refreshes(void)
     nearf(store.imu.gyro_rad_s[1], 0.125f, 1e-7f);
 }
 
+/*
+ * 8190→2は+4カウント、2→8190は-4カウント。
+ * 右車輪の符号を反転することで、鏡像動作の位置方向とRPMから求める
+ * 速度方向を独立に検証する。20msの鮮度境界も受信時刻で判定する。
+ */
 static void test_encoder_wrap_speed_and_symmetry(void)
 {
     BObservationStore store;
@@ -119,6 +131,11 @@ static void test_encoder_wrap_speed_and_symmetry(void)
     assert(!after_limit.wheel[0] && !after_limit.wheel[1]);
 }
 
+/*
+ * CAN2フレームを人工的な生値に分解するのではなく、
+ * 実装中のb_c620_parse_feedback()から観測ストアへ接続する結合試験。
+ * モータIDを車輪添字へ写像し、受信していない右側はvalidにしない。
+ */
 static void test_real_c620_codec_to_observation(void)
 {
     const BMotorCanFrame frame = {
@@ -140,6 +157,10 @@ static void test_real_c620_codec_to_observation(void)
     assert(!store.stamps.wheel[1].valid);
 }
 
+/*
+ * 巻数が確定しない半回転差、無効な新規時刻、未校正や途中の換算設定変更を
+ * 全て拒否する。拒否後の時刻・エンコーダ生値・積算距離が不変なことを確認。
+ */
 static void test_invalid_encoder_and_config_fail_closed(void)
 {
     BObservationStore store;

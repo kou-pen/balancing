@@ -41,6 +41,9 @@ static BLegKinematics solve(BLegFixtureGeometry g, BLegJointState q,
     return state;
 }
 
+/* 左右の符号と16:24の理想歯数比を数値上で分離する。
+ * モータ側と機構側の瞬時仕事率が一致することも確認するが、
+ * 実機の伝達効率・エンコーダ原点は未校正である。 */
 static void test_motor_mapping(void)
 {
     const BLegMotorMap map = {
@@ -76,6 +79,8 @@ static void test_motor_mapping(void)
     near(motor.torque_nm[1], 0.0f, 0.0f);
 }
 
+/* 同じ入力角に対し円交点の組立分岐が2つ存在することを検証する。
+ * 分岐の自動ジャンプを許さず、仮想脚長・下向き0の角度を数値照合する。 */
 static void test_forward_and_branch(void)
 {
     BLegFixtureGeometry g = fixture();
@@ -96,6 +101,8 @@ static void test_forward_and_branch(void)
     near(invalid.length_m, 0.0f, 0.0f);
 }
 
+/* 解析微分式に依存しない中央差分でJの各列を検算する。
+ * 差分幅は数学fixtureの検証用で、運転時の数値微分には使わない。 */
 static void test_jacobian_against_central_difference(void)
 {
     const float delta = 0.0005f;
@@ -126,6 +133,8 @@ static void test_jacobian_against_central_difference(void)
     }
 }
 
+/* 左右入力軸の反射・交換で脚のxとθの符号が反転する不変条件を検証。
+ * また±2πずらしても同じ物理幾何へ写像されることを確認する。 */
 static void test_reflection_and_angle_periodicity(void)
 {
     const BLegFixtureGeometry g = fixture();
@@ -150,6 +159,8 @@ static void test_reflection_and_angle_periodicity(void)
     near(a.theta_rad, c.theta_rad, 2e-5f);
 }
 
+/* J^Tの実装と仮想仕事率の保存を別々の計算経路から照合する。
+ * これは理想伝達のみの数学検証であり、実モータのトルク指令ではない。 */
 static void test_virtual_work_and_torque_mapping(void)
 {
     const BLegKinematics state =
@@ -213,7 +224,9 @@ static void test_unreachable_singular_and_invalid(void)
     near(torques.torque_nm[0], 0.0f, 0.0f);
 }
 
-/* Deterministic grid across the fixture work envelope; no CAD limit claim. */
+/* 人工的な13×13姿勢格子の両組立分岐を走査し、
+ * 有効な点について中央差分と解析Jの一致を確認する。
+ * CAD由来の可動域や実機特異姿勢の安全範囲を主張するものではない。 */
 static void test_jacobian_grid_and_extreme_inputs(void)
 {
     const BLegFixtureGeometry g = fixture();
