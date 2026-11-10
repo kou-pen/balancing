@@ -17,6 +17,7 @@ add_library(balancing_core STATIC
     ${F446_APP}/Src/balancing/communication/balancing_tx_scheduler.c
     ${F446_APP}/Src/balancing/control/estimator/balancing_leg_kinematics.c
     ${F446_APP}/Src/balancing/control/estimator/balancing_observation.c
+    ${F446_APP}/Src/balancing/app/balancing_operator_input.c
 )
 target_include_directories(balancing_core PUBLIC
     ${F446_APP}/Inc
