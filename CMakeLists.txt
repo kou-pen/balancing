@@ -15,6 +15,7 @@ add_library(balancing_core STATIC
     ${F446_APP}/Src/balancing/communication/balancing_motor_can.c
     ${F446_APP}/Src/balancing/app/balancing_motor_bench.c
     ${F446_APP}/Src/balancing/communication/balancing_tx_scheduler.c
+    ${F446_APP}/Src/balancing/control/estimator/balancing_leg_kinematics.c
 )
 target_include_directories(balancing_core PUBLIC
     ${F446_APP}/Inc
@@ -37,6 +38,12 @@ add_executable(balancing_tx_scheduler_tests tests/test_tx_scheduler.c)
 target_link_libraries(balancing_tx_scheduler_tests PRIVATE balancing_core m)
 target_compile_options(balancing_tx_scheduler_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_tx_scheduler_tests COMMAND balancing_tx_scheduler_tests)
+
+# CAD-unverified mathematical 2-input closed-chain fixture (Issue #7).
+add_executable(balancing_leg_kinematics_tests tests/test_leg_kinematics.c)
+target_link_libraries(balancing_leg_kinematics_tests PRIVATE balancing_core m)
+target_compile_options(balancing_leg_kinematics_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME balancing_leg_kinematics_tests COMMAND balancing_leg_kinematics_tests)
 
 # F446 HAL adapter is host-compiled with an explicit test-only HAL shim.
 # This does not replace a real STM32CubeMX build or an MCU hardware test.
