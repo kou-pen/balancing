@@ -4,7 +4,7 @@ PROJECT_NAME           = "バランシングロボット制御FW"
 PROJECT_BRIEF          = "仕様IDと公開APIの対応を示す技術資料"
 OUTPUT_LANGUAGE        = Japanese
 OUTPUT_DIRECTORY       = build/docs
-INPUT                  = README.md AGENTS.md docs firmware
+INPUT                  = README.md CONTRIBUTING.md AGENTS.md docs firmware
 FILE_PATTERNS          = *.c *.cpp *.h *.hpp *.md
 # CubeMXとHAL/CMSISの自動生成コードはAPIの正本ではない。
 EXCLUDE                = firmware/f446/balancing_f446/Drivers firmware/f446/balancing_f446/Core

@@ -4,10 +4,19 @@
 
 このページでは、データの流れ、起動・駆動許可、定周期処理、状態遷移、非常停止の関係を示す。**図は設計仕様の視覚化であり、コード実装済み・実機動作検証済みを意味しない。**
 
-- [通信IDとデータ単位](can-id-table.md)
-- [ソフトウェア構成](architecture.md)
-- [ロボット操作・状態遷移の詳細](specs/behavior/robot_operation.md)
-- [F446基板](specs/boards/f446_control.md)／[F303電源基板](specs/boards/f303_power.md)
+## 図の目次
+
+| 知りたいこと | 図 |
+|---|---|
+| 入力からモータ指令まで | 1. 全体データフロー |
+| ARMと送信完了・応答の関係 | 2. ARM要求から倒立開始 |
+| 演算と送信の周期 | 3. 倒立中の周期処理 |
+| DISARMED・BALANCING・FAULT | 4. 状態遷移 |
+| 異常停止と電源遮断 | 5. 非常停止 |
+| ホスト制御コアの接続点 | 6. C制御コアと周辺 |
+| 後続のジャンプ | 7. ジャンプ状態機械 |
+
+通信ID・電気的な条件は [CAN総覧](can-id-table.md) と [F446](specs/boards/f446_control.md)・[F303](specs/boards/f303_power.md) の仕様書、状態遷移の条件は [動作仕様](specs/behavior/robot_operation.md) を参照してください。
 
 ## 1. 全体データフロー
 
