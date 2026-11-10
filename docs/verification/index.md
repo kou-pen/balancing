@@ -6,10 +6,11 @@
 
 | 目的 | 記録 | 確認できた範囲 |
 |---|---|---|
-| 最新のF446ファイル配置 | [機能別配置・6ソースビルド](f446-module-layout.md) | CubeIDE Debug/Release、全6ソース、ARM ELF32 |
+| F446の6ソース→7ソース | [旧配置検証](f446-module-layout.md)／[現行運動学](issue7-kinematics-host.md) | 7ソースのDebug/ReleaseクロスビルドもPASS（実機は未実施） |
 | CAN周期と送信調停 | [Issue #5ホスト試験](issue5-can-scheduler-host.md) | 仮想時刻・3メールボックス・故障注入 |
 | CAN仕様の整合とID重複 | [Issue #6 CAN静的照合](can-contract-audit.md) | RS06/C620の既知フレーム、F303/Piの未確定項目 |
 | ARM・FAULT判定の差分 | [状態機械の監査](core-mode-contract-audit.md) | ホスト回帰PASSと既知の仕様不一致 |
+| 脚運動学の数値演算 | [Issue #7数学fixture](issue7-kinematics-host.md) | 解析ヤコビアンと有限差分、実機CAD未検証 |
 | 過去のCubeIDE配置 | [5ソース配置の検証](f446-source-layout.md) | PR #16時点の構成と再生成結果 |
 | 初期のF446クロスビルド | [2026-11-09の記録](f446-crossbuild-20261109.md) | 統合前のC++骨組み |
 
@@ -25,6 +26,6 @@
 
 ## 現時点の境界
 
-制御コア・CAN通信・送信要求モデルの**ホスト試験**と、F446の**CubeIDE Debug/Releaseビルド**は確認されています。一方、実機書込み、CAN実通信、トルク出力、実時間性能、独立非常停止、実機での倒立は未検証です。
+制御コア・CAN通信・送信要求モデルと運動学fixtureの**ホスト試験**、F446の**新7ソースCubeIDE Debug/Release管理ビルド**も2026-11-10にPASSしました。一方、実機書込み、CAN実通信、トルク出力、実時間性能、独立非常停止、実機での倒立は未検証です。
 
 次の試験を計画するときは [実機検証TODO](../todo/verification.md) の受入条件を参照し、作業上の最新状態はGitHub Issue/PRで確認します。

@@ -129,6 +129,30 @@ for label, flags in [
     subprocess.run(cpp_common + flags + ["-o", str(path)], check=True, cwd=ROOT, timeout=30)
     print(f"[{label}] 実行", flush=True)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
+# The fixture is not the actual six-bar CAD mechanism. Test only mathematical properties.
+leg_common = [
+    "gcc",
+    "-std=c11",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-pedantic",
+    "-I",
+    str(F446_APP / "Inc"),
+    str(F446_APP / "Src" / "balancing" / "control" / "estimator" / "balancing_leg_kinematics.c"),
+    str(ROOT / "tests" / "test_leg_kinematics.c"),
+    "-lm",
+]
+for label, flags in [
+    ("運動学fixture通常ビルド", []),
+    ("運動学fixture未定義動作検査", ["-fsanitize=undefined", "-fno-sanitize-recover=all"]),
+]:
+    path = OUT / ("test_leg_kinematics_ubsan" if flags else "test_leg_kinematics")
+    print(f"[{label}] コンパイル", flush=True)
+    subprocess.run(leg_common + flags + ["-o", str(path)], check=True, cwd=ROOT, timeout=30)
+    print(f"[{label}] 実行", flush=True)
+    subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
+
 print("[CubeIDE C++設定回帰試験] 実行", flush=True)
 subprocess.run(
     [

@@ -26,6 +26,8 @@ routing:
     - docs/specs/behavior/robot_operation.md
     - docs/software-core.md
     - docs/verification/core-mode-contract-audit.md
+    - docs/design/leg-kinematics.md
+    - docs/verification/issue7-kinematics-host.md
   can:
     - docs/specs/protocols/
     - docs/design/motor-layer.md
