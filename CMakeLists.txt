@@ -53,6 +53,12 @@ target_link_libraries(balancing_observation_tests PRIVATE balancing_core m)
 target_compile_options(balancing_observation_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_observation_tests COMMAND balancing_observation_tests)
 
+# Explicitly decoded USB/CAN operator targets; host fixtures only, no HID/CAN IDs.
+add_executable(balancing_operator_input_tests tests/test_operator_input.c)
+target_link_libraries(balancing_operator_input_tests PRIVATE balancing_core m)
+target_compile_options(balancing_operator_input_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME balancing_operator_input_tests COMMAND balancing_operator_input_tests)
+
 # F446 HAL adapter is host-compiled with an explicit test-only HAL shim.
 # This does not replace a real STM32CubeMX build or an MCU hardware test.
 add_executable(balancing_motor_hal_port_tests
