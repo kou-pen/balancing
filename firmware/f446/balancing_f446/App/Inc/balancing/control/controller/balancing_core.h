@@ -1,6 +1,8 @@
 #ifndef BALANCING_CORE_H
 #define BALANCING_CORE_H
 
+#include "balancing/core/balancing_observation_time.h"
+
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -23,20 +25,6 @@ typedef enum {
     B_FAULT_GUARD,
     B_FAULT_SCHEDULER /**< 500 Hz制御更新が6 ms以上停止、または時計が逆行。 */
 } BFaultCause;
-
-/** @brief モノトニック時刻付きの観測値。時刻単位はマイクロ秒。 */
-typedef struct {
-    bool valid;
-    uint64_t stamp_us;
-} BSampleStamp;
-
-/** @brief 通信層が収集した最後の「新規・有効」測定の時刻。 */
-typedef struct {
-    BSampleStamp imu;
-    BSampleStamp rs[4];
-    BSampleStamp wheel[2];
-    BSampleStamp power;
-} BObservedStamps;
 
 /** @brief センサの有効性・更新鮮度。集約状態はb_freshness_allで求める。 */
 typedef struct {

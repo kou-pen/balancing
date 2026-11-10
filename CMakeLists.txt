@@ -16,6 +16,7 @@ add_library(balancing_core STATIC
     ${F446_APP}/Src/balancing/app/balancing_motor_bench.c
     ${F446_APP}/Src/balancing/communication/balancing_tx_scheduler.c
     ${F446_APP}/Src/balancing/control/estimator/balancing_leg_kinematics.c
+    ${F446_APP}/Src/balancing/control/estimator/balancing_observation.c
 )
 target_include_directories(balancing_core PUBLIC
     ${F446_APP}/Inc
@@ -44,6 +45,12 @@ add_executable(balancing_leg_kinematics_tests tests/test_leg_kinematics.c)
 target_link_libraries(balancing_leg_kinematics_tests PRIVATE balancing_core m)
 target_compile_options(balancing_leg_kinematics_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_leg_kinematics_tests COMMAND balancing_leg_kinematics_tests)
+
+# Timestamped IMU and C620 wheel snapshots, host-only without an ISR/RTOS.
+add_executable(balancing_observation_tests tests/test_observation.c)
+target_link_libraries(balancing_observation_tests PRIVATE balancing_core m)
+target_compile_options(balancing_observation_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME balancing_observation_tests COMMAND balancing_observation_tests)
 
 # F446 HAL adapter is host-compiled with an explicit test-only HAL shim.
 # This does not replace a real STM32CubeMX build or an MCU hardware test.
