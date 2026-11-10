@@ -48,6 +48,13 @@ static void test_rs06_codec(void)
     frame.id = 0x028101fdu;
     assert(b_rs06_parse_feedback(&frame, &fb));
     assert(fb.fault_bits == 1u);
+    frame.id = 0x188001fdu; /* Type24 response: only codec format, not HW evidence */
+    assert(b_rs06_parse_feedback(&frame, &fb));
+    assert(fb.motor_id == 1u && fb.mode == 2u);
+    frame.id = 0x028001fdu;
+    frame.dlc = 7u;
+    assert(!b_rs06_parse_feedback(&frame, &fb));
+    frame.dlc = 8u;
     frame.id = 0x018001fdu;
     assert(!b_rs06_parse_feedback(&frame, &fb));
     frame.extended = false;
@@ -84,6 +91,14 @@ static void test_c620_codec(void)
     frame.data[0] = 0x20u; /* invalid rotor angle */
     assert(!b_c620_parse_feedback(&frame, &fb));
     frame.data[0] = 0x1fu;
+    frame.id = 0x1ffu; /* reserved output group, not feedback */
+    assert(!b_c620_parse_feedback(&frame, &fb));
+    frame.id = 0x205u; /* outside declared codec receive range */
+    assert(!b_c620_parse_feedback(&frame, &fb));
+    frame.id = 0x202u;
+    frame.dlc = 7u;
+    assert(!b_c620_parse_feedback(&frame, &fb));
+    frame.dlc = 8u;
     frame.extended = true;
     assert(!b_c620_parse_feedback(&frame, &fb));
 }
