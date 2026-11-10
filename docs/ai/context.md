@@ -28,6 +28,8 @@ routing:
     - docs/verification/core-mode-contract-audit.md
     - docs/design/leg-kinematics.md
     - docs/verification/issue7-kinematics-host.md
+    - docs/design/observation-snapshot.md
+    - docs/verification/issue10-observation-host.md
   can:
     - docs/specs/protocols/
     - docs/design/motor-layer.md

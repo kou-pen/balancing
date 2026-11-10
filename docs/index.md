@@ -20,6 +20,7 @@
 | 制御ソフト | [C11制御コア](software-core.md) | 状態機械、LQR計算、公開APIと単位 |
 | データ構造 | [データモデル](design/data-model.md) | 所有権、スナップショット、モジュール境界 |
 | 脚運動学 | [閉リンク数学fixture](design/leg-kinematics.md) | 関節角、脚長、ヤコビアン。実機CAD未検証 |
+| センサの時刻管理 | [観測スナップショット](design/observation-snapshot.md) | 新規測定、車輪折返し、500 Hzでの固定コピー |
 | F446ファームウェア | [CubeIDE開発](design/cubeide-cpp.md) | CとC++の境界、生成コードの扱い |
 | CAN実装 | [モータ通信層](design/motor-layer.md) | コーデック、試運転、HAL接続条件 |
 | PCでの検証 | [離散線形シミュレーション](design/linear-simulation.md) | 数学テスト用モデルと再現方法 |

@@ -153,6 +153,32 @@ for label, flags in [
     print(f"[{label}] 実行", flush=True)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
+# C620 physical feedback -> observation and frozen sensor freshness, normal + UBSan.
+observation_common = [
+    "gcc",
+    "-std=c11",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-pedantic",
+    "-I",
+    str(F446_APP / "Inc"),
+    str(F446_APP / "Src" / "balancing" / "control" / "estimator" / "balancing_observation.c"),
+    str(F446_APP / "Src" / "balancing" / "control" / "controller" / "balancing_core.c"),
+    str(F446_APP / "Src" / "balancing" / "communication" / "balancing_motor_can.c"),
+    str(ROOT / "tests" / "test_observation.c"),
+    "-lm",
+]
+for label, flags in [
+    ("観測スナップショット通常ビルド", []),
+    ("観測スナップショットUBSan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"]),
+]:
+    path = OUT / ("test_observation_ubsan" if flags else "test_observation")
+    print(f"[{label}] コンパイル", flush=True)
+    subprocess.run(observation_common + flags + ["-o", str(path)], check=True, cwd=ROOT, timeout=30)
+    print(f"[{label}] 実行", flush=True)
+    subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
+
 print("[CubeIDE C++設定回帰試験] 実行", flush=True)
 subprocess.run(
     [
