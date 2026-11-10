@@ -64,7 +64,7 @@ python3 tools/verify_f446_build.py
 
 全6ソースのApp/Src/balancing/...以下のsubdir.mkとobjects.listが自動生成され、DebugとRelease両方で新しいARM ELF32が生成されることを確認する。
 
-**現時点の判定を混同しないこと：** PR #16で確認された旧5ソースのCubeIDE managed-buildはPASSだが、**本PRの6ソース機能別配置のCubeIDE managed-buildは、上記コマンドの実行ログが得られるまでNOT VERIFIED**。Git管理外のMakefileを手修正して得たクロスリンクはCubeIDE本体の再生成成功ではない。
+**2026-11-10追記：新構造6ソースのCubeIDE managed-buildはDebug/ReleaseともPASS。** ユーザーがVMの通常ターミナルで再生成を実行し、CubeIDEのクリーンビルドログを確認した。Debug 10:29:39、Release 10:29:54にいずれも Build Finished（0 errors, 0 warnings）。両構成の全6ソースが生成済みのネストしたMakefile・objects.listに登録され、オブジェクトと新しいARM ELF32が存在し、python3 tools/verify_f446_build.pyが両構成PASS。生成ログはGit管理外のbuild/cubeide-managed-pr16/debug.logとrelease.logにある。Debug text/data/bss = 15708/12/2820 B、Release = 9216/12/2820 B。IDE再生成では.cprojectの追跡差分が出ず、python3 tools/sync_cubeide_cpp.pyもPASS。ホスト通常/UBSan・設定回帰20件も再実行しPASS。これは実機CAN通信、物理安全、実機TX期限、モータ駆動を検証したことを意味しない。
 
 ## 変更禁止事項・保留事項
 

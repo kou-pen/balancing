@@ -2,7 +2,7 @@
 
 **更新日：** 2026-11-10  
 **適用：** F446制御基板、`firmware/f446/balancing_f446`。  
-**状態：** CubeMX管理のmain.cからC++入口・TIM7 500 Hzイベントを受ける骨組みを維持。PR #16の旧App直下5ソース構成はCubeIDE 1.19.0によるDebug/Release管理ビルドPASS。**機能別ディレクトリへの一括再配置後は、6ソース構成のCubeIDE自動再生成・リンクが未検証**。実機書込み・CAN通常運転への接続は未実施。
+**状態：** CubeMX管理のmain.cからC++入口・TIM7 500 Hzイベントを受ける骨組みを維持。PR #16の旧App直下5ソース構成はCubeIDE 1.19.0によるDebug/Release管理ビルドPASS。**機能別ディレクトリへ一括再配置した6ソース構成も2026-11-10にCubeIDE本体のDebug/Release管理ビルドを行い、0エラー・0警告でPASS**。実機書込み・CAN通常運転への接続は未実施。
 
 ## 設計方針
 
@@ -45,7 +45,7 @@ balancing/firmware/f446/balancing_f446/
 2. 新規プロジェクト作成時は**Targeted Language: C++**。すでにCで作成した場合はProject Explorerでプロジェクト右クリック→**Convert to C++**（画面・バージョンにより表示が異なる）。
 3. `Project → Properties → C/C++ Build → Settings`でC++コンパイラを有効にし、Debug/Releaseともに**GNU++17（`-std=gnu++17`）**を設定する。現行`.cproject`には明示設定済みで、`tools/sync_cubeide_cpp.py --fix`でも再生成後に復元できる。CソースはGNU11、リンクには`arm-none-eabi-g++`を使用する。
 4. IDEでプロジェクトをRefresh（F5）。`App/Src/balancing/app/application.cpp`がプロジェクト内に見えていてビルド対象であることを確認する。階層化したCソースは`App/Inc`をCコンパイラのInclude Paths（Debug/Release両方）に維持し、`balancing/...`の修飾付きヘッダー名を使用する。C++ブリッジは従来の相対includeのまま。
-5. C11制御コア・CAN codec・HAL試運転アダプタとC++アプリを`App/Src/balancing/`以下へ機能別に再配置した。CubeIDEの既存`App` sourcePathが再帰的に新規ソースを検出することを、Debug/Releaseの正規再生成で確認する必要がある。モータ駆動経路、CAN開始・フィルタ・割込みは未接続。
+5. C11制御コア・CAN codec・HAL試運転アダプタとC++アプリを`App/Src/balancing/`以下へ機能別に再配置した。CubeIDEの既存`App` sourcePathがネストした6ソースを検出していることを、2026-11-10のDebug/Release管理ビルドで確認した。モータ駆動経路、CAN開始・フィルタ・割込みは未接続。
 6. `main.c`はリネームしない。**以下は現在の生成済みmain.cのUSER CODEへ適用済み**。今後の再生成で残っていることを確認する。
 
 ## main.cへの最小限の追加
@@ -161,4 +161,4 @@ CubeIDE 1.19.0のヘッドレスF446 DebugビルドはPASS。GUIの`Project → 
 
 ## 2026-11-10の機能別再配置後の検証境界
 
-PR #16のCubeIDE Debug/Release管理ビルドPASSは**旧App直下5ソース**の記録。機能別再配置後の**6ソース新構成はホスト通常/UBSan・CTestで検証済みだが、CubeIDE本体による生成Makefile更新とクロスリンクは未実施**。新しい再生成手順と対象ファイルの一覧は[機能別配置検証](../verification/f446-module-layout.md)、旧構成の実測は[PR #16の検証記録](../verification/f446-source-layout.md)を参照。
+PR #16のCubeIDE Debug/Release管理ビルドPASSは**旧App直下5ソース**の記録。機能別再配置後の**6ソース新構成についても2026-11-10にCubeIDE本体が生成Makefileを更新し、Debug/Releaseとも0エラー・0警告でARM ELF32へクロスリンク成功**。実機書込み・CAN実通信・モータ駆動は未実施。新しい再生成手順と対象ファイルの一覧は[機能別配置検証](../verification/f446-module-layout.md)、旧構成の実測は[PR #16の検証記録](../verification/f446-source-layout.md)を参照。

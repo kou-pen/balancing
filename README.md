@@ -29,7 +29,7 @@
 | `docs/specs/control/` | 状態推定、LQR、VMC |
 | `docs/specs/behavior/` | ロボット操作と状態遷移 |
 | `docs/todo/` | P0/P1/P2の未実装・未検証事項（`roadmap.md`が入口） |
-| `firmware/f446/balancing_f446/` | F446のCubeIDEプロジェクト。自作ソースを`App/{Inc,Src}/balancing/`へ機能別に配置。PR #16の旧5ソースCubeIDEビルドPASS。新6ソース配置のCubeIDE管理ビルドと実機書込みは未検証。F303用FWは未実装 |
+| `firmware/f446/balancing_f446/` | F446のCubeIDEプロジェクト。自作ソースを`App/{Inc,Src}/balancing/`へ機能別に配置。旧5ソース（PR #16）と新6ソース（PR #18）のCubeIDE Debug/Release管理ビルドPASS。実機書込みは未実施。F303用FWは未実装 |
 | `firmware/f446/balancing_f446/App/Inc/balancing/`・`App/Src/balancing/` | 自作C11/C++の公開ヘッダーと実装を機能別にミラー配置。詳しくは[配置検証](docs/verification/f446-module-layout.md) |\n| `firmware/f446/balancing_f446/App/Examples/` | Doxygenコメントの書式例 |
 | `Doxyfile` | HTMLリファレンス生成設定 |
 | .gitignore・.gitattributes | Gitの除外設定と改行コード統一。GitHub Actionsは当面使用しない |
