@@ -5,6 +5,11 @@
 #include <stddef.h>
 #include <string.h>
 
+/*
+ * 鮮度は「有効ビット」だけでは判断せず、最後に確認できた測定時刻からの経過で決める。
+ * 同じ時刻を再利用しても鮮度を回復させない。共通の単調増加時計を前提とし、
+ * 未来時刻を含む測定は拒否する。期限ちょうどまでは有効とする。
+ */
 static bool sample_is_recent(BSampleStamp sample, uint64_t now_us,
                              uint64_t max_age_us)
 {
@@ -12,6 +17,11 @@ static bool sample_is_recent(BSampleStamp sample, uint64_t now_us,
            now_us - sample.stamp_us <= max_age_us;
 }
 
+/*
+ * 各センサで規定の更新期限が異なるため、IMU・電源・RS06・車輪を個別判定する。
+ * タイムアウト値は現行の仕様契約であり、数学テスト都合で変更しない。
+ * NULL入力なら全てfalseのスナップショットを返す。
+ */
 BFreshness b_check_freshness(const BObservedStamps *stamps, uint64_t now_us)
 {
     BFreshness result = {0};
@@ -34,6 +44,10 @@ BFreshness b_check_freshness(const BObservedStamps *stamps, uint64_t now_us)
     return result;
 }
 
+/*
+ * ARMと稼働監視に必要な全観測系統の論理積。
+ * 未接続のセンサを暗黙にtrueとして扱うと危険なので、1軸でも欠ければfalse。
+ */
 bool b_freshness_all(BFreshness freshness)
 {
     unsigned i;
@@ -54,8 +68,12 @@ bool b_freshness_all(BFreshness freshness)
     return true;
 }
 
+/* 起動時に前回のARM要求やFAULT原因を引き継がず、DISARMEDから開始する。
+ * 電源断後にFAULTを保持する方式は別途未決定であり、この実装で保証しない。 */
 void b_mode_init(BModeMachine *machine)
 {
+    /* 状態自体が存在しない場合でも、結果には停止要求を明示する。
+     * 出力コマンドが実際にモータに届くことまでは保証しない。 */
     if (machine == NULL) {
         return;
     }
@@ -63,6 +81,12 @@ void b_mode_init(BModeMachine *machine)
     machine->mode = B_MODE_DISARMED;
 }
 
+/*
+ * ARMを開始するための検証済み条件をまとめる。validな入力と「実機で検証した」
+ * 校正・モデル・上限は別概念。呼出元が仮の値をtrueにすると安全証明にならない。
+ * 現行posture_okは上位が与えるブール値で、実機姿勢範囲ゲートとの仕様差分は
+ * 別の監査Issueで管理する（コメント追加で挙動を変更しない）。
+ */
 static bool arm_preconditions(const BModeInput *input)
 {
     return b_freshness_all(input->fresh) && input->power_on &&
@@ -70,6 +94,12 @@ static bool arm_preconditions(const BModeInput *input)
            input->limits_verified && input->posture_ok;
 }
 
+/*
+ * RS06の有効化は要求した瞬間には成立しない。
+ * 4軸すべてについて「当該ARM要求以降に実送信されたType3」と
+ * 「その送信時刻より厳密に後の新しい正常応答」の両方を要求する。
+ * 要求時刻をHAL受付・CAN完了の代わりに使わない。
+ */
 static bool all_enabled_after_request(const BModeMachine *machine,
                                       const BModeInput *input,
                                       uint64_t now_us)
@@ -90,6 +120,12 @@ static bool all_enabled_after_request(const BModeMachine *machine,
     return true;
 }
 
+/*
+ * 呼出し1回を制御状態機械の1イベントとして扱う。
+ * 判定優先順位はE-STOP/外部FAULT、稼働中の周期異常、通常遷移。
+ * 最後にdrive_allowedを状態から一意に導出し、FAULT解除と同じイベントで
+ * 暗黙に再ARMしないようにする。物理非常停止はこの関数の外に必要。
+ */
 BModeOutput b_mode_step(BModeMachine *machine, const BModeInput *input,
                         uint64_t now_us)
 {
@@ -102,6 +138,7 @@ BModeOutput b_mode_step(BModeMachine *machine, const BModeInput *input,
         result.request_rs_disable = true;
         return result;
     }
+    /* 欠損した入力で最後のトルク許可を保持しない。FAULTへラッチする。 */
     if (input == NULL) {
         machine->mode = B_MODE_FAULT;
         machine->fault_cause = B_FAULT_GUARD;
@@ -110,6 +147,8 @@ BModeOutput b_mode_step(BModeMachine *machine, const BModeInput *input,
         goto finish;
     }
 
+    /* 最優先の異常入力。E-STOPでは電源遮断の「要求」を追加するのみ。
+     * 実電源を遮断できるかはF303と独立した物理経路の責務である。 */
     if (input->estop_active || input->external_fault) {
         machine->mode = B_MODE_FAULT;
         machine->fault_cause = input->estop_active ?
@@ -134,6 +173,8 @@ BModeOutput b_mode_step(BModeMachine *machine, const BModeInput *input,
 
     ready = arm_preconditions(input);
 
+    /* FAULT→DISARMEDの解除は明示エッジと許可の両方を要求する。
+     * この同一ティック中に後続のARM遷移を実行しない分岐順序を維持する。 */
     if (machine->mode == B_MODE_FAULT) {
         /* 明示的な故障原因解除許可なしに再ARMはしない。 */
         if (input->clear_fault_edge && input->clear_authorized) {
@@ -142,6 +183,8 @@ BModeOutput b_mode_step(BModeMachine *machine, const BModeInput *input,
             machine->arm_pending = false;
         }
     } else if (machine->mode == B_MODE_BALANCING) {
+        /* 稼働中の鮮度・校正前提の欠落は中止より強いFAULTとし、
+         * 明示DISARMではFAULTを生成せず駆動禁止に遷移する。 */
         if (!ready) {
             machine->mode = B_MODE_FAULT;
             machine->fault_cause = B_FAULT_GUARD;
@@ -178,6 +221,8 @@ BModeOutput b_mode_step(BModeMachine *machine, const BModeInput *input,
     }
 
 finish:
+    /* 状態から許可を導き、外部が内部フラグを二重管理しないようにする。
+     * 現在の値を記録しても、その周期に新規センサが来たことにはならない。 */
     machine->last_step_us = now_us;
     machine->has_last_step = true;
     result.mode = machine->mode;
@@ -186,6 +231,12 @@ finish:
     return result;
 }
 
+/*
+ * 前回の目標値から1周期に進める量を max_rate × dt に制限する。
+ * スティックがニュートラルへ戻った際にも瞬間的な指令反転を避けるため、
+ * 出力範囲そのものではなく「前回からの変化量」を飽和する。
+ * NaN・Infと不正周期は0へフェイルクローズする。
+ */
 bool b_rate_limit(float previous, float request, float max_rate,
                   float dt_s, float *result)
 {
@@ -218,6 +269,11 @@ bool b_rate_limit(float previous, float request, float max_rate,
     return true;
 }
 
+/*
+ * 2輪の合計バランストルクをまず左右同量に分け、そのあとYaw差動を配分する。
+ * 左右個別の上限が異なるときは小さい側を共通成分の上限とし、
+ * 残容量の範囲でのみYawを入れるため、姿勢保持を優先する。
+ */
 bool b_wheel_allocate(float total_balance_nm, float yaw_delta_nm,
                       float left_limit_nm, float right_limit_nm,
                       BWheelAllocation *result)
@@ -241,6 +297,8 @@ bool b_wheel_allocate(float total_balance_nm, float yaw_delta_nm,
     base_request = total_balance_nm / 2.0f;
     base_limit = fminf(left_limit_nm, right_limit_nm);
     base = fmaxf(-base_limit, fminf(base_limit, base_request));
+    /* 共通成分を使った後の左右の余剰トルクだけをYawへ割り当てる。
+     * 飽和は正常な制限動作であって、それだけではFAULTにしない。 */
     yaw_limit = fminf(left_limit_nm - fabsf(base),
                       right_limit_nm - fabsf(base));
     yaw = fmaxf(-yaw_limit, fminf(yaw_limit, yaw_delta_nm));
@@ -253,6 +311,11 @@ bool b_wheel_allocate(float total_balance_nm, float yaw_delta_nm,
     return true;
 }
 
+/*
+ * 6状態誤差と2×6ゲインの純粋な行列積。配置順を構造体レイアウトに
+ * 依存させず、状態・目標の単位付きフィールドから明示的に転記する。
+ * 状態/ゲイン/平衡入力を外部で検証するまでARM条件は満たされない。
+ */
 bool b_lqr_compute(const BLqrConfig *config, const BControlState *state,
                    const BControlState *target, BControlTorque *torque)
 {
@@ -298,10 +361,15 @@ bool b_lqr_compute(const BLqrConfig *config, const BControlState *state,
             return false;
         }
     }
+    /* 車輪の積算位置が走行で無制限に離れても、その誤差だけで
+     * 必要以上のトルクを要求しないよう位置成分のみに制限を掛ける。 */
     error[B_STATE_POSITION] =
         fmaxf(-config->max_position_error_m,
               fminf(config->max_position_error_m, error[B_STATE_POSITION]));
 
+    /* u = u_eq - K(x - x_ref)。
+     * doubleで積を蓄積しfloat出力へ戻す前にオーバーフローを拒否する。
+     * これは行列演算の正しさであって、実機のKが安全という意味ではない。 */
     for (j = 0; j < B_OUTPUT_COUNT; ++j) {
         double value = config->equilibrium[j];
         if (!isfinite(value)) {
