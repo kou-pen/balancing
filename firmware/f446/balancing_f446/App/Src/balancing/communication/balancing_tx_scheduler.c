@@ -10,6 +10,8 @@
 #define RS_RX_TIMEOUT_US 30000u
 #define WHEEL_RX_TIMEOUT_US 20000u
 
+/* 論理バスを固定2スロットへ写像する。CAN1/2は別のメールボックス群。
+ * 不明なバスをCAN2として黙認しない。 */
 static int bus_slot(BSchedBus bus)
 {
     if (bus == B_SCHED_CAN1_RS06) {
@@ -18,6 +20,11 @@ static int bus_slot(BSchedBus bus)
     return bus == B_SCHED_CAN2_C620 ? 1 : -1;
 }
 
+/*
+ * FAULTは累積ビットとしてラッチし、以後の駆動許可を落とす。
+ * ソフトウェア上の未受付要求を破棄し、CAN2の次要求は0 Aへ置換する。
+ * HAL受付済みフレームや物理モータを停止できたことは保証しない。
+ */
 static void request_fault(BTxScheduler *s, uint32_t flags)
 {
     s->fault_requested = true;
@@ -38,6 +45,11 @@ static void request_fault(BTxScheduler *s, uint32_t flags)
     s->wheel_zero = true;
 }
 
+/*
+ * すべてのイベントを同じ単調増加us時計で記録する。
+ * 時刻が逆行した場合は、駆動中のみFAULTを要求して以後の更新を拒否。
+ * 先行イベントの時刻で期限を再計算するとTX欠落を見逃すため重要。
+ */
 static bool note_time(BTxScheduler *s, uint64_t now_us)
 {
     if (s->event_valid && now_us < s->last_event_us) {
@@ -51,6 +63,8 @@ static bool note_time(BTxScheduler *s, uint64_t now_us)
     return true;
 }
 
+/* 期限は差分で計算してuint64_t加算オーバーフローを避ける。
+ * しきい値ちょうどを「期限到達」と判定する。 */
 static bool expired(uint64_t now_us, uint64_t since_us, uint64_t limit_us)
 {
     return now_us >= since_us && now_us - since_us >= limit_us;
@@ -73,6 +87,12 @@ bool b_sched_init(BTxScheduler *s, const BSchedConfig *config)
     return true;
 }
 
+/*
+ * 受信フィードバック(RX)と実送信完了(TX)は独立に監視する。
+ * HALの受付成功はTX完了でも受信成功でもない。
+ * 有効化直後に完了履歴がない軸はactive_sinceを起点に期限を測る。
+ * 異常は最初に検出した系統をFAULTとして要求し、上位Safetyが扱う。
+ */
 static void check_freshness(BTxScheduler *s, uint64_t now_us)
 {
     if (!s->drive_active) {
@@ -107,6 +127,12 @@ static void check_freshness(BTxScheduler *s, uint64_t now_us)
     }
 }
 
+/*
+ * 500 Hz周期を仮想時刻で表現し、CAN2を毎ティック、CAN1を4ms位相で更新。
+ * 遅延したティックの過去世代を後追い送信しない。これにより
+ * 古いトルク要求が現在の制御結果より後から出ることを防ぐ。
+ * 本関数はデータなしの送信要求モデルであり、実フレームを生成しない。
+ */
 void b_sched_tick(BTxScheduler *s, uint64_t now_us, bool drive_allowed)
 {
     if (!s || !s->initialized || !note_time(s, now_us)) {
@@ -128,6 +154,8 @@ void b_sched_tick(BTxScheduler *s, uint64_t now_us, bool drive_allowed)
         s->tick_valid = true;
     }
 
+    /* 上位Safetyからの許可が落ちると、受付待ちのRS06要求を破棄する。
+     * 実CANを使ってType4を送る制御は別コンポーネントの責務。 */
     const bool activate = drive_allowed && !s->fault_requested;
     if (!activate) {
         if (s->drive_active) {
@@ -158,6 +186,8 @@ void b_sched_tick(BTxScheduler *s, uint64_t now_us, bool drive_allowed)
     s->wheel_pending = true;
     s->wheel_zero = !s->drive_active;
 
+    /* RS06の位相は4ms境界で進める。遅延した周期をバースト送信すると
+     * 3メールボックスに旧コマンドが溜まるので、最新世代のみ保持する。 */
     if (now_us >= s->next_rs_due_us) {
         /* 遅れた周期をまとめて送信しない。時間基準の位相を維持する。 */
         const uint64_t phases = (now_us - s->next_rs_due_us) / RS_PERIOD_US + 1u;
@@ -179,6 +209,11 @@ void b_sched_tick(BTxScheduler *s, uint64_t now_us, bool drive_allowed)
 
 /* next()とaccepted()に同じ占有条件を適用する。
  * accepted()は呼出し側が古いIntentを保持している場合でも再検証する。 */
+/*
+ * 前世代のフレームが実HALメールボックスに残る間は新世代を重ねない。
+ * 受付済み要求をソフトから取り消せないため、遅いCANが旧トルクを
+ * 後送する危険をモデル側で検知・抑制する。
+ */
 static bool rs_previous_generation_inflight(const BTxScheduler *s)
 {
     for (unsigned m = 0; m < 3u; ++m) {
@@ -190,6 +225,8 @@ static bool rs_previous_generation_inflight(const BTxScheduler *s)
     return false;
 }
 
+/* C620の共通0x200は1フレームに4軸分が入る。
+ * 旧0x200のHAL受付が残る間は別世代の共通指令を重ねない。 */
 static bool wheel_inflight(const BTxScheduler *s)
 {
     for (unsigned m = 0; m < 3u; ++m) {
@@ -200,6 +237,11 @@ static bool wheel_inflight(const BTxScheduler *s)
     return false;
 }
 
+/*
+ * 未受付の最新世代Intentを提示するだけでキューには積まない。
+ * 同じIntentを複数回参照し得るため、実HALが送信を受けた場合のみ
+ * accepted()で占有を確定する。
+ */
 bool b_sched_next(const BTxScheduler *s, BSchedBus bus, BSchedIntent *intent)
 {
     if (!s || !s->initialized || !intent) {
@@ -229,6 +271,12 @@ bool b_sched_next(const BTxScheduler *s, BSchedBus bus, BSchedIntent *intent)
     return false;
 }
 
+/*
+ * HALがメールボックスへの受付に成功した時刻を記録する。
+ * next()の呼出し後に別の制御ティックやFAULTが発生した可能性があるので、
+ * 世代・軸・駆動許可・占有状態を改めて検証する。
+ * 実HAL受付と本関数の間の割込み競合の扱いは統合層の責務。
+ */
 bool b_sched_accepted(BTxScheduler *s, const BSchedIntent *intent,
                       uint8_t mailbox, uint64_t now_us)
 {
@@ -260,12 +308,19 @@ bool b_sched_accepted(BTxScheduler *s, const BSchedIntent *intent,
     } else {
         s->wheel_pending = false;
     }
+    /* 後の送信完了通知で、そのメールボックスの元の世代を特定する。
+     * 受付済みでも実バスへ出たとは限らず、完了時刻は別途記録する。 */
     s->mail[bus][mailbox].active = true;
     s->mail[bus][mailbox].intent = *intent;
     s->mail[bus][mailbox].accepted_us = now_us;
     return true;
 }
 
+/*
+ * HALの送信完了と受付を区別し、古い世代の完了では現在のTX鮮度を回復しない。
+ * 遅延完了でもメールボックス占有は解放して次要求に進める。
+ * 結果は物理モータの停止やCANの信頼性を保証しない。
+ */
 bool b_sched_completed(BTxScheduler *s, BSchedBus bus,
                        uint8_t mailbox, uint64_t now_us)
 {
@@ -292,6 +347,10 @@ bool b_sched_completed(BTxScheduler *s, BSchedBus bus,
     return true;
 }
 
+/*
+ * 通信デコーダが新規妥当と判定したフィードバックの受信時刻だけ受け取る。
+ * TX完了とは別の時刻を保持し、同一時刻の再投入では鮮度を延長しない。
+ */
 bool b_sched_feedback(BTxScheduler *s, BSchedBus bus,
                       uint8_t axis, uint64_t now_us)
 {
@@ -316,6 +375,8 @@ bool b_sched_feedback(BTxScheduler *s, BSchedBus bus,
     return true;
 }
 
+/* CAN Bus-offを上位から通知された場合、FAULT要求をラッチする。
+ * 実CANの復旧手順やFAULT解除は本送信モデルの責務外である。 */
 void b_sched_bus_off(BTxScheduler *s, uint64_t now_us)
 {
     if (s && s->initialized && note_time(s, now_us)) {
