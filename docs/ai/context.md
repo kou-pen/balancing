@@ -29,7 +29,11 @@ routing:
     - docs/design/leg-kinematics.md
     - docs/verification/issue7-kinematics-host.md
     - docs/design/observation-snapshot.md
+    - docs/design/operator-input.md
+    - docs/design/attitude-filter.md
     - docs/verification/issue10-observation-host.md
+    - firmware/f446/balancing_f446/App/Src/balancing/app/balancing_operator_input.c
+    - firmware/f446/balancing_f446/App/Src/balancing/control/filter/balancing_attitude_filter.c
   can:
     - docs/specs/protocols/
     - docs/design/motor-layer.md

@@ -6,8 +6,8 @@ STM32F446を中心に、脚機構と車輪を協調制御するロボットの�
 
 | 領域 | 確認できていること | まだ確認できていないこと |
 |---|---|---|
-| F446のコード | C++17入口とC11モジュール。CubeIDE Debug/Releaseで6ソースのARMビルドPASS | 実機書込み、実時間500 Hz |
-| 制御・通信の基礎 | 制御コア、RS06/C620符号化、CAN送信要求モデルのホスト試験PASS | CAN/HALの通常運転統合、実機の停止性能 |
+| F446のコード | C++17入口とC11モジュール。CubeIDE Debug/Releaseで10ソースのARMビルドPASS | 実機書込み、実時間500 Hz |
+| 制御・通信の基礎 | 制御コア、CAN通信、IMU数学フィルタ、操作入力モックのホスト試験PASS | CAN/HAL・USB/I2Cの実機統合、停止性能 |
 | ロボット全体 | 制御・通信・安全の設計と仕様IDを整備 | 状態推定・VMC等の結合、F303統合、実機倒立 |
 
 **ホストPASSと実機PASSは別物です。** 今のビルド成果物は、モータを安全に動かせることを保証しません。
@@ -33,6 +33,7 @@ STM32F446を中心に、脚機構と車輪を協調制御するロボットの�
 python3 tools/validate_specs.py
 python3 tools/run_host_tests.py
 cmake -S . -B build/host-cmake
+cmake --build build/host-cmake -j4
 cmake --build build/host-cmake --target test
 ```
 

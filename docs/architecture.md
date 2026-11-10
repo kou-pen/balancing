@@ -36,10 +36,11 @@ flowchart LR
 
 | 層 | 現状 | 詳細 |
 |---|---|---|
-| C++入口・CubeIDE | 6ソースのDebug/Release ARMビルドPASS | [F446配置・ビルド記録](verification/f446-module-layout.md) |
+| C++入口・CubeIDE | 現行10ソースのDebug/Release ARMビルドPASS | [現行ホスト・ビルド記録](verification/issue10-observation-host.md) |
 | 状態機械・LQR数値関数 | ホスト試験PASS。一部の仕様不一致は残存 | [制御コア](software-core.md)・[仕様差分](verification/core-mode-contract-audit.md) |
 | RS06/C620通信と送信調停 | コーデック・スケジューラのホスト試験PASS | [モータ通信](design/motor-layer.md)・[送信モデル](design/can-scheduler.md) |
-| センサ統合・VMC・実CAN駆動 | 通常運転経路は未完成 | [ロードマップ](todo/roadmap.md) |
+| IMU/車輪と操作入力 | 時刻付き入力、相補フィルタ、USB/CAN操作元モックのホスト試験PASS。実I/Oは未接続 | [観測](design/observation-snapshot.md)・[入力](design/operator-input.md)・[姿勢フィルタ](design/attitude-filter.md) |
+| VMC・実CAN駆動 | 通常運転経路は未完成 | [ロードマップ](todo/roadmap.md) |
 | F303電源連携・実機倒立 | 未検証 | [実機検証TODO](todo/verification.md) |
 
 ## 安全に関する境界
