@@ -3,7 +3,7 @@
 **日付:** 2026-11-09  
 **環境:** Balancing Development VM（`/home/dev-admin/chatgpt-workspace/balancing`）  
 **実装コミット:** `0a78f94`（初期実装）、`ec8402b`（不正初期化時の無効化ガード）。  
-**作業ブランチ:** `feature/issue5-host-scheduler`（PR #16の作業ブランチ `refactor/f446-unified-firmware-tree` から派生）  
+**作業ブランチ:** `feature/issue5-host-scheduler`（2026-11-10にマージ済みPR #16の `master` を取り込み、ホスト用実装を独立PRで提出）  
 **実施範囲:** PC仮想時刻・模擬CANメールボックスのみ。実機書込み/駆動なし。
 
 ## 検証対象
@@ -17,7 +17,7 @@
 
 | コマンド | 結果 |
 |---|---|
-| `python3 tools/run_host_tests.py` | **PASS**：制御コア、CAN codec、HAL模擬、C++、CANスケジューラ（通常＋UBSan）、CubeIDE設定回帰13件 |
+| `python3 tools/run_host_tests.py` | **PASS**：制御コア、CAN codec、HAL模擬、C++、CANスケジューラ（通常＋UBSan）、CubeIDE設定回帰16件 |
 | `cmake -S . -B build/host-cmake` | **PASS** |
 | `cmake --build build/host-cmake -j 4` | **PASS** |
 | `cmake --build build/host-cmake --target test` | **PASS**：CTest 5/5 |
@@ -26,7 +26,7 @@
 | `python3 tools/dev_lint.py ruff-check` | **PASS** |
 | `python3 tools/dev_lint.py ruff-format-check` | **PASS** |
 | `doxygen Doxyfile` | **PASS**：既知の日本語翻訳警告あり |
-| 新しい配置でのSTM32CubeIDE Debug/Releaseクロスビルド | **NOT RUN**（PR #16のブロッカー継続） |
+| 新しい6ソース構成でのSTM32CubeIDE Debug/Releaseクロスビルド | **NOT RUN**（PR #16の5ソース管理ビルドはPASS。本Issue追加の`balancing_tx_scheduler.c`はMakefile未再生成） |
 | CAN1/2実機バス波形・CPU負荷・ISR競合 | **NOT RUN** |
 | 実機書込み・送信・モータ駆動 | **NOT RUN** |
 
@@ -75,7 +75,17 @@
 2. HAL送信API成功からモデル`accepted()`記録までの割込み競合を防ぐ手順。CAN1/2それぞれのIRQ優先順位。
 3. 実機計測に基づくRS06各軸/C620共通送信のタイムアウト値。現在は未決定。
 4. `BModeMachine`の既存FAULT入力へ送信監視エラーを結合すること。物理非常停止の独立動作。
-5. CubeIDEプロジェクトの新しいApp/Srcソース全件をコンパイルしてDebug/ReleaseのELFを確認。PR #16の`tools/verify_f446_build.py`がPASSするまで、過去の成果物で代用しない。
+5. CubeIDEプロジェクトの新規`balancing_tx_scheduler.c`を含めた6ソース全件をコンパイルしてDebug/ReleaseのELFを確認。PR #16の5ソース成功は本Issueの6ソース成功を意味しない。`tools/verify_f446_build.py`は現時点で両構成NOT VERIFIED。
 6. 実CAN 1 Mbpsの負荷、割込みレイテンシ、CPU使用率、TX完了タイムスタンプ、RX鮮度、PWM/制御周期の測定。
 
 **結論：** Issue #5のホストで検証可能な要求モデルは作成し、仮想時刻による正常系・故障系の試験がPASS。MCUクロスビルドと実機の締切・安全性は証明していない。Issueは安全・実機検証未完につき自動クローズしない。
+
+## 2026-11-10：ホスト実装の統合ゲートと構造移動の順序
+
+- PR #16 は `master` にSquashマージ済み。既存コード一元配置の基準は確定した。
+- Issue #5の**受入条件で指定された仮想時刻スケジューラの挙動・CAN1 3メールボックス・遅延時破棄・RX/TX独立監視・6 ms周期停止・時刻逆行のホスト検証はPASS**（通常・UBSan）。CMake/CTest 5/5、仕様監査、Ruff、DoxygenもPASS。
+- **このPRの完了範囲は抽象送信要求モデルとホスト故障注入まで**。実機値・HAL割込み経路・Type3/Type4物理停止調停・モータ駆動は接続も認証もしていない。
+- 新規C11ソースはまだMCUの生成Makefileに含まれないため、CubeIDE Debug/Release実リンクはこのコミットでは未確認。追加ソースを認識させるCubeIDE正規再生成が必要。
+- **作業順序の変更（ユーザー指示）**：このホスト実装をPRで区切った後、C11/C++自作コードを`App/Inc/balancing`と`App/Src/balancing`へ**まとめて再配置**する。移動と同時に制御・通信ロジックの書き換えはしない。ヘッダ公開参照、CMake、テスト、IDE設定、設計文書を移動PRで更新。
+- ハードウェアが使えないため、Issue #5そのものの実機安全検証をPASS扱いにせず、未実施チェックを残す。実機TXタイムアウト値は方針A（実測後に確定）を維持。
+
