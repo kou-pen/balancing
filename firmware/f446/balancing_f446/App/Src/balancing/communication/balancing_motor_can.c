@@ -1,4 +1,4 @@
-#include "balancing_motor_can.h"
+#include "balancing/communication/balancing_motor_can.h"
 
 #include <math.h>
 #include <stddef.h>

@@ -1,5 +1,5 @@
-#include "balancing_motor_bench.h"
-#include "balancing_motor_can.h"
+#include "balancing/app/balancing_motor_bench.h"
+#include "balancing/communication/balancing_motor_can.h"
 
 #include <assert.h>
 #include <math.h>

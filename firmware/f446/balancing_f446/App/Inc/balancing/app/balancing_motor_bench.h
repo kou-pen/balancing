@@ -1,7 +1,7 @@
 #ifndef BALANCING_MOTOR_BENCH_H
 #define BALANCING_MOTOR_BENCH_H
 
-#include "balancing_motor_can.h"
+#include "balancing/communication/balancing_motor_can.h"
 #include <stdbool.h>
 #include <stdint.h>
 

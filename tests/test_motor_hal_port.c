@@ -1,4 +1,4 @@
-#include "balancing_f446_motor_bench_port.h"
+#include "balancing/device/balancing_f446_motor_bench_port.h"
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>

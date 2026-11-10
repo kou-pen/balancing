@@ -1,4 +1,4 @@
-#include "balancing_core.h"
+#include "balancing/control/controller/balancing_core.h"
 
 #include <assert.h>
 #include <math.h>
