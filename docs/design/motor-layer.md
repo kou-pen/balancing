@@ -11,12 +11,12 @@
 
 | ファイル | 役割 |
 |---|---|
-| `firmware/f446/balancing_f446/App/Inc/balancing_motor_can.h` | CANフレーム／フィードバックの名前付き型、公開API |
-| `firmware/f446/balancing_f446/App/Src/balancing_motor_can.c` | RS06 Type 1/2/3/4、C620 0x200/0x201〜204の符号化・復号 |
-| `firmware/f446/balancing_f446/App/Inc/balancing_motor_bench.h` | 短時間・単軸試運転用の最小状態管理API |
-| `firmware/f446/balancing_f446/App/Src/balancing_motor_bench.c` | 有効化応答確認、送信・受信鮮度、試運転時間制限、停止要求 |
-| `firmware/f446/balancing_f446/App/Inc/balancing_f446_motor_bench_port.h` | F446/HAL向けの接続API |
-| `firmware/f446/balancing_f446/App/Src/balancing_f446_motor_bench_port.c` | bxCAN1/2送受信と送信完了メールボックスの連携 |
+| `firmware/f446/balancing_f446/App/Inc/balancing/communication/balancing_motor_can.h` | CANフレーム／フィードバックの名前付き型、公開API |
+| `firmware/f446/balancing_f446/App/Src/balancing/communication/balancing_motor_can.c` | RS06 Type 1/2/3/4、C620 0x200/0x201〜204の符号化・復号 |
+| `firmware/f446/balancing_f446/App/Inc/balancing/app/balancing_motor_bench.h` | 短時間・単軸試運転用の最小状態管理API |
+| `firmware/f446/balancing_f446/App/Src/balancing/app/balancing_motor_bench.c` | 有効化応答確認、送信・受信鮮度、試運転時間制限、停止要求 |
+| `firmware/f446/balancing_f446/App/Inc/balancing/device/balancing_f446_motor_bench_port.h` | F446/HAL向けの接続API |
+| `firmware/f446/balancing_f446/App/Src/balancing/device/balancing_f446_motor_bench_port.c` | bxCAN1/2送受信と送信完了メールボックスの連携 |
 | `tests/test_motor_can.c` | RS06/C620既知フレーム、入力拒否、故障・タイムアウトのホスト試験 |
 
 **正式な制御層との接続点：** 500 HzのLQR/VMCでモータ軸の物理トルク・車輪電流を求め、駆動許可・上限を確定させてから`b_rs06_torque_frame`／`b_c620_current_frame`へ渡す。安全状態機械自体は既存`BModeMachine`を使う。**試運転専用`BMotorBench`を通常バランシングの状態機械に組み込まない。**
@@ -33,7 +33,7 @@
 
 ## HAL実装へ接続する条件
 
-実際のSTM32CubeIDEプロジェクトは firmware/f446/balancing_f446/ にあり、IOC・main.c・スタートアップコードとHALを含む。2026-11-09にCubeIDE 1.19.0のヘッドレスF446クロスビルドで非駆動C++アプリ骨組みのELF生成はPASS。**移動前にはモータCANアダプタとC11モータCAN層がMCUビルド対象外だったが、現在は`App/Src`に配置された。移動後のCubeIDEビルドは未検証で、CAN初期化・送受信callbackは未接続。**モータを駆動できる完成ファームウェアではなく、実機へは書き込まない。
+実際のSTM32CubeIDEプロジェクトは firmware/f446/balancing_f446/ にあり、IOC・main.c・スタートアップコードとHALを含む。2026-11-09にCubeIDE 1.19.0のヘッドレスF446クロスビルドで非駆動C++アプリ骨組みのELF生成はPASS。**PR #16で5ソースのCubeIDE Debug/ReleaseクロスビルドはPASS。Issue #5追加のCAN送信モデルを含む6ソース新配置のCubeIDE再生成は未検証で、CAN初期化・送受信callbackは未接続。**モータを駆動できる完成ファームウェアではなく、実機へは書き込まない。
 
 CubeMX等で、F446のCAN1とCAN2を1 Mbit/sに設定し、CAN1拡張ID（RS06）、CAN2標準ID（C620）のフィルタ、CAN Rx FIFO0、Tx mailbox complete IRQ、2 msの時刻基準、IWDG、物理非常停止入力を準備する。CAN2使用時にはCAN1側のクロックとフィルタバンク分割に注意。ピンは基板回路図と照合する。
 

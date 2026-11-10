@@ -33,7 +33,7 @@ def cxx_metadata(project: str, cproject: str) -> tuple[str, str]:
     elif cproject.count(app_entry) != 2:
         raise ValueError("App source configuration is inconsistent")
 
-    # C files moved into App/Src include the hand-written App/Inc headers.
+    # C files in nested App/Src modules include hand-written App/Inc headers.
     # CubeMX may remove this setting during regeneration; --fix restores it.
     core_include = '<listOptionValue builtIn="false" value="../Core/Inc"/>'
     app_include = '<listOptionValue builtIn="false" value="../App/Inc"/>'
@@ -175,7 +175,7 @@ def audit() -> None:
     ioc = (PROJECT / "balancing_f446.ioc").read_text(encoding="utf-8")
     main = (PROJECT / "Core/Src/main.c").read_text(encoding="utf-8")
     bridge = PROJECT / "App/Inc/balancing_app_bridge.h"
-    app = PROJECT / "App/Src/application.cpp"
+    app = PROJECT / "App/Src/balancing/app/application.cpp"
     expected_ioc = {
         "HSE 16 MHz": "RCC.HSE_VALUE=16000000",
         "SYSCLK 168 MHz": "RCC.SYSCLKFreq_VALUE=168000000",

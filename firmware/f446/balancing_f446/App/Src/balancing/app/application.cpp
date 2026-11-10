@@ -1,4 +1,4 @@
-#include "../Inc/balancing_app_bridge.h"
+#include "../../../Inc/balancing_app_bridge.h"
 
 #include <cstdint>
 

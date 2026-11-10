@@ -19,7 +19,7 @@ common = [
     "-pedantic",
     "-I",
     str(F446_APP / "Inc"),
-    str(F446_APP / "Src" / "balancing_core.c"),
+    str(F446_APP / "Src" / "balancing" / "control" / "controller" / "balancing_core.c"),
     str(ROOT / "tests" / "test_core.c"),
     "-lm",
 ]
@@ -43,8 +43,8 @@ motor_common = [
     "-pedantic",
     "-I",
     str(F446_APP / "Inc"),
-    str(F446_APP / "Src" / "balancing_motor_can.c"),
-    str(F446_APP / "Src" / "balancing_motor_bench.c"),
+    str(F446_APP / "Src" / "balancing" / "communication" / "balancing_motor_can.c"),
+    str(F446_APP / "Src" / "balancing" / "app" / "balancing_motor_bench.c"),
     str(ROOT / "tests" / "test_motor_can.c"),
     "-lm",
 ]
@@ -68,7 +68,7 @@ scheduler_common = [
     "-pedantic",
     "-I",
     str(F446_APP / "Inc"),
-    str(F446_APP / "Src" / "balancing_tx_scheduler.c"),
+    str(F446_APP / "Src" / "balancing" / "communication" / "balancing_tx_scheduler.c"),
     str(ROOT / "tests" / "test_tx_scheduler.c"),
 ]
 for label, flags in [
@@ -92,9 +92,9 @@ hal_common = [
     str(ROOT / "tests" / "stubs"),
     "-I",
     str(F446_APP / "Inc"),
-    str(F446_APP / "Src" / "balancing_motor_can.c"),
-    str(F446_APP / "Src" / "balancing_motor_bench.c"),
-    str(F446_APP / "Src" / "balancing_f446_motor_bench_port.c"),
+    str(F446_APP / "Src" / "balancing" / "communication" / "balancing_motor_can.c"),
+    str(F446_APP / "Src" / "balancing" / "app" / "balancing_motor_bench.c"),
+    str(F446_APP / "Src" / "balancing" / "device" / "balancing_f446_motor_bench_port.c"),
     str(ROOT / "tests" / "test_motor_hal_port.c"),
     "-lm",
 ]
@@ -117,7 +117,7 @@ cpp_common = [
     "-pedantic",
     "-I",
     str(F446_APP / "Inc"),
-    str(F446_APP / "Src" / "application.cpp"),
+    str(F446_APP / "Src" / "balancing" / "app" / "application.cpp"),
     str(ROOT / "tests" / "test_cpp_app.cpp"),
 ]
 for label, flags in [

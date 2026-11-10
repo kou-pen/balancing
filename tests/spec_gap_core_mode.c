@@ -3,7 +3,7 @@
  * An expected nonzero exit status demonstrates MOTOR-151 is not yet implemented.
  * The pending diagnostic is observational: no timeout has been agreed.
  */
-#include "balancing_core.h"
+#include "balancing/control/controller/balancing_core.h"
 
 #include <stdint.h>
 #include <stdio.h>

@@ -16,7 +16,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from verify_f446_build import verify_configuration
+from verify_f446_build import app_sources, generated_makefile, verify_configuration
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT = ROOT / "firmware" / "f446" / "balancing_f446"
@@ -98,17 +98,19 @@ def main() -> int:
             )
             return 1
 
-        generated = PROJECT / config / "App" / "Src" / "subdir.mk"
-        if not generated.is_file():
-            print(f"NOT VERIFIED: {generated} missing", file=sys.stderr)
-            return 1
-        if MANUAL_PATCH_MARKER in generated.read_text(encoding="utf-8"):
-            print(
-                f"NOT VERIFIED: CubeIDE {config} left manually patched subdir.mk "
-                "unchanged; cannot claim automatic regeneration.",
-                file=sys.stderr,
-            )
-            return 1
+        app_src = PROJECT / "App" / "Src"
+        for source in app_sources(PROJECT):
+            generated = generated_makefile(PROJECT / config, source, app_src)
+            if not generated.is_file():
+                print(f"NOT VERIFIED: {generated} missing", file=sys.stderr)
+                return 1
+            if MANUAL_PATCH_MARKER in generated.read_text(encoding="utf-8"):
+                print(
+                    f"NOT VERIFIED: CubeIDE {config} left manually patched subdir.mk "
+                    f"in {generated}; cannot claim automatic regeneration.",
+                    file=sys.stderr,
+                )
+                return 1
 
         errors = verify_configuration(PROJECT, config)
         if errors:

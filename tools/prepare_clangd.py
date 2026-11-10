@@ -36,7 +36,8 @@ def main() -> None:
     # Host CMake retains real build flags for App C++ sources.
     sources = sorted((MCU / "Core" / "Src").glob("*.c"))
     # The HAL port has its own host-stub entry. Replace it with real STM32 HAL flags.
-    sources += sorted((MCU / "App" / "Src").glob("*.c"))
+    # App sources are nested under the balancing/ module tree.
+    sources += sorted((MCU / "App" / "Src").rglob("*.c"))
     if not sources:
         raise SystemExit("No generated MCU Core/Src found")
     source_keys = {str(source.resolve()) for source in sources}

@@ -9,6 +9,13 @@
 - `../balancing-spec/`は過去のスナップショット。通常の編集対象ではない。
 - MOTOR決定事項が優先。MOTOR-095（再起動時FAULT保持）とMOTOR-132（起き上がり関連の詳細）は**保留**。ただしMOTOR-159でARM時の脚長目標初期値は**現在脚長**に決定済み。CAN ID、フレーム、電流上限、ゲインは推測で確定しない。
 
+## ファイル配置規約
+
+- F446のCubeMX生成`Core/`・`Drivers/`は移動しない。自作C11/C++は`firmware/f446/balancing_f446/App/{Inc,Src}/balancing/`の機能別ミラー階層で管理する。
+- 生成`main.c`からC++を呼ぶ公開ブリッジ`App/Inc/balancing_app_bridge.h`は互換性のため直下に残す。
+- 分類は`app/`・`control/controller/`・`control/estimator/`・`control/filter/`・`device/`・`communication/`・`core/`。`util/`は作らず、機能固有の処理を安易に`core/`へ置かない。
+- パスだけの一括移動と、制御アルゴリズムの分割・挙動変更は別PRとして扱う。[配置と再生成の検証](docs/verification/f446-module-layout.md)を参照。
+
 ## コード変更時の必須手順
 
 1. 対象の**仕様ID**、基板（F446／F303）、TODO、観測できる受入結果を特定する。

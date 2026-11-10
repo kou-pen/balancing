@@ -11,10 +11,10 @@ set(CMAKE_C_EXTENSIONS OFF)
 set(F446_APP firmware/f446/balancing_f446/App)
 
 add_library(balancing_core STATIC
-    ${F446_APP}/Src/balancing_core.c
-    ${F446_APP}/Src/balancing_motor_can.c
-    ${F446_APP}/Src/balancing_motor_bench.c
-    ${F446_APP}/Src/balancing_tx_scheduler.c
+    ${F446_APP}/Src/balancing/control/controller/balancing_core.c
+    ${F446_APP}/Src/balancing/communication/balancing_motor_can.c
+    ${F446_APP}/Src/balancing/app/balancing_motor_bench.c
+    ${F446_APP}/Src/balancing/communication/balancing_tx_scheduler.c
 )
 target_include_directories(balancing_core PUBLIC
     ${F446_APP}/Inc
@@ -42,7 +42,7 @@ add_test(NAME balancing_tx_scheduler_tests COMMAND balancing_tx_scheduler_tests)
 # This does not replace a real STM32CubeMX build or an MCU hardware test.
 add_executable(balancing_motor_hal_port_tests
     tests/test_motor_hal_port.c
-    ${F446_APP}/Src/balancing_f446_motor_bench_port.c
+    ${F446_APP}/Src/balancing/device/balancing_f446_motor_bench_port.c
 )
 target_include_directories(balancing_motor_hal_port_tests PRIVATE
     tests/stubs
@@ -54,7 +54,7 @@ add_test(NAME balancing_motor_hal_port_tests COMMAND balancing_motor_hal_port_te
 # C++ entry bridge is kept outside CubeMX-owned Core/Src. Host test only.
 add_executable(balancing_cpp_app_tests
     tests/test_cpp_app.cpp
-    ${F446_APP}/Src/application.cpp
+    ${F446_APP}/Src/balancing/app/application.cpp
 )
 target_include_directories(balancing_cpp_app_tests PRIVATE
     ${F446_APP}/Inc

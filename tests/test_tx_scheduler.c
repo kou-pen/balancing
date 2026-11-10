@@ -1,4 +1,4 @@
-#include "balancing_tx_scheduler.h"
+#include "balancing/communication/balancing_tx_scheduler.h"
 
 #include <assert.h>
 #include <inttypes.h>

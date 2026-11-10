@@ -51,14 +51,27 @@ class CubeIdeMetadataTests(unittest.TestCase):
             with self.subTest(old_path=old_path):
                 self.assertFalse(any(item.is_file() for item in (root / old_path).rglob("*")))
 
-        for filename in (
-            "balancing_core.c",
-            "balancing_motor_can.c",
-            "balancing_motor_bench.c",
-            "balancing_f446_motor_bench_port.c",
-        ):
+        for filename in SOURCES:
             with self.subTest(filename=filename):
                 self.assertTrue((PROJECT / "App" / "Src" / filename).is_file())
+        # All hand-written translation units belong under the agreed module root.
+        self.assertFalse(list((PROJECT / "App" / "Src").glob("*.c")))
+        self.assertFalse(list((PROJECT / "App" / "Src").glob("*.cpp")))
+
+    def test_public_headers_mirror_source_modules(self) -> None:
+        expected = (
+            "balancing/app/balancing_motor_bench.h",
+            "balancing/communication/balancing_motor_can.h",
+            "balancing/communication/balancing_tx_scheduler.h",
+            "balancing/control/controller/balancing_core.h",
+            "balancing/device/balancing_f446_motor_bench_port.h",
+        )
+        inc = PROJECT / "App" / "Inc"
+        self.assertTrue((inc / "balancing_app_bridge.h").is_file())
+        for relative in expected:
+            with self.subTest(header=relative):
+                self.assertTrue((inc / relative).is_file())
+                self.assertFalse((inc / Path(relative).name).exists())
 
     def test_both_cpp_linkers_explicitly_link_math_library(self) -> None:
         self.assertEqual(self.cproject.count('<listOptionValue builtIn="false" value="m"/>'), 2)
@@ -95,56 +108,89 @@ class CubeIdeBuildArtifactTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.project = Path(self.temp.name)
         app_src = self.project / "App" / "Src"
-        generated = self.project / "Debug" / "App" / "Src"
+        build = self.project / "Debug"
         app_src.mkdir(parents=True)
-        generated.mkdir(parents=True)
+        build.mkdir(parents=True)
         (self.project / ".cproject").write_text("metadata", encoding="utf-8")
+        generated_by_folder: dict[Path, list[str]] = {}
+        object_list: list[str] = []
         for name in SOURCES:
-            (app_src / name).write_text("/* simulated source */", encoding="utf-8")
-            (generated / f"{Path(name).stem}.o").write_bytes(b"test object")
-        (generated / "subdir.mk").write_text(
-            "\n".join(f"../App/Src/{name}" for name in SOURCES),
-            encoding="utf-8",
+            relative = Path(name)
+            source = app_src / relative
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_text("/* simulated source */", encoding="utf-8")
+            generated = build / "App" / "Src" / relative.parent
+            generated.mkdir(parents=True, exist_ok=True)
+            (generated / f"{relative.stem}.o").write_bytes(b"test object")
+            generated_by_folder.setdefault(generated, []).append(f"../App/Src/{name}")
+            object_list.append(f"./App/Src/{relative.with_suffix('.o').as_posix()}")
+        for folder, entries in generated_by_folder.items():
+            (folder / "subdir.mk").write_text(chr(10).join(entries), encoding="utf-8")
+        (build / "objects.list").write_text(chr(10).join(object_list), encoding="utf-8")
+        self.elf = build / "balancing_f446.elf"
+        self.elf.write_bytes(
+            bytes.fromhex("7f 45 4c 46 01 01") + bytes(12) + bytes.fromhex("28 00")
         )
-        (self.project / "Debug" / "objects.list").write_text(
-            "\n".join(f"./App/Src/{Path(name).stem}.o" for name in SOURCES),
-            encoding="utf-8",
-        )
-        self.elf = self.project / "Debug" / "balancing_f446.elf"
-        self.elf.write_bytes(b"\x7fELF\x01\x01" + bytes(12) + b"\x28\x00")
 
     def test_complete_fresh_arm_build_is_accepted(self) -> None:
         self.assertEqual(verify_configuration(self.project, "Debug"), [])
 
     def test_future_app_c_source_cannot_be_silently_omitted(self) -> None:
-        new_source = self.project / "App" / "Src" / "future_scheduler.c"
+        new_source = self.project / "App/Src/balancing/communication/future_scheduler.c"
         new_source.write_text("/* new C implementation */", encoding="utf-8")
         errors = verify_configuration(self.project, "Debug")
         self.assertTrue(
-            any("generated makefile omits future_scheduler.c" in error for error in errors)
+            any(
+                "generated makefile omits" in error and "future_scheduler.c" in error
+                for error in errors
+            )
         )
-        self.assertTrue(any("objects.list omits future_scheduler.o" in error for error in errors))
+        self.assertTrue(
+            any("objects.list omits" in error and "future_scheduler.o" in error for error in errors)
+        )
 
     def test_future_cpp_source_cannot_be_silently_omitted(self) -> None:
-        new_source = self.project / "App" / "Src" / "future_adapter.cpp"
+        new_source = self.project / "App/Src/balancing/app/future_adapter.cpp"
         new_source.write_text("/* new C++ implementation */", encoding="utf-8")
         errors = verify_configuration(self.project, "Debug")
         self.assertTrue(
-            any("generated makefile omits future_adapter.cpp" in error for error in errors)
+            any(
+                "generated makefile omits" in error and "future_adapter.cpp" in error
+                for error in errors
+            )
+        )
+
+    def test_missing_generated_nested_makefile_is_rejected(self) -> None:
+        future = self.project / "App/Src/balancing/control/filter/future_filter.c"
+        future.parent.mkdir(parents=True)
+        future.write_text("/* future filter */", encoding="utf-8")
+        errors = verify_configuration(self.project, "Debug")
+        self.assertTrue(any("balancing/control/filter/subdir.mk" in error for error in errors))
+
+    def test_orphan_source_at_old_app_root_is_rejected(self) -> None:
+        (self.project / "App/Src/orphan.c").write_text("/* source */", encoding="utf-8")
+        errors = verify_configuration(self.project, "Debug")
+        self.assertTrue(any("Debug/App/Src/subdir.mk" in error for error in errors))
+
+    def test_missing_mandatory_source_is_rejected(self) -> None:
+        (self.project / "App/Src/balancing/control/controller/balancing_core.c").unlink()
+        errors = verify_configuration(self.project, "Debug")
+        self.assertTrue(
+            any("missing:" in error and "balancing_core.c" in error for error in errors)
         )
 
     def test_stale_makefile_is_detected_even_with_elf(self) -> None:
-        mk = self.project / "Debug" / "App" / "Src" / "subdir.mk"
-        mk.write_text("../App/Src/application.cpp\n", encoding="utf-8")
+        mk = self.project / "Debug/App/Src/balancing/control/controller/subdir.mk"
+        mk.write_text("../App/Src/balancing/app/application.cpp\\n", encoding="utf-8")
         errors = verify_configuration(self.project, "Debug")
-        self.assertTrue(any("omits balancing_core.c" in error for error in errors))
+        self.assertTrue(any("omits" in error and "balancing_core.c" in error for error in errors))
 
     def test_stale_object_is_rejected(self) -> None:
-        obj = self.project / "Debug" / "App" / "Src" / "balancing_core.o"
+        obj = self.project / "Debug/App/Src/balancing/control/controller/balancing_core.o"
         os.utime(obj, ns=(1, 1))
         self.assertTrue(
             any(
-                "stale object balancing_core.o" in error
+                "stale object" in error and "balancing_core.o" in error
                 for error in verify_configuration(self.project, "Debug")
             )
         )

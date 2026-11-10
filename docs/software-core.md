@@ -16,7 +16,7 @@
 | 校正とパラメータ | 実測K_300、電流上限、機械原点 | 未確定 |
 | MCU統合 | F446／F303動作、500 Hz実測、CANバス負荷 | 未検証 |
 
-実装ファイルは`firmware/f446/balancing_f446/App/Inc/balancing_core.h`と`firmware/f446/balancing_f446/App/Src/balancing_core.c`。HAL、ROS、MCU固有ライブラリに依存しない。
+実装ファイルは`firmware/f446/balancing_f446/App/Inc/balancing/control/controller/balancing_core.h`と`firmware/f446/balancing_f446/App/Src/balancing/control/controller/balancing_core.c`。HAL、ROS、MCU固有ライブラリに依存しない。
 
 ## データ構造の原則
 
@@ -74,13 +74,13 @@ C11の厳格警告付きビルドに加えUBSanによる未定義動作検査を
 
 ## モータCAN層の追加（2026-11-09）
 
-[モータCAN制御層と単軸試運転](design/motor-layer.md)を参照。RS06/C620のCANフレーム生成・復号、単軸試験の時間制限と受信鮮度をホスト試験済み。F446向け薄いHALアダプタも作成したが、**現在のCubeIDEプロジェクトには未統合**。`.ioc`・生成HALは存在し、非駆動C++アプリだけF446クロスビルドPASS。CAN開始・フィルタ・IRQ接続、実機動作は未確認。この試運転器を通常の`BModeMachine`と混同しない。
+[モータCAN制御層と単軸試運転](design/motor-layer.md)を参照。RS06/C620のCANフレーム生成・復号、単軸試験の時間制限と受信鮮度をホスト試験済み。F446向け薄いHALアダプタはCubeIDEのコンパイル対象に含まれ、PR #16の5ソース構成でクロスビルドPASS。ただし、**CAN開始・フィルタ・IRQおよび通常運転の呼出し経路は未接続**。一括再配置後の6ソース構成は別途CubeIDE管理ビルドを確認する。この試運転器を通常の`BModeMachine`と混同しない。
 
 ## 次の開発課題
 
 **2026-11-09の状態機械監査では、既存動作を保つ回帰テストを追加したが、安全状態機械の機能変更は行っていない。** [差分表](verification/core-mode-contract-audit.md)に、MOTOR-151の姿勢ゲート不一致、MOTOR-198の有効化失敗判定未実装、脚長初期化・DISARM時のC620ゼロ指令の未統合を記録した。仕様上の安全動作を変える修正は承認後に行う。
 
-- 500 Hz制御・250 Hz RS06指令の純粋な周期分周と異常時処理。
+- 500 Hz制御・250 Hz RS06指令の純粋な周期分周と異常時処理はIssue #5でホスト検証済み。残るのはHAL/Safetyへの統合と実機監視期限の実測確定。
 - 状態推定・6節リンクの運動学と数値微分による検証。
 - VMC、脚長PD、Roll PD、Yaw PI、指令の上限配分。
 - 既知フレームを用いたCAN符号化／復号のホスト試験。未確定IDは新設しない。

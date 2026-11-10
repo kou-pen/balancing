@@ -1,7 +1,7 @@
 #ifndef BALANCING_F446_MOTOR_BENCH_PORT_H
 #define BALANCING_F446_MOTOR_BENCH_PORT_H
 
-#include "balancing_motor_bench.h"
+#include "balancing/app/balancing_motor_bench.h"
 #include "stm32f4xx_hal.h"
 
 #ifdef __cplusplus

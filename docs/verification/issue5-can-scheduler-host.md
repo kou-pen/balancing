@@ -8,7 +8,7 @@
 
 ## 検証対象
 
-- 新規C11 `App/Inc/balancing_tx_scheduler.h`／`App/Src/balancing_tx_scheduler.c`。
+- 新規C11 `App/Inc/balancing/communication/balancing_tx_scheduler.h`／`App/Src/balancing/communication/balancing_tx_scheduler.c`。
 - 新規 `tests/test_tx_scheduler.c` を `tools/run_host_tests.py` の通常とUBSanの両方に追加。
 - CMake `balancing_tx_scheduler_tests` をCTestへ追加。
 - 既存 `application.cpp`、`main.c`、CAN HALアダプタ、安全状態機械は**変更していない**。

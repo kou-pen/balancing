@@ -8,7 +8,7 @@
 
 F446で実行する500 Hz制御ティックを基準に、CAN1のRS06×4へ250 Hz、CAN2のC620共通フレームへ500 Hzの**送信要求**を発行する。CAN送信の受付と完了、各モータの新しい受信報告は**別々の事象**である。外部HALが割り込んでも最新世代のみを扱い、古いトルクをソフトウェアに蓄積しないことを確認する。
 
-実装は `App/Inc/balancing_tx_scheduler.h` と `App/Src/balancing_tx_scheduler.c`。テストは `tests/test_tx_scheduler.c`。このAPIはモータを動かす機能を**持たない**。実際のトルク生成、CAN-ID符号化、HAL割込み接続、ドライバ許可、非常停止の保証を含めない。
+実装は `App/Inc/balancing/communication/balancing_tx_scheduler.h` と `App/Src/balancing/communication/balancing_tx_scheduler.c`。テストは `tests/test_tx_scheduler.c`。このAPIはモータを動かす機能を**持たない**。実際のトルク生成、CAN-ID符号化、HAL割込み接続、ドライバ許可、非常停止の保証を含めない。
 
 ## 2. 時系列：何が2 ms / 4 msなのか
 

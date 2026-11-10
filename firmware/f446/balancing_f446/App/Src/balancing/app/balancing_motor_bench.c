@@ -1,4 +1,4 @@
-#include "balancing_motor_bench.h"
+#include "balancing/app/balancing_motor_bench.h"
 #include <math.h>
 #include <stddef.h>
 #include <string.h>
