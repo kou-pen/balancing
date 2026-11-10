@@ -169,4 +169,17 @@ subprocess.run(
     cwd=ROOT,
     timeout=30,
 )
+print("[CAN通信契約の静的監査] 実行", flush=True)
+subprocess.run(
+    [sys.executable, "tools/check_can_contract.py"],
+    check=True,
+    cwd=ROOT,
+    timeout=30,
+)
+subprocess.run(
+    [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", "test_can_contract.py"],
+    check=True,
+    cwd=ROOT,
+    timeout=30,
+)
 print("ホスト試験：全件合格")

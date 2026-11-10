@@ -8,6 +8,7 @@
 |---|---|---|
 | F446の6ソース→7ソース | [旧配置検証](f446-module-layout.md)／[現行運動学](issue7-kinematics-host.md) | 7ソースのDebug/ReleaseクロスビルドもPASS（実機は未実施） |
 | CAN周期と送信調停 | [Issue #5ホスト試験](issue5-can-scheduler-host.md) | 仮想時刻・3メールボックス・故障注入 |
+| CAN仕様の整合とID重複 | [Issue #6 CAN静的照合](can-contract-audit.md) | RS06/C620の既知フレーム、F303/Piの未確定項目 |
 | ARM・FAULT判定の差分 | [状態機械の監査](core-mode-contract-audit.md) | ホスト回帰PASSと既知の仕様不一致 |
 | 脚運動学の数値演算 | [Issue #7数学fixture](issue7-kinematics-host.md) | 解析ヤコビアンと有限差分、実機CAD未検証 |
 | 過去のCubeIDE配置 | [5ソース配置の検証](f446-source-layout.md) | PR #16時点の構成と再生成結果 |
