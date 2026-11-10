@@ -15,7 +15,7 @@
 | 到達不能・特異姿勢 | 円が交差しない、接する、ほぼ一直線、NaN/Inf | ホストPASS |
 | 仮想仕事 | 軸力と仮想脚トルクからの機構軸トルク、理想外部比 | ホストPASS |
 | 実機六節リンク | 節の接続、仮想足先、組立分岐、左右の原点・方向 | **未検証** |
-| 新ソースのARMビルド | CubeIDEの正規Makefile再生成とDebug/Release | **NOT VERIFIED** |
+| 新ソースのARMビルド | CubeIDEの正規Makefile再生成とDebug/Release | **PASS：7ソース、0エラー・0警告** |
 
 このモデルは実機の六節リンクを数式化したものではありません。実接続が不明なため、別の数学fixtureとして二本の先端ロッドの円交点を解いています。旧来の脚長近似式を確定運動学として採用していません。
 
@@ -53,8 +53,10 @@ doxygen Doxyfile
 | 仕様ID・文書リンク | **PASS** |
 | Doxygen・Ruff | **PASS**（Doxygenの既知の日本語翻訳警告のみ） |
 | CubeIDEメタデータ整合 | **PASS** |
-| CubeIDE Debug/Release（7ソース） | **NOT VERIFIED**：新しい estimator/subdir.mk 未再生成 |
+| CubeIDE Debug/Release（7ソース） | **PASS：2026-11-10 12:44、両構成0エラー・0警告、ARM ELF32** |
 | 実機書込み・動作 | **NOT RUN** |
+
+CubeIDE本体のクリーンビルドは `python3 tools/regenerate_cubeide_f446.py` で実行。Debug 12:44:44、Release 12:44:59に両方 `Build Finished. 0 errors, 0 warnings.` を確認し、`python3 tools/verify_f446_build.py` で7ソース全件の生成Makefile・オブジェクト・ARM ELF32・成果物の鮮度をPASS。ログはGit管理外の `build/cubeide-managed-pr16/{debug,release}.log` に保存。
 
 追加テストでは、13×13の角度格子と2組立分岐を走査し、各成功点のヤコビアンを中央有限差分に比較しています。失敗時は出力をゼロ化し、入力・特異・到達不能を呼出側へ明確に返します。
 
