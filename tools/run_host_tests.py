@@ -183,8 +183,12 @@ for label, flags in [
 operator_common = [
     "gcc",
     "-std=c11",
-    "-Wall", "-Wextra", "-Werror", "-pedantic",
-    "-I", str(F446_APP / "Inc"),
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-pedantic",
+    "-I",
+    str(F446_APP / "Inc"),
     str(F446_APP / "Src" / "balancing" / "app" / "balancing_operator_input.c"),
     str(F446_APP / "Src" / "balancing" / "control" / "controller" / "balancing_core.c"),
     str(ROOT / "tests" / "test_operator_input.c"),
@@ -196,8 +200,7 @@ for label, flags in [
 ]:
     path = OUT / ("test_operator_input_ubsan" if flags else "test_operator_input")
     print(f"[{label}] コンパイル", flush=True)
-    subprocess.run(operator_common + flags + ["-o", str(path)],
-                   check=True, cwd=ROOT, timeout=30)
+    subprocess.run(operator_common + flags + ["-o", str(path)], check=True, cwd=ROOT, timeout=30)
     print(f"[{label}] 実行", flush=True)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
@@ -205,8 +208,12 @@ for label, flags in [
 attitude_common = [
     "gcc",
     "-std=c11",
-    "-Wall", "-Wextra", "-Werror", "-pedantic",
-    "-I", str(F446_APP / "Inc"),
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-pedantic",
+    "-I",
+    str(F446_APP / "Inc"),
     str(F446_APP / "Src" / "balancing" / "control" / "filter" / "balancing_attitude_filter.c"),
     str(ROOT / "tests" / "test_attitude_filter.c"),
     "-lm",
@@ -217,8 +224,7 @@ for label, flags in [
 ]:
     path = OUT / ("test_attitude_filter_ubsan" if flags else "test_attitude_filter")
     print(f"[{label}] コンパイル", flush=True)
-    subprocess.run(attitude_common + flags + ["-o", str(path)],
-                   check=True, cwd=ROOT, timeout=30)
+    subprocess.run(attitude_common + flags + ["-o", str(path)], check=True, cwd=ROOT, timeout=30)
     print(f"[{label}] 実行", flush=True)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
