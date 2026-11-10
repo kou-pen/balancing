@@ -228,6 +228,33 @@ for label, flags in [
     print(f"[{label}] 実行", flush=True)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
+# Issue #10: 新規センサ→snapshot→IMU推定・操作ゲートの連結ホスト回帰。
+flow_common = [
+    "gcc",
+    "-std=c11",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-pedantic",
+    "-I",
+    str(F446_APP / "Inc"),
+    str(F446_APP / "Src" / "balancing" / "app" / "balancing_operator_input.c"),
+    str(F446_APP / "Src" / "balancing" / "control" / "controller" / "balancing_core.c"),
+    str(F446_APP / "Src" / "balancing" / "control" / "estimator" / "balancing_observation.c"),
+    str(F446_APP / "Src" / "balancing" / "control" / "filter" / "balancing_attitude_filter.c"),
+    str(ROOT / "tests" / "test_issue10_flow.c"),
+    "-lm",
+]
+for label, flags in [
+    ("Issue10統合通常ビルド", []),
+    ("Issue10統合UBSan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"]),
+]:
+    path = OUT / ("test_issue10_flow_ubsan" if flags else "test_issue10_flow")
+    print(f"[{label}] コンパイル", flush=True)
+    subprocess.run(flow_common + flags + ["-o", str(path)], check=True, cwd=ROOT, timeout=30)
+    print(f"[{label}] 実行", flush=True)
+    subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
+
 print("[CubeIDE C++設定回帰試験] 実行", flush=True)
 subprocess.run(
     [
