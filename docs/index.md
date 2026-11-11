@@ -18,6 +18,7 @@
 | 要求仕様 | [仕様ID索引](spec-index.md) | F446/F303、通信、状態推定、制御、動作 |
 | 通信 | [CAN総覧](can-id-table.md) | バスとIDの一覧。フレーム定義は各プロトコル仕様が正本 |
 | 制御ソフト | [C11制御コア](software-core.md) | 状態機械、LQR計算、公開APIと単位 |
+| Yaw角速度制御 | [Yaw PI](design/yaw-pi.md) | 積分飽和防止、倒立優先の車輪余力、モードリセット |
 | データ構造 | [データモデル](design/data-model.md) | 所有権、スナップショット、モジュール境界 |
 | 脚運動学 | [閉リンク数学fixture](design/leg-kinematics.md) | 関節角、脚長、ヤコビアン。実機CAD未検証 |
 | 固定脚長制御 | [脚長PD・Roll PD](design/leg-pd-roll.md) | ARM前の脚長目標、支持力の抽象演算、未検証境界 |

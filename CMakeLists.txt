@@ -13,6 +13,7 @@ set(F446_APP firmware/f446/balancing_f446/App)
 add_library(balancing_core STATIC
     ${F446_APP}/Src/balancing/control/controller/balancing_core.c
     ${F446_APP}/Src/balancing/control/controller/balancing_leg_pd.c
+    ${F446_APP}/Src/balancing/control/controller/balancing_yaw_pi.c
     ${F446_APP}/Src/balancing/communication/balancing_motor_can.c
     ${F446_APP}/Src/balancing/app/balancing_motor_bench.c
     ${F446_APP}/Src/balancing/communication/balancing_tx_scheduler.c
@@ -42,6 +43,12 @@ add_executable(balancing_tx_scheduler_tests tests/test_tx_scheduler.c)
 target_link_libraries(balancing_tx_scheduler_tests PRIVATE balancing_core m)
 target_compile_options(balancing_tx_scheduler_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_tx_scheduler_tests COMMAND balancing_tx_scheduler_tests)
+
+# Yaw rate PI with conditional integration; no physical motor output (Issue #9).
+add_executable(balancing_yaw_pi_tests tests/test_yaw_pi.c)
+target_link_libraries(balancing_yaw_pi_tests PRIVATE balancing_core m)
+target_compile_options(balancing_yaw_pi_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME balancing_yaw_pi_tests COMMAND balancing_yaw_pi_tests)
 
 # CAD-unverified mathematical 2-input closed-chain fixture (Issue #7).
 add_executable(balancing_leg_kinematics_tests tests/test_leg_kinematics.c)
