@@ -255,6 +255,23 @@ for label, flags in [
     print(f"[{label}] 実行", flush=True)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
+# ARM前固定脚長目標とRoll差動をC11単体で検証。実機ゲインは使用しない。
+leg_pd_common = [
+    "gcc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
+    "-I", str(F446_APP / "Inc"),
+    str(F446_APP / "Src" / "balancing" / "control" / "controller" / "balancing_leg_pd.c"),
+    str(ROOT / "tests" / "test_leg_pd.c"), "-lm",
+]
+for label, flags in [
+    ("固定脚長/ロールPD通常ビルド", []),
+    ("固定脚長/ロールPD UBSan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"]),
+]:
+    path = OUT / ("test_leg_pd_ubsan" if flags else "test_leg_pd")
+    print(f"[{label}] コンパイル", flush=True)
+    subprocess.run(leg_pd_common + flags + ["-o", str(path)], check=True, cwd=ROOT, timeout=30)
+    print(f"[{label}] 実行", flush=True)
+    subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
+
 # 車輪倒立LQR配分との境界も含むYaw PIの通常・UBSan回帰。
 yaw_pi_common = [
     "gcc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",

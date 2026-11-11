@@ -14,9 +14,9 @@
 | `firmware/f446/balancing_f446/App/Inc/balancing/communication/balancing_motor_can.h` | CANフレーム／フィードバックの名前付き型、公開API |
 | `firmware/f446/balancing_f446/App/Src/balancing/communication/balancing_motor_can.c` | RS06 Type 1/2/3/4、C620 0x200/0x201〜204の符号化・復号 |
 | `firmware/f446/balancing_f446/App/Inc/balancing/app/balancing_motor_bench.h` | 短時間・単軸試運転用の最小状態管理API |
-| `firmware/f446/balancing_f446/App/Src/balancing/app/balancing_motor_bench.c` | 有効化応答確認、送信・受信鮮度、試運転時間制限、停止要求 |
+| `firmware/f446/balancing_f446/App/Src/balancing/app/balancing_motor_bench.c` | 有効化応答確認、試運転パルス期限、停止要求。受信タイムアウトの値と比較は持たない |
 | `firmware/f446/balancing_f446/App/Inc/balancing/device/balancing_f446_motor_bench_port.h` | F446/HAL向けの接続API |
-| `firmware/f446/balancing_f446/App/Src/balancing/device/balancing_f446_motor_bench_port.c` | bxCAN1/2送受信と送信完了メールボックスの連携 |
+| `firmware/f446/balancing_f446/App/Src/balancing/device/balancing_f446_motor_bench_port.c` | bxCAN1/2の受信時刻・期限判定、送信完了メールボックスの連携 |
 | `tests/test_motor_can.c` | RS06/C620既知フレーム、入力拒否、故障・タイムアウトのホスト試験 |
 
 **正式な制御層との接続点：** 500 HzのLQR/VMCでモータ軸の物理トルク・車輪電流を求め、駆動許可・上限を確定させてから`b_rs06_torque_frame`／`b_c620_current_frame`へ渡す。安全状態機械自体は既存`BModeMachine`を使う。**試運転専用`BMotorBench`を通常バランシングの状態機械に組み込まない。**
@@ -28,7 +28,7 @@
 - C620：CAN2、標準11bit、0x200で最大4台分。M3508のロータ角0〜8191、速度rpm。指令値±16384が±20 Aに対応する。ただし実機の許容電流上限とは別。
 - RS06の対象ID・主機ID・C620の対象ID、モータFW版、電源条件、低トルク／低電流試験上限は**未確定**。起動時に推測で埋めない。
 - 開発用`BMotorBench`は同時に複数モータへ非ゼロ指令を出さない。RS06はType3送信完了後の新規正常報告（mode=2、fault=0）を確認してからトルク指令を開始。C620は20 ms以内の正常形式フィードバック確認を要求する。
-- 試運転コードには**RS06最大0.5 N·m、C620最大0.5 A、最大200 ms**の保守的なハード上限を設ける。これらは機構安全を保証する数値ではなく、実機で確認する上限はさらに低く設定できる。RS06フィードバック30 ms切れ、C620フィードバック20 ms切れ、RS06有効化待ち150 ms経過時に出力を止める。運転中の異常では再起動要求を自動で発行しない。
+- 試運転コードには**RS06最大0.5 N·m、C620最大0.5 A、最大200 ms**の保守的なハード上限を設ける。これらは機構安全を保証する数値ではなく、実機で確認する上限はさらに低く設定できる。RS06フィードバック30 ms切れ、C620フィードバック20 ms切れは**CANポートだけで**判定し、`BMotorBench`へ真偽を渡す。RS06有効化待ち150 msは独立したトランザクション期限として残す。運転中の異常では再起動要求を自動で発行しない。
 - 試運転の終了時はRS06停止Type4、C620の0 Aを送信する。ただしCANバスオフ・MCU停止・無通電では送達できない。**これだけでは安全停止ではない**。独立した物理非常停止を必須とする。
 
 ## HAL実装へ接続する条件

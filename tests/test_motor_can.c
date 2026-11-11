@@ -119,13 +119,13 @@ static void test_bench_rs06(void)
     BMotorBenchConfig c = config();
     assert(b_bench_init(&bench, &c));
     BMotorCanFrame frame = {0};
-    assert(!b_bench_rs06_frame(&bench, 0u, &frame));
-    assert(b_bench_c620_frame(&bench, 0u, &frame));
+    assert(!b_bench_rs06_frame(&bench, 0u, false, &frame));
+    assert(b_bench_c620_frame(&bench, 0u, false, &frame));
     for (unsigned i=0; i<8u; ++i) assert(frame.data[i] == 0u);
     assert(!b_bench_request_rs06(&bench, 0.4f, 0u));
     assert(b_bench_request_rs06(&bench, 0.2f, 1000u));
     assert(!b_bench_request_rs06(&bench, 0.2f, 1001u));
-    assert(b_bench_rs06_frame(&bench, 1000u, &frame));
+    assert(b_bench_rs06_frame(&bench, 1000u, false, &frame));
     assert((frame.id >> 24) == 3u);
     b_bench_rs06_tx_done(&bench, &frame, 1100u);
 
@@ -133,12 +133,12 @@ static void test_bench_rs06(void)
         .motor_id = 1u, .host_id = 0xfdu, .mode = 2u, .fault_bits = 0u
     };
     b_bench_on_rs06_feedback(&bench, &fb, 1200u);
-    assert(b_bench_rs06_frame(&bench, 2000u, &frame));
+    assert(b_bench_rs06_frame(&bench, 2000u, true, &frame));
     assert((frame.id >> 24) == 1u);
     assert(bench.state == B_BENCH_RS06_PULSE);
 
-    b_bench_on_rs06_feedback(&bench, &fb, 60000u);
-    assert(b_bench_rs06_frame(&bench, 102000u, &frame));
+    /* フレーム自身に受信時刻の判定をさせず、ポートの期限超過判定を注入。 */
+    assert(b_bench_rs06_frame(&bench, 102000u, false, &frame));
     assert((frame.id >> 24) == 4u); /* stale feedback => fail closed */
     assert(bench.state == B_BENCH_FAILED);
     b_bench_rs06_tx_done(&bench, &frame, 102100u);
@@ -153,15 +153,15 @@ static void test_bench_wheel(void)
     BMotorBench bench;
     BMotorBenchConfig c = config();
     assert(b_bench_init(&bench, &c));
-    assert(!b_bench_request_c620(&bench, 0.2f, 1000u));
-    BC620Feedback fb = { .motor_id = 2u };
-    b_bench_on_c620_feedback(&bench, &fb, 1000u);
-    assert(b_bench_request_c620(&bench, 0.2f, 1500u));
+    assert(!b_bench_request_c620(&bench, 0.2f, 1000u, false));
+    /* CANポートが新しい対象IDの受信を確認した場合だけtrueを渡す。 */
+    assert(b_bench_request_c620(&bench, 0.2f, 1500u, true));
     BMotorCanFrame frame = {0};
-    assert(b_bench_c620_frame(&bench, 2000u, &frame));
+    assert(b_bench_c620_frame(&bench, 2000u, true, &frame));
     assert(frame.data[2] == 0u && frame.data[3] != 0u);
     assert(frame.data[0] == 0u && frame.data[1] == 0u);
-    assert(b_bench_c620_frame(&bench, 22000u, &frame));
+    /* 期限超過はCANポートが判定し、ベンチはfalseで即ゼロ出力。 */
+    assert(b_bench_c620_frame(&bench, 22000u, false, &frame));
     for (int i=0;i<8;++i) assert(frame.data[i] == 0u);
     assert(bench.state == B_BENCH_FAILED);
 }
@@ -185,12 +185,12 @@ static void test_bench_timeout_and_cancel(void)
     assert(b_bench_init(&bench, &c));
     assert(b_bench_request_rs06(&bench, 0.1f, 100u));
     BMotorCanFrame frame;
-    assert(b_bench_rs06_frame(&bench, 200000u, &frame));
+    assert(b_bench_rs06_frame(&bench, 200000u, false, &frame));
     assert((frame.id >> 24) == 4u && bench.state == B_BENCH_FAILED);
     assert(b_bench_init(&bench, &c));
     assert(b_bench_request_rs06(&bench, -0.1f, 100u));
     b_bench_cancel(&bench);
-    assert(b_bench_rs06_frame(&bench, 200u, &frame));
+    assert(b_bench_rs06_frame(&bench, 200u, false, &frame));
     assert((frame.id >> 24) == 4u);
     b_bench_rs06_tx_done(&bench, &frame, 300u);
     assert(bench.state == B_BENCH_IDLE);

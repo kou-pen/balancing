@@ -21,6 +21,11 @@ typedef struct {
     BMotorCanFrame rs_mailbox_frame[3];
     bool rs_mailbox_pending[3];
     bool wheel_tx_pending;
+    /* 最新の妥当なCANフィードバックの受信時刻はI/F層だけが所有する。 */
+    uint64_t rs_last_rx_us;
+    uint64_t wheel_last_rx_us;
+    bool rs_rx_valid;
+    bool wheel_rx_valid;
     uint8_t divider;
 } BF446MotorBenchPort;
 
@@ -35,6 +40,8 @@ bool b_f446_motor_port_init(BF446MotorBenchPort *port,
 /**
  * @brief 500 Hz主ループから呼ぶ。CAN1は2回に1回、CAN2は毎回。
  * @spec{BOARD-F446-001}
+ * @note RS06 30 ms／C620 20 msの受信期限はここで一度だけ評価し、
+ *       試運転状態機械には有効/無効を渡す。
  * @warning 自動でモータを有効化しない。電流0のみが自動送信される。
  */
 void b_f446_motor_port_tick_2ms(BF446MotorBenchPort *port, uint64_t now_us);
