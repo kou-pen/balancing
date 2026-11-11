@@ -20,6 +20,7 @@
 | 制御ソフト | [C11制御コア](software-core.md) | 状態機械、LQR計算、公開APIと単位 |
 | データ構造 | [データモデル](design/data-model.md) | 所有権、スナップショット、モジュール境界 |
 | 脚運動学 | [閉リンク数学fixture](design/leg-kinematics.md) | 関節角、脚長、ヤコビアン。実機CAD未検証 |
+| 固定脚長制御 | [脚長PD・Roll PD](design/leg-pd-roll.md) | ARM前の脚長目標、支持力の抽象演算、未検証境界 |
 | センサの時刻管理 | [観測スナップショット](design/observation-snapshot.md) | 新規測定、車輪折返し、500 Hzでの固定コピー |
 | 操作入力 | [USB/CAN操作元](design/operator-input.md) | 通信断・復帰、ニュートラル確認、自動ARM禁止 |
 | 姿勢推定 | [IMU相補フィルタ](design/attitude-filter.md) | 静止バイアス、取付軸の数学的変換、Pitch・Roll |
