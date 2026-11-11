@@ -49,6 +49,12 @@ target_link_libraries(balancing_leg_kinematics_tests PRIVATE balancing_core m)
 target_compile_options(balancing_leg_kinematics_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_leg_kinematics_tests COMMAND balancing_leg_kinematics_tests)
 
+# Fixed-leg PD and Roll PD support-force math; host fixture only (Issue #9).
+add_executable(balancing_leg_pd_tests tests/test_leg_pd.c)
+target_link_libraries(balancing_leg_pd_tests PRIVATE balancing_core m)
+target_compile_options(balancing_leg_pd_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME balancing_leg_pd_tests COMMAND balancing_leg_pd_tests)
+
 # Timestamped IMU and C620 wheel snapshots, host-only without an ISR/RTOS.
 add_executable(balancing_observation_tests tests/test_observation.c)
 target_link_libraries(balancing_observation_tests PRIVATE balancing_core m)
