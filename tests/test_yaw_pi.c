@@ -22,7 +22,7 @@ static void test_conditional_integration_and_wheel_priority(void)
     BYawPiInput input = {
         .target_rate_rad_s = 0.2f, .measured_rate_rad_s = 0.0f,
         .dt_s = 0.1f, .available_delta_nm = 1.0f,
-        .balancing = true, .gyro_fresh = true
+        .balancing = true
     };
     BYawPiOutput out = {0};
     assert(b_yaw_pi_step(&state, &gains, &input, &out));
@@ -59,14 +59,14 @@ static void test_conditional_integration_and_wheel_priority(void)
 }
 
 /* 0容量・モード解除・通信断で非ゼロ要求や積分が残らないこと。 */
-static void test_disable_and_freshness_gate(void)
+static void test_disable_and_configuration_guard(void)
 {
     BYawPiState state = {0};
     BYawPiGains gains = {2.0f, 4.0f, 0.6f, true};
     BYawPiInput input = {
         .target_rate_rad_s = 1.0f, .measured_rate_rad_s = 0.0f,
         .dt_s = 0.1f, .available_delta_nm = 0.0f,
-        .balancing = true, .gyro_fresh = true
+        .balancing = true
     };
     BYawPiOutput out = {0};
     assert(b_yaw_pi_step(&state, &gains, &input, &out));
@@ -88,12 +88,7 @@ static void test_disable_and_freshness_gate(void)
     assert(b_yaw_pi_step(&state, &gains, &input, &out));
     near(state.integral_nm, 0.04f);
 
-    input.gyro_fresh = false;
-    assert(!b_yaw_pi_step(&state, &gains, &input, &out));
-    near(out.delta_nm, 0.0f);
-    near(state.integral_nm, 0.0f);
-    assert(!state.active);
-    input.gyro_fresh = true;
+    /* センサの鮮度判定は安全状態機械が担当する。この層はゲインを検証する。 */
     gains.verified = false;
     assert(!b_yaw_pi_step(&state, &gains, &input, &out));
     gains.verified = true;
@@ -118,7 +113,7 @@ static void test_integral_limit(void)
     BYawPiInput input = {
         .target_rate_rad_s = 0.1f, .measured_rate_rad_s = 0.0f,
         .dt_s = 1.0f, .available_delta_nm = 1.0f,
-        .balancing = true, .gyro_fresh = true
+        .balancing = true
     };
     BYawPiOutput out = {0};
     for (int i = 0; i < 20; ++i) {
@@ -141,7 +136,7 @@ int main(void)
 {
     test_conditional_integration_and_wheel_priority();
     test_integral_limit();
-    test_disable_and_freshness_gate();
-    puts("PASS: Yaw PI anti-windup, wheel priority, reset and stale gyro gates");
+    test_disable_and_configuration_guard();
+    puts("PASS: Yaw PI anti-windup, wheel priority, mode reset and input validation");
     return 0;
 }
