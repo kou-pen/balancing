@@ -12,6 +12,7 @@ set(F446_APP firmware/f446/balancing_f446/App)
 
 add_library(balancing_core STATIC
     ${F446_APP}/Src/balancing/control/controller/balancing_core.c
+    ${F446_APP}/Src/balancing/control/controller/balancing_leg_pd.c
     ${F446_APP}/Src/balancing/communication/balancing_motor_can.c
     ${F446_APP}/Src/balancing/app/balancing_motor_bench.c
     ${F446_APP}/Src/balancing/communication/balancing_tx_scheduler.c
@@ -47,6 +48,12 @@ add_executable(balancing_leg_kinematics_tests tests/test_leg_kinematics.c)
 target_link_libraries(balancing_leg_kinematics_tests PRIVATE balancing_core m)
 target_compile_options(balancing_leg_kinematics_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_leg_kinematics_tests COMMAND balancing_leg_kinematics_tests)
+
+# Fixed-leg PD and Roll PD support-force math; host fixture only (Issue #9).
+add_executable(balancing_leg_pd_tests tests/test_leg_pd.c)
+target_link_libraries(balancing_leg_pd_tests PRIVATE balancing_core m)
+target_compile_options(balancing_leg_pd_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME balancing_leg_pd_tests COMMAND balancing_leg_pd_tests)
 
 # Timestamped IMU and C620 wheel snapshots, host-only without an ISR/RTOS.
 add_executable(balancing_observation_tests tests/test_observation.c)
