@@ -12,6 +12,7 @@ set(F446_APP firmware/f446/balancing_f446/App)
 
 add_library(balancing_core STATIC
     ${F446_APP}/Src/balancing/control/controller/balancing_core.c
+    ${F446_APP}/Src/balancing/control/controller/balancing_leg_pd.c
     ${F446_APP}/Src/balancing/communication/balancing_motor_can.c
     ${F446_APP}/Src/balancing/app/balancing_motor_bench.c
     ${F446_APP}/Src/balancing/communication/balancing_tx_scheduler.c
