@@ -28,7 +28,6 @@ typedef struct {
     float dt_s; /**< 実際の制御演算間隔 [s]。 */
     float available_delta_nm; /**< 車輪倒立成分確保後の左右差動余力 [N m]。 */
     bool balancing; /**< 実制御状態がBALANCINGの場合のみtrue。 */
-    bool gyro_fresh; /**< ジャイロの新規測定時刻から鮮度判定した結果。 */
 } BYawPiInput;
 
 /** @brief 車輪配分器へ渡す左右逆符号の差動トルク要求。 */
@@ -56,6 +55,8 @@ void b_yaw_pi_reset(BYawPiState *state);
  * @param[in] input 一周期の目標・観測・時間間隔・差動余力・動作状態。
  * @param[out] output 差動要求と飽和・積分停止フラグ。失敗時ゼロ。
  * @return 入力が有効な場合true。BALANCING外ではtrueでゼロを返す。
+ * @pre 呼出し元の安全状態機械がセンサ鮮度と通信断を判断済みであること。
+ *      本関数ではジャイロ鮮度を重複して監視しない。
  * @warning available_delta_nmはb_wheel_allocateと同じ倒立優先の
  *          左右容量から呼出し元が求める。ここではCAN/ARM操作を行わない。
  */

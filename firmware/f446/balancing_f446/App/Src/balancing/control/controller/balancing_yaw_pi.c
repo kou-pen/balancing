@@ -39,13 +39,14 @@ bool b_yaw_pi_step(BYawPiState *state, const BYawPiGains *gains,
         return false;
     }
 
-    /* BALANCING以外ではゲイン値や古い観測に関係なく差動を出さない。
-     * 呼出し側がFAULTに遷移した次ティックでも積分を残さない。 */
+    /* 鮮度・通信断の判断は安全状態機械に集約する。
+     * 本層はBALANCING以外で差動を出さず積分を持ち越さない。
+     * 安全層が判断を終えた後に、制御周期ごとに本関数を呼ぶ。 */
     if (!input->balancing) {
         b_yaw_pi_reset(state);
         return true;
     }
-    if (!input->gyro_fresh || gains == NULL || !gains->verified ||
+    if (gains == NULL || !gains->verified ||
         !isfinite(gains->kp_nm_s_rad) || gains->kp_nm_s_rad < 0.0f ||
         !isfinite(gains->ki_nm_rad) || gains->ki_nm_rad < 0.0f ||
         !isfinite(gains->integral_limit_nm) || gains->integral_limit_nm < 0.0f ||
