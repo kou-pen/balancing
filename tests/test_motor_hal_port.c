@@ -67,6 +67,86 @@ static void rx_rs_good(uint64_t stamp_us)
     /* The caller provides time to the port. */
     (void)stamp_us;
 }
+
+/* 受信期限はベンチではなくCANアダプタの1箇所で確認する。
+ * 対象外IDで鮮度を更新しないこと、20/30msの境界、停止フレームを実証。 */
+static void test_port_owns_feedback_timeout(void)
+{
+    BF446MotorBenchPort port;
+    const BMotorBenchConfig cfg = {
+        .rs06_motor_id = 1u, .rs06_host_id = 0xfdu, .c620_motor_id = 2u,
+        .rs06_limit_nm = 0.3f, .c620_limit_a = 0.25f, .pulse_duration_ms = 100u
+    };
+    const uint8_t wheel_fb[8] = {0,0,0,0,0,0,26,0};
+
+    memset(&test_can1, 0, sizeof(test_can1));
+    memset(&test_can2, 0, sizeof(test_can2));
+    assert(b_f446_motor_port_init(&port, &can1, &can2, &cfg));
+    test_can2.rx_header = (CAN_RxHeaderTypeDef){
+        .IDE = CAN_ID_STD, .RTR = CAN_RTR_DATA, .DLC = 8u, .StdId = 0x201u
+    };
+    memcpy(test_can2.rx_data, wheel_fb, sizeof(wheel_fb));
+    test_can2.rx_pending = true;
+    b_f446_motor_port_on_rx0(&port, &can2, 500u);
+    assert(!port.wheel_rx_valid);
+    assert(!b_f446_motor_port_pulse_c620(&port, 0.1f, 501u));
+
+    test_can2.rx_header.StdId = 0x202u;
+    test_can2.rx_pending = true;
+    b_f446_motor_port_on_rx0(&port, &can2, 1000u);
+    assert(port.wheel_rx_valid && port.wheel_last_rx_us == 1000u);
+    /* 対象外IDの受信では最後の対象フィードバック時刻を延長しない。 */
+    test_can2.rx_header.StdId = 0x201u;
+    test_can2.rx_pending = true;
+    b_f446_motor_port_on_rx0(&port, &can2, 15000u);
+    assert(port.wheel_last_rx_us == 1000u);
+    assert(!b_f446_motor_port_pulse_c620(&port, 0.1f, 21001u));
+
+    /* ちょうど20msなら開始可能だが、超過後は0Aに戻して失敗する。 */
+    assert(b_f446_motor_port_init(&port, &can1, &can2, &cfg));
+    test_can2.rx_header.StdId = 0x202u;
+    test_can2.rx_pending = true;
+    b_f446_motor_port_on_rx0(&port, &can2, 1000u);
+    assert(b_f446_motor_port_pulse_c620(&port, 0.1f, 21000u));
+    b_f446_motor_port_tick_2ms(&port, 21001u);
+    assert(port.bench.state == B_BENCH_FAILED);
+    for (unsigned i = 0; i < 8u; ++i) assert(test_can2.data[i] == 0u);
+
+    /* RS06も対象外の29bit IDを無視し、期限をCANポートだけで判定。 */
+    assert(b_f446_motor_port_init(&port, &can1, &can2, &cfg));
+    assert(b_f446_motor_port_pulse_rs06(&port, 0.2f, 1000u));
+    test_can1.rx_header = (CAN_RxHeaderTypeDef){
+        .IDE = CAN_ID_EXT, .RTR = CAN_RTR_DATA, .DLC = 8u,
+        .ExtId = 0x028002fdu
+    };
+    const uint8_t rs_fb[8] = {0x80,0,0x80,0,0x80,0,1,44};
+    memcpy(test_can1.rx_data, rs_fb, sizeof(rs_fb));
+    test_can1.rx_pending = true;
+    b_f446_motor_port_on_rx0(&port, &can1, 1500u);
+    assert(!port.rs_rx_valid);
+    b_f446_motor_port_tick_2ms(&port, 2000u);
+    b_f446_motor_port_on_tx_done(&port, &can2, 0u, 2100u);
+    b_f446_motor_port_tick_2ms(&port, 4000u);
+    assert((test_can1.header.ExtId >> 24) == 3u);
+    b_f446_motor_port_on_tx_done(&port, &can1, 0u, 4100u);
+    b_f446_motor_port_on_tx_done(&port, &can2, 0u, 4100u);
+    rx_rs_good(4200u);
+    b_f446_motor_port_on_rx0(&port, &can1, 4200u);
+    assert(port.rs_rx_valid && port.rs_last_rx_us == 4200u);
+    b_f446_motor_port_tick_2ms(&port, 6000u);
+    b_f446_motor_port_on_tx_done(&port, &can2, 0u, 6100u);
+    b_f446_motor_port_tick_2ms(&port, 8000u);
+    assert(port.bench.state == B_BENCH_RS06_PULSE);
+    assert((test_can1.header.ExtId >> 24) == 1u);
+    b_f446_motor_port_on_tx_done(&port, &can1, 0u, 8100u);
+    b_f446_motor_port_on_tx_done(&port, &can2, 0u, 8100u);
+    b_f446_motor_port_tick_2ms(&port, 34000u);
+    b_f446_motor_port_on_tx_done(&port, &can2, 0u, 34010u);
+    b_f446_motor_port_tick_2ms(&port, 34201u);
+    assert(port.bench.state == B_BENCH_FAILED);
+    assert((test_can1.header.ExtId >> 24) == 4u);
+}
+
 int main(void)
 {
     BF446MotorBenchPort port;
@@ -120,6 +200,7 @@ int main(void)
     b_f446_motor_port_tick_2ms(&port,40000u); /* Feedback stale => zero + FAILED */
     for (int i=0;i<8;i++) assert(test_can2.data[i]==0u);
     assert(port.bench.state == B_BENCH_FAILED);
-    puts("合格：F446 HALアダプタの送受信・送信完了・短時間パルス（ホスト模擬）");
+    test_port_owns_feedback_timeout();
+    puts("合格：F446 HALアダプタの送受信・送信完了・受信期限・短時間パルス（ホスト模擬）");
     return 0;
 }

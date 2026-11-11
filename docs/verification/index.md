@@ -9,6 +9,7 @@
 | F446の11ソース構成 | [Issue #9脚長・Rollホスト検証](issue9-leg-pd-host.md) | Debug/Releaseで新しい脚長PDソースを含むARMクロスビルドPASS（実機未実施） |
 | F446の直前10ソース構成 | [Issue #10ホスト・ARM検証](issue10-observation-host.md) | PR #23時点の10ソース、実機未実施 |
 | CAN周期と送信調停 | [Issue #5ホスト試験](issue5-can-scheduler-host.md) | 仮想時刻・3メールボックス・故障注入 |
+| 単軸試運転の受信期限 | [CANポート集約](motorbench-rx-owner.md) | ベンチの重複期限除去とポート境界の故障注入 |
 | CAN仕様の整合とID重複 | [Issue #6 CAN静的照合](can-contract-audit.md) | RS06/C620の既知フレーム、F303/Piの未確定項目 |
 | ARM・FAULT判定の差分 | [状態機械の監査](core-mode-contract-audit.md) | ホスト回帰PASSと既知の仕様不一致 |
 | 脚運動学の数値演算 | [Issue #7数学fixture](issue7-kinematics-host.md) | 解析ヤコビアンと有限差分、実機CAD未検証 |

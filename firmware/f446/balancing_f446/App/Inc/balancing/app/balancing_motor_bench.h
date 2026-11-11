@@ -39,11 +39,9 @@ typedef struct {
     uint64_t rs_enable_sent_us;
     uint64_t rs_enable_offer_us;
     uint64_t rs_feedback_us;
-    uint64_t wheel_feedback_us;
     bool rs_enable_sent_valid;
     bool rs_enable_offer_valid;
     bool rs_feedback_valid;
-    bool wheel_feedback_valid;
     bool rs_operational;
     bool rs_stop_pending;
 } BMotorBench;
@@ -66,13 +64,6 @@ void b_bench_on_rs06_feedback(BMotorBench *bench,
                               const BRS06Feedback *feedback, uint64_t now_us);
 
 /**
- * @brief C620の新しい受信値を試験器へ渡す。
- * @spec{PROTO-C620-001}
- */
-void b_bench_on_c620_feedback(BMotorBench *bench,
-                              const BC620Feedback *feedback, uint64_t now_us);
-
-/**
  * @brief RS06へ短いトルクパルスを要求する。Type3有効化応答までは出力しない。
  * @spec{PROTO-RS06-001}
  * @warning 安全に固定したモータで、試験操作からのみ呼ぶこと。自動実行は禁止。
@@ -80,10 +71,13 @@ void b_bench_on_c620_feedback(BMotorBench *bench,
 bool b_bench_request_rs06(BMotorBench *bench, float torque_nm, uint64_t now_us);
 
 /**
- * @brief C620へ短い電流パルスを要求する。新しいフィードバックが必要。
+ * @brief C620へ短い電流パルスを要求する。通信状態はデバイス層で判定する。
  * @spec{PROTO-C620-001}
+ * @param[in] feedback_current CAN受信ポートが期限内のフィードバックを確認した結果。
+ * @warning 本関数で受信期限を再計算しない。通信不良ならfalseを渡す。
  */
-bool b_bench_request_c620(BMotorBench *bench, float current_a, uint64_t now_us);
+bool b_bench_request_c620(BMotorBench *bench, float current_a, uint64_t now_us,
+                          bool feedback_current);
 
 /**
  * @brief 試験を中止し、RS06の停止指令を優先する。
@@ -94,9 +88,12 @@ void b_bench_cancel(BMotorBench *bench);
 /**
  * @brief CAN1で次に送るRS06フレームを生成する。4 msごとに呼ぶ。
  * @spec{PROTO-RS06-001}
+ * @param[in] feedback_current CAN受信ポートが期限内の返信を確認した結果。
  * @return 送信するフレームがあればtrue。
+ * @warning 受信期限はポート層のみで管理し、ここでは経過時間を再判定しない。
  */
-bool b_bench_rs06_frame(BMotorBench *bench, uint64_t now_us, BMotorCanFrame *out);
+bool b_bench_rs06_frame(BMotorBench *bench, uint64_t now_us,
+                        bool feedback_current, BMotorCanFrame *out);
 
 /**
  * @brief RS06の有効化・停止フレームのCAN送信完了時刻を反映する。
@@ -109,9 +106,12 @@ void b_bench_rs06_tx_done(BMotorBench *bench, const BMotorCanFrame *frame,
 /**
  * @brief CAN2で次に送る0x200フレームを生成する。2 msごとに呼ぶ。
  * @spec{PROTO-C620-001}
+ * @param[in] feedback_current CAN受信ポートが期限内の返信を確認した結果。
  * @return 初期化済みならtrue。停止中は全チャネル0 A。
+ * @warning ポート層が必ず最新の受信状態を渡すこと。
  */
-bool b_bench_c620_frame(BMotorBench *bench, uint64_t now_us, BMotorCanFrame *out);
+bool b_bench_c620_frame(BMotorBench *bench, uint64_t now_us,
+                        bool feedback_current, BMotorCanFrame *out);
 
 #ifdef __cplusplus
 }
