@@ -8,6 +8,19 @@
  * CANフィルタ・ピン・クロック等のボード固有設定を勝手に追加しない。
  */
 
+/* CANフィードバックの生存判定はI/F境界でのみ行い、ベンチは結果を消費する。
+ * 型ごとの閾値は既存仕様値で変更しない。RS06有効化/パルスの期限とは別。 */
+#define BENCH_RS_RX_TIMEOUT_US UINT64_C(30000)
+#define BENCH_C620_RX_TIMEOUT_US UINT64_C(20000)
+
+/* 最後の新規受信からの単調経過だけを判定する。未来時刻、未受信は無効。
+ * 現行仕様と同じく閾値ちょうどは有効、超過後に無効とする。 */
+static bool rx_alive(bool seen, uint64_t last_us, uint64_t now_us,
+                     uint64_t timeout_us)
+{
+    return seen && now_us >= last_us && now_us - last_us <= timeout_us;
+}
+
 /*
  * 試運転の共有状態をRX/TX割込みと主ループで更新するため、PRIMASKを保存する。
  * 既に外側で割込み禁止ならleave()で勝手に有効化しない。
@@ -89,9 +102,15 @@ void b_f446_motor_port_tick_2ms(BF446MotorBenchPort *port, uint64_t now_us)
     BMotorCanFrame wheel;
     /* 既に0x200が受付済みなら次の要求を重ねない。
      * ハードウェアの送信完了IRQでpendingを解放する設計。 */
+    const bool wheel_alive = rx_alive(port->wheel_rx_valid,
+                                       port->wheel_last_rx_us, now_us,
+                                       BENCH_C620_RX_TIMEOUT_US);
+    const bool rs_alive = rx_alive(port->rs_rx_valid,
+                                    port->rs_last_rx_us, now_us,
+                                    BENCH_RS_RX_TIMEOUT_US);
     if (HAL_CAN_GetTxMailboxesFreeLevel(port->wheel_can) > 0u &&
         !port->wheel_tx_pending &&
-        b_bench_c620_frame(&port->bench, now_us, &wheel)) {
+        b_bench_c620_frame(&port->bench, now_us, wheel_alive, &wheel)) {
         uint32_t mailbox_mask = 0u;
         if (tx_frame(port->wheel_can, &wheel, &mailbox_mask)) {
             port->wheel_tx_pending = true;
@@ -106,7 +125,7 @@ void b_f446_motor_port_tick_2ms(BF446MotorBenchPort *port, uint64_t now_us)
         for (int i = 0; i < 3; ++i) any_pending |= port->rs_mailbox_pending[i];
         if (!any_pending) {
             BMotorCanFrame rs;
-            if (b_bench_rs06_frame(&port->bench, now_us, &rs)) {
+            if (b_bench_rs06_frame(&port->bench, now_us, rs_alive, &rs)) {
                 uint32_t mailbox_mask = 0u;
                 if (tx_frame(port->rs_can, &rs, &mailbox_mask)) {
                     const int idx = mailbox_index(mailbox_mask);
@@ -145,13 +164,25 @@ void b_f446_motor_port_on_rx0(BF446MotorBenchPort *port,
         frame.id = frame.extended ? header.ExtId : header.StdId;
         if (hcan == port->rs_can) {
             BRS06Feedback fb;
-            if (b_rs06_parse_feedback(&frame, &fb)) {
+            if (b_rs06_parse_feedback(&frame, &fb) &&
+                fb.motor_id == port->bench.config.rs06_motor_id &&
+                fb.host_id == port->bench.config.rs06_host_id &&
+                (!port->rs_rx_valid || now_us > port->rs_last_rx_us)) {
+                /* フレームが対象モータ由来と確定したときだけ時刻を更新。
+                 * 別IDや古い時刻で通信断を隠さない。 */
+                port->rs_rx_valid = true;
+                port->rs_last_rx_us = now_us;
                 b_bench_on_rs06_feedback(&port->bench, &fb, now_us);
             }
         } else {
             BC620Feedback fb;
-            if (b_c620_parse_feedback(&frame, &fb)) {
-                b_bench_on_c620_feedback(&port->bench, &fb, now_us);
+            if (b_c620_parse_feedback(&frame, &fb) &&
+                fb.motor_id == port->bench.config.c620_motor_id &&
+                (!port->wheel_rx_valid || now_us > port->wheel_last_rx_us)) {
+                /* C620ベンチは電流パルス用に数値フィードバックを使用しない。
+                 * 受信時刻の所有をCANポートへ集約する。 */
+                port->wheel_rx_valid = true;
+                port->wheel_last_rx_us = now_us;
             }
         }
     }
@@ -189,14 +220,17 @@ bool b_f446_motor_port_pulse_rs06(BF446MotorBenchPort *port, float torque_nm,
     return ok;
 }
 
-/* CAN2電流パルスも要求キューへの登録だけを行う。
- * 受信の新規性・上限・停止期限はbenchの状態機械が判定する。 */
+/* CAN2電流パルスの開始時にもポートで受信有効性を確認する。
+ * bench本体は電流上限・パルス期限だけを判断する。 */
 bool b_f446_motor_port_pulse_c620(BF446MotorBenchPort *port, float current_a,
                                    uint64_t now_us)
 {
     if (port == NULL) return false;
     const uint32_t mask = enter_critical();
-    const bool ok = b_bench_request_c620(&port->bench, current_a, now_us);
+    const bool alive = rx_alive(port->wheel_rx_valid,
+                                port->wheel_last_rx_us, now_us,
+                                BENCH_C620_RX_TIMEOUT_US);
+    const bool ok = b_bench_request_c620(&port->bench, current_a, now_us, alive);
     leave_critical(mask);
     return ok;
 }

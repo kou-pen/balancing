@@ -6,10 +6,8 @@
 /*
  * 以下は単軸の短時間試験専用であり、4軸バランシング時の制御ゲイン・
  * 実機の許容トルクや非常停止の保証値ではない。
- * 通信・有効化・パルスの期限をそれぞれ独立に管理する。
+ * 受信期限はCANポート層が一括管理する。ここでは有効化とパルス時間だけ扱う。
  */
-#define RS_FEEDBACK_TIMEOUT_US 30000u
-#define C620_FEEDBACK_TIMEOUT_US 20000u
 #define RS_ENABLE_TIMEOUT_US 150000u
 #define RS_ENABLE_RETRY_US 20000u
 /* 初期単軸試運転専用のコード上限。機械的安全を保証する数値ではない。 */
@@ -22,13 +20,6 @@
 static bool elapsed(uint64_t now_us, uint64_t since_us, uint64_t delta_us)
 {
     return now_us >= since_us && (now_us - since_us) >= delta_us;
-}
-
-/* 受信時刻は送信成功や単なる再読出しでは更新されない前提。
- * 指定期限を超えた応答を使ってパルスを延長しない。 */
-static bool fresh(uint64_t now_us, uint64_t since_us, uint64_t maximum_age)
-{
-    return now_us >= since_us && (now_us - since_us) <= maximum_age;
 }
 
 /* RS06停止はゼロトルク要求ではなくType4無効化の要求を残す。
@@ -83,18 +74,6 @@ void b_bench_on_rs06_feedback(BMotorBench *bench,
     }
 }
 
-/* C620も試験対象ID以外の返信では受信時刻を更新しない。
- * 現行ベンチは新規CAN返信の受付時刻を保持するだけで、連続位置推定はしない。 */
-void b_bench_on_c620_feedback(BMotorBench *bench,
-                              const BC620Feedback *feedback, uint64_t now_us)
-{
-    if (bench && feedback &&
-        feedback->motor_id == bench->config.c620_motor_id) {
-        bench->wheel_feedback_valid = true;
-        bench->wheel_feedback_us = now_us;
-    }
-}
-
 /*
  * パルスはIDLE中かつ明示要求があった場合だけ開始する。
  * 先にType3送信完了→新しい正常応答を確認し、待機中のトルクは出さない。
@@ -117,14 +96,14 @@ bool b_bench_request_rs06(BMotorBench *bench, float torque_nm, uint64_t now_us)
 
 /*
  * C620はRS06と違って有効化トランザクションを持たないので、
- * 新しいフィードバックが存在することをパルス開始前の条件とする。
- * 初期値不明・通信断のときは要求を拒否する。
+ * CANポートの受信状態が正常なことをパルス開始前の条件とする。
+ * タイムアウト値と受信時刻は持たず、ポートからの判定だけを消費する。
  */
-bool b_bench_request_c620(BMotorBench *bench, float current_a, uint64_t now_us)
+bool b_bench_request_c620(BMotorBench *bench, float current_a, uint64_t now_us,
+                          bool feedback_current)
 {
     if (!bench || bench->state != B_BENCH_IDLE ||
-        !bench->wheel_feedback_valid ||
-        !fresh(now_us, bench->wheel_feedback_us, C620_FEEDBACK_TIMEOUT_US) ||
+        !feedback_current ||
         !isfinite(current_a) || current_a == 0.0f ||
         fabsf(current_a) > bench->config.c620_limit_a) {
         return false;
@@ -161,7 +140,8 @@ void b_bench_cancel(BMotorBench *bench)
  * 最後にType1トルクパルスの順で1フレームを選ぶ。
  * 有効化要求時刻ではなくType3送信完了時刻より後の応答を採用する。
  */
-bool b_bench_rs06_frame(BMotorBench *bench, uint64_t now_us, BMotorCanFrame *out)
+bool b_bench_rs06_frame(BMotorBench *bench, uint64_t now_us,
+                        bool feedback_current, BMotorCanFrame *out)
 {
     if (!bench || !out) {
         return false;
@@ -180,8 +160,7 @@ bool b_bench_rs06_frame(BMotorBench *bench, uint64_t now_us, BMotorCanFrame *out
         }
         if (bench->rs_enable_sent_valid && bench->rs_feedback_valid &&
             bench->rs_feedback_us > bench->rs_enable_sent_us &&
-            bench->rs_operational &&
-            fresh(now_us, bench->rs_feedback_us, RS_FEEDBACK_TIMEOUT_US)) {
+            bench->rs_operational && feedback_current) {
             bench->state = B_BENCH_RS06_PULSE;
             bench->pulse_start_us = now_us;
         } else {
@@ -197,11 +176,11 @@ bool b_bench_rs06_frame(BMotorBench *bench, uint64_t now_us, BMotorCanFrame *out
                                         bench->config.rs06_host_id, true, out);
         }
     }
-    /* トルク出力中もRS06の正常返信が継続することを毎回要求し、
-     * 受信が古くなったときは試験を終了する。 */
+    /* トルク出力中はポートから受け取ったリンク状態だけで停止を判断する。
+     * 返信時刻・鮮度期限の比較はポートで行い、ここでは再計算しない。 */
     if (bench->state == B_BENCH_RS06_PULSE) {
         if (!bench->rs_feedback_valid || !bench->rs_operational ||
-            !fresh(now_us, bench->rs_feedback_us, RS_FEEDBACK_TIMEOUT_US)) {
+            !feedback_current) {
             stop_rs(bench, true);
         } else if (elapsed(now_us, bench->pulse_start_us,
                            (uint64_t)bench->config.pulse_duration_ms * 1000u)) {
@@ -244,18 +223,18 @@ void b_bench_rs06_tx_done(BMotorBench *bench, const BMotorCanFrame *frame,
 
 /*
  * CAN2の共通0x200フレームを毎回構成し、指定1軸以外は0Aにする。
- * パルス期限切れや受信期限切れではリクエストを0Aへ戻す。
+ * パルス終了またはポートから通信異常が通知されたら0Aへ戻す。
  * トルク・電流ゼロのCAN指令だけでは電源遮断にならない。
  */
-bool b_bench_c620_frame(BMotorBench *bench, uint64_t now_us, BMotorCanFrame *out)
+bool b_bench_c620_frame(BMotorBench *bench, uint64_t now_us,
+                        bool feedback_current, BMotorCanFrame *out)
 {
     if (!bench || !out) {
         return false;
     }
     float current[4] = {0.0f};
     if (bench->state == B_BENCH_C620_PULSE) {
-        if (!bench->wheel_feedback_valid ||
-            !fresh(now_us, bench->wheel_feedback_us, C620_FEEDBACK_TIMEOUT_US)) {
+        if (!feedback_current) {
             bench->state = B_BENCH_FAILED;
             bench->requested_output = 0.0f;
         } else if (elapsed(now_us, bench->pulse_start_us,
