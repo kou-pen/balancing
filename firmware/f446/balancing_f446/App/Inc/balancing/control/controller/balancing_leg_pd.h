@@ -47,12 +47,13 @@ typedef struct {
  * @param[out] reference 保存先。失敗時は初期化して無効化する。
  * @param[in] feedback 同一周期で固定した左右の測定値。
  * @param[in] disarmed 真なら操縦系がDISARMEDにあることを示す。
- * @param[in] lengths_fresh 真なら左右の測定がともに新鮮なことを示す。
+ * @pre 呼出し側が左右RS06の鮮度を安全状態機械で評価済みであること。
+ *      この関数では新鮮さを重複判定せず、渡された脚長を数学的に検査する。
  * @return 有限・正の脚長を持ち、安全ゲートを満たした場合だけtrue。
  * @warning 目標を取得しただけでARM許可を出さない。実機可動域も検証しない。
  */
 bool b_leg_pd_capture(BLegPdReference *reference, const BLegPdFeedback *feedback,
-                      bool disarmed, bool lengths_fresh);
+                      bool disarmed);
 
 /**
  * @brief 脚長PDとRoll PDを合成し、左右の仮想支持力を計算する。

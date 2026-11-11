@@ -17,18 +17,19 @@ static bool measured_lengths_ok(const BLegPdFeedback *feedback)
 }
 
 /*
- * この操作はARM遷移直前、観測スナップショットを確定した後に限る。
+ * この操作はARM遷移直前、上位安全層で左右RS06の鮮度を判定し、
+ * 観測スナップショットを確定した後に限る。新規時刻の判定を重複実装しない。
  * 途中で失敗した場合に前回の脚長目標を再利用させないため、先に無効化する。
  * 差分を半分として持てば初期目標は左右の測定長を正確に再現できる。
  */
 bool b_leg_pd_capture(BLegPdReference *reference, const BLegPdFeedback *feedback,
-                      bool disarmed, bool lengths_fresh)
+                      bool disarmed)
 {
     if (reference == NULL) {
         return false;
     }
     memset(reference, 0, sizeof(*reference));
-    if (!disarmed || !lengths_fresh || !measured_lengths_ok(feedback)) {
+    if (!disarmed || !measured_lengths_ok(feedback)) {
         return false;
     }
 
