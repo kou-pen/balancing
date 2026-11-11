@@ -4,7 +4,7 @@
 
 ## 処理の境界
 
-DISARMED中、同一周期の左右脚長が新鮮な場合だけ `b_leg_pd_capture` で基準を取得します。平均脚長 `L0=(LL+LR)/2` と初期左右差 `ΔL=(LL-LR)/2` を保存し、`Lref,left=L0+ΔL`、`Lref,right=L0-ΔL` として保持します。両脚の初期長を同じ値へ強制しないため、ARM直後の脚長PDの段差を抑えます。
+呼出し側が安全状態機械で左右RS06の鮮度を確認した後、DISARMED中の同一周期スナップショットから `b_leg_pd_capture` で基準を取得します。関数内では鮮度フラグを重複して確認しません。平均脚長 `L0=(LL+LR)/2` と初期左右差 `ΔL=(LL-LR)/2` を保存し、`Lref,left=L0+ΔL`、`Lref,right=L0-ΔL` として保持します。両脚の初期長を同じ値へ強制しないため、ARM直後の脚長PDの段差を抑えます。
 
 `b_leg_pd_compute` は左右それぞれ `Fleg=Kp(Lref-L)-Kd·dL+Fgravity` を計算し、`Froll=-Kp_roll·roll-Kd_roll·roll_rate` を左へ加算、右から減算します。D項は目標の差分ではなく実測した伸縮速度のみを使います。
 

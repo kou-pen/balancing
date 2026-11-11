@@ -12,7 +12,7 @@
 | `python3 tools/validate_specs.py` | PASS | 仕様ID・参照・CAN一覧 |
 | `python3 tools/regenerate_cubeide_f446.py` | Debug/Release PASS | CubeIDE管理クロスビルドのみ、実機動作ではない |
 
-追加 `tests/test_leg_pd.c` は、測定時の左右差を維持するARM前ラッチ、目標一致時のPD段差ゼロ、実伸縮速度のみのD項、Roll左右逆符号、未検証ゲイン・NaN・Inf・非正脚長・オーバーフロー時のゼロ出力を確認します。既存のホスト回帰も再実行しています。
+追加 `tests/test_leg_pd.c` は、測定時の左右差を維持するARM前ラッチ、目標一致時のPD段差ゼロ、実伸縮速度のみのD項、Roll左右逆符号、未検証ゲイン・NaN・Inf・非正脚長・オーバーフロー時のゼロ出力を確認します。鮮度期限と通信途絶は既存の安全状態機械で別途検証する責務にし、脚長PD関数には重複する鮮度入力を設けません。既存のホスト回帰も再実行しています。
 
 ## 適用してはいけない値
 
