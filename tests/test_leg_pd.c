@@ -19,7 +19,7 @@ static void test_capture_and_initial_support(void)
     BLegPdReference ref = {0};
     BLegPdOutput out = {0};
     const BLegPdGains gains = {100.0f, 10.0f, 20.0f, 2.0f, 5.0f, true};
-    assert(b_leg_pd_capture(&ref, &measured, true, true));
+    assert(b_leg_pd_capture(&ref, &measured, true));
     near(ref.common_length_m, 0.30f);
     near(ref.half_difference_m, 0.02f);
     assert(b_leg_pd_compute(&ref, &gains, &measured, &out));
@@ -39,22 +39,20 @@ static void test_capture_and_initial_support(void)
     near(out.right_force_n, 8.0f);
 }
 
-/* ARM後の目標の不用意な上書きと、古い脚長での再ARMを防ぐ。 */
+/* ARM後の目標の不用意な上書きと、数学的に不正な脚長を拒否する。 */
 static void test_capture_denial_clears_reference(void)
 {
     BLegPdReference ref = {0};
     const BLegPdFeedback measured = {.left_length_m=0.3f, .right_length_m=0.3f};
-    assert(b_leg_pd_capture(&ref, &measured, true, true));
-    assert(!b_leg_pd_capture(&ref, &measured, false, true));
-    assert(!ref.valid);
-    assert(!b_leg_pd_capture(&ref, &measured, true, false));
+    assert(b_leg_pd_capture(&ref, &measured, true));
+    assert(!b_leg_pd_capture(&ref, &measured, false));
     assert(!ref.valid);
     BLegPdFeedback invalid = measured;
     invalid.right_length_m = NAN;
-    assert(!b_leg_pd_capture(&ref, &invalid, true, true));
+    assert(!b_leg_pd_capture(&ref, &invalid, true));
     invalid.right_length_m = 0.0f;
-    assert(!b_leg_pd_capture(&ref, &invalid, true, true));
-    assert(!b_leg_pd_capture(NULL, &measured, true, true));
+    assert(!b_leg_pd_capture(&ref, &invalid, true));
+    assert(!b_leg_pd_capture(NULL, &measured, true));
 }
 
 /* 微分項は目標値変更ではなく測定速度だけに反応する。 */
@@ -64,7 +62,7 @@ static void test_derivative_and_fail_closed(void)
     BLegPdReference ref = {0};
     BLegPdGains gains = {0.0f, 4.0f, 0.0f, 0.0f, 0.0f, true};
     BLegPdOutput out = {0};
-    assert(b_leg_pd_capture(&ref, &measured, true, true));
+    assert(b_leg_pd_capture(&ref, &measured, true));
     BLegPdFeedback moving = measured;
     moving.left_velocity_m_s = 0.5f;
     moving.right_velocity_m_s = -0.25f;
