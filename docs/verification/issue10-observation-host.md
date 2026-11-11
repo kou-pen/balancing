@@ -1,51 +1,63 @@
-# Issue #10：時刻付きIMU・車輪スナップショットのホスト検証
+# Issue #10：センサ・操作入力のホスト検証
 
-**対象：** CTRL-EST-001、PROTO-C620-001、T-CTRL-04/05、T-F446-05  
-**範囲：** C11 HAL非依存演算のみ。実機センサの測定成功や物理校正を意味しない。
+**対象：** CTRL-EST-001、BEHAV-001、PROTO-C620-001、PROTO-REMOTE-001、T-CTRL-04/05、T-F446-05/06。  
+**結果：** ホストの数学・時刻管理・入力復旧テストはPASS。実機BNO055・DualSense・CAN_REMOTE・モータとの結合は未実施。
 
-## 何を確認したか
+## 検証済みの処理
 
-| 項目 | ホスト試験の条件 | 判定 |
+| 処理 | 確認した条件 | 判定 |
 |---|---|---|
-| 500 Hz用の固定コピー | ストア更新後も過去のスナップショットは不変 | PASS |
-| IMU時刻の保持 | 新規測定未証明、重複、過去、未来、NaN/Infは不受理 | PASS |
-| IMUの50 ms鮮度境界 | 元の測定時刻が境界と超過で正しく判定される | PASS |
-| C620デコーダとの接続 | 実C11 codecのID 0x201からロータ角・RPMを取得 | PASS |
-| 左右車輪 | 8190→2／2→8190の折返し、鏡像方向、RPM換算 | PASS |
-| 車輪20 ms鮮度境界 | コピー時刻ではなく受信時刻で判定 | PASS |
-| 非一意・不正入力 | ±4096カウント、未校正設定、違う半径/減速比/方向 | PASS |
-| RS06/F303・DualSense | 未実装（全体の有効性は通らない） | **NOT VERIFIED** |
-| 実際のBNO055の更新証明・軸・偏差 | 実機未接続 | **NOT VERIFIED** |
+| 500 Hz向けスナップショット | コピー後も値と元の測定時刻が固定。再読出しで時刻更新しない | PASS |
+| C620車輪位置・速度 | 実CAN codecから復号、8192カウントの折返し、左右符号、20 ms期限 | PASS |
+| IMU受信時刻 | 未証明の新規入力、重複、過去、未来、NaN/Infを拒否。50 ms期限 | PASS |
+| USB/CAN操作元 | DISARMEDのみ切替、未選択ソースの指令を拒否。自動切替なし | PASS |
+| 操作入力喪失・復帰 | 速度・Yaw目標をゼロへ減速。複数の新規ニュートラル入力を確認後に操作だけ再開 | PASS |
+| 自動ARM禁止 | 操作入力からARM/CLEAR_FAULTイベントを生成しない。DISARMED/FAULTの目標は0 | PASS |
+| BNO055数学フィルタ | 明示的な静止確認、ジャイロバイアス平均、取付軸の右手系、相補補正と角度±π境界 | PASS |
+| IMUの異常・外乱 | 重力範囲外はジャイロのみ。新規時刻の異常、長い計測欠落、未校正を拒否 | PASS |
+| 連結された模擬センサ・操作入力 | IMU測定→固定コピー→姿勢推定、C620の別周期更新、操作断とDISARMED状態機械 | PASS |
 
-### 実行結果（2026-11-10、開発VM）
+## 実行結果（2026-11-10、開発VM）
 
 | チェック | 結果 |
 |---|---|
-| 通常・UBSan | **PASS**：IMU/車輪と既存全モジュール |
-| CMake/CTest | **7/7 PASS** |
-| 仕様ID・文書リンク、Doxygen、Ruff | **PASS**（Doxygenの既知の日本語翻訳警告のみ） |
-| CubeIDE Debug | **PASS**：8ソース・17:48:25、0エラー・0警告 |
-| CubeIDE Release | **PASS**：8ソース・17:48:40、0エラー・0警告 |
-| 実機センサ・受信割込み | **NOT RUN** |
+| 通常・UBSanのC11ホスト試験 | PASS |
+| CMake/CTest | **10/10 PASS** |
+| CubeIDE Debug / Release | **10ソースのARMクロスビルドPASS**（両方0エラー・0警告） |
+| CubeIDE生成Makefile・オブジェクト・ARM ELF32 | PASS |
+| 仕様ID・文書リンク、Ruff、Doxygen | PASS（Doxygenの既知の翻訳警告のみ） |
+| 実機I2C/USB/CAN、物理500 Hzと安全停止 | **NOT RUN** |
 
-CubeIDE管理ビルドは `python3 tools/regenerate_cubeide_f446.py` でクリーン再生成し、`python3 tools/verify_f446_build.py` で8ソースの生成Makefile、オブジェクト、ARM ELF32と鮮度を確認しました。ログはGit管理外の `build/cubeide-managed-pr16/{debug,release}.log` に保存されています。
+前回のPR #22では、観測スナップショットまでの **8ソース・CTest 7/7 PASS** を確認済みです。今回のホストモックと数学フィルタの2ソース、連結試験を追加して、10ソース・CTest 10/10となりました。ビルドログはGit管理外の `build/cubeide-managed-pr16/{debug,release}.log` にあります。
 
-### 実行方法
+## 再現コマンド
 
 ```sh
 python3 tools/run_host_tests.py
 cmake -S . -B build/host-cmake
+cmake --build build/host-cmake -j4
 cmake --build build/host-cmake --target test
-python3 tools/validate_specs.py
+python3 tools/regenerate_cubeide_f446.py
 python3 tools/verify_f446_build.py
+python3 tools/validate_specs.py
+doxygen Doxyfile
 ```
 
-テスト数値の車輪半径0.1 m、ロータ／車輪比10:1、左右の符号は**数学fixture**です。実車輪径、M3508の内外減速比、左右極性・トルク定数を確認したことにはなりません。ハードウェアへの制御出力は一切追加していません。
+## 未確定事項と安全境界
 
-## ソフトウェア上の残件
+| 未確定の項目 | 必要な確認 |
+|---|---|
+| BNO055のI2C/ACCGYRO新規測定判定、取付方向、静止判定 | 実センサと実装する受信アダプター |
+| DualSenseのHID report・ボタン番号・実デッドゾーン | 実デバイスのレポート解析 |
+| CAN_REMOTEのID/DLC・ペイロード・送信元認証 | 既存の上位機器ソースとCAN仕様 |
+| 車輪半径・減速比・左右の符号 | CADと実機 |
+| RS06×4・F303電源を含む全観測ストア | 実ドライバと時刻付きデータ更新 |
+| IRQとの共有・操作元切替の実シーケンス・物理500 Hz | 実機/HAL結合後の試験 |
 
-IMUの新規測定判定は外部から真偽値を渡すだけで、BNO055 I2Cデータレジスタや実HID入力の処理は実装していません。RS06×4・F303電源の受信値はこのストアでは保持しないため、既存 `BObservedStamps` の該当項目は無効のままです。全系統の鮮度が必要なARM状態へは接続していません。
+姿勢フィルタの角度予測は、ジャイロ機体X/Y軸の角速度をEuler Roll/Pitch微分に近似したものです。大姿勢やYawとの結合が強い運動へはこのまま適用せず、実機への統合前に運動学の妥当性を検証します。
 
-将来のIRQ/制御ループ接続では同じストアを割込みと主ループから無同期で触らず、イベントの直列化・スナップショットのコピー一貫性を別途検証します。実際にサンプル間でロータが半回転以上する場合の巻数復元は、このアルゴリズムでは保証できません。
+**ホストで使用した数値は人工fixtureです。** 例として車輪半径0.1 m、ロータ対車輪比10:1、操作入力期限10 ms、ニュートラル継続4 ms、ジャイロ相補係数0.9を使用しました。これらを実機の制御・安全値へ転記しません。
 
-**本変更はIssue #10の部分実装です。** 操作元切替、BNO055補正・フィルタ、実車輪パラメータの同定を終えるまではIssueを閉じません。
+[観測スナップショット](../design/observation-snapshot.md) · [操作入力](../design/operator-input.md) · [姿勢フィルタ](../design/attitude-filter.md)
+
+**Issue #10のホスト検証部分は進展しましたが、実機HAL/USB/I2C統合と物理校正を残してOpenを維持します。**

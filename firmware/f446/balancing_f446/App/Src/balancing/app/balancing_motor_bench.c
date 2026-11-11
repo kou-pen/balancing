@@ -3,6 +3,11 @@
 #include <stddef.h>
 #include <string.h>
 
+/*
+ * 以下は単軸の短時間試験専用であり、4軸バランシング時の制御ゲイン・
+ * 実機の許容トルクや非常停止の保証値ではない。
+ * 通信・有効化・パルスの期限をそれぞれ独立に管理する。
+ */
 #define RS_FEEDBACK_TIMEOUT_US 30000u
 #define C620_FEEDBACK_TIMEOUT_US 20000u
 #define RS_ENABLE_TIMEOUT_US 150000u
@@ -12,16 +17,22 @@
 #define BENCH_C620_HARD_LIMIT_A 0.5f
 #define BENCH_HARD_PULSE_MS 200u
 
+/* 期限判定は差分で行い、時刻逆行を「経過済み」と誤認しない。
+ * 期限に等しい時刻は終了側の条件に入る。 */
 static bool elapsed(uint64_t now_us, uint64_t since_us, uint64_t delta_us)
 {
     return now_us >= since_us && (now_us - since_us) >= delta_us;
 }
 
+/* 受信時刻は送信成功や単なる再読出しでは更新されない前提。
+ * 指定期限を超えた応答を使ってパルスを延長しない。 */
 static bool fresh(uint64_t now_us, uint64_t since_us, uint64_t maximum_age)
 {
     return now_us >= since_us && (now_us - since_us) <= maximum_age;
 }
 
+/* RS06停止はゼロトルク要求ではなくType4無効化の要求を残す。
+ * 通信断ではType4の実送達を保証できないため物理停止機構が必要。 */
 static void stop_rs(BMotorBench *bench, bool failed)
 {
     bench->rs_stop_pending = true;
@@ -29,6 +40,11 @@ static void stop_rs(BMotorBench *bench, bool failed)
     bench->requested_output = 0.0f;
 }
 
+/*
+ * 実機で確認したIDと低出力上限・試験時間の入力がなければ初期化しない。
+ * 短時間パルスでも常時駆動状態を残す危険があるため、上限と時間を
+ * 別々に拘束する。ここで初期化してもモータ自動有効化はしない。
+ */
 bool b_bench_init(BMotorBench *bench, const BMotorBenchConfig *config)
 {
     if (!bench || !config || config->rs06_motor_id == 0u ||
@@ -46,6 +62,11 @@ bool b_bench_init(BMotorBench *bench, const BMotorBenchConfig *config)
     return true;
 }
 
+/*
+ * 対象モータIDとhost IDを両方照合し、別の装置からの状態通知で
+ * 追従状態や有効化判定を更新しない。FWのmode=2かつfault=0を
+ * 「正常なフィードバック」と扱うのはベンチの仮定で、実機で要照合。
+ */
 void b_bench_on_rs06_feedback(BMotorBench *bench,
                               const BRS06Feedback *feedback, uint64_t now_us)
 {
@@ -62,6 +83,8 @@ void b_bench_on_rs06_feedback(BMotorBench *bench,
     }
 }
 
+/* C620も試験対象ID以外の返信では受信時刻を更新しない。
+ * 現行ベンチは新規CAN返信の受付時刻を保持するだけで、連続位置推定はしない。 */
 void b_bench_on_c620_feedback(BMotorBench *bench,
                               const BC620Feedback *feedback, uint64_t now_us)
 {
@@ -72,6 +95,11 @@ void b_bench_on_c620_feedback(BMotorBench *bench,
     }
 }
 
+/*
+ * パルスはIDLE中かつ明示要求があった場合だけ開始する。
+ * 先にType3送信完了→新しい正常応答を確認し、待機中のトルクは出さない。
+ * 直前の有効化送信履歴を無効にして旧レスポンスの再利用を防ぐ。
+ */
 bool b_bench_request_rs06(BMotorBench *bench, float torque_nm, uint64_t now_us)
 {
     if (!bench || bench->state != B_BENCH_IDLE || bench->rs_stop_pending ||
@@ -87,6 +115,11 @@ bool b_bench_request_rs06(BMotorBench *bench, float torque_nm, uint64_t now_us)
     return true;
 }
 
+/*
+ * C620はRS06と違って有効化トランザクションを持たないので、
+ * 新しいフィードバックが存在することをパルス開始前の条件とする。
+ * 初期値不明・通信断のときは要求を拒否する。
+ */
 bool b_bench_request_c620(BMotorBench *bench, float current_a, uint64_t now_us)
 {
     if (!bench || bench->state != B_BENCH_IDLE ||
@@ -102,6 +135,8 @@ bool b_bench_request_c620(BMotorBench *bench, float current_a, uint64_t now_us)
     return true;
 }
 
+/* キャンセルは単に状態をIDLEへ書き換えるだけでは不十分。
+ * 有効化済みRS06はType4送信完了までSTOPPINGを維持する。 */
 void b_bench_cancel(BMotorBench *bench)
 {
     if (!bench) {
@@ -121,6 +156,11 @@ void b_bench_cancel(BMotorBench *bench)
     }
 }
 
+/*
+ * 4msの送信機会に、最優先はType4停止、次にType3有効化、
+ * 最後にType1トルクパルスの順で1フレームを選ぶ。
+ * 有効化要求時刻ではなくType3送信完了時刻より後の応答を採用する。
+ */
 bool b_bench_rs06_frame(BMotorBench *bench, uint64_t now_us, BMotorCanFrame *out)
 {
     if (!bench || !out) {
@@ -131,6 +171,8 @@ bool b_bench_rs06_frame(BMotorBench *bench, uint64_t now_us, BMotorCanFrame *out
                                     bench->config.rs06_host_id, false, out);
     }
     if (bench->state == B_BENCH_WAIT_RS06) {
+        /* 有効化に時間がかかっても永続的な待機にはせず、
+         * 期限到達時に停止要求を発生させる。 */
         if (elapsed(now_us, bench->requested_us, RS_ENABLE_TIMEOUT_US)) {
             stop_rs(bench, true);
             return b_rs06_control_frame(bench->config.rs06_motor_id,
@@ -155,6 +197,8 @@ bool b_bench_rs06_frame(BMotorBench *bench, uint64_t now_us, BMotorCanFrame *out
                                         bench->config.rs06_host_id, true, out);
         }
     }
+    /* トルク出力中もRS06の正常返信が継続することを毎回要求し、
+     * 受信が古くなったときは試験を終了する。 */
     if (bench->state == B_BENCH_RS06_PULSE) {
         if (!bench->rs_feedback_valid || !bench->rs_operational ||
             !fresh(now_us, bench->rs_feedback_us, RS_FEEDBACK_TIMEOUT_US)) {
@@ -173,6 +217,11 @@ bool b_bench_rs06_frame(BMotorBench *bench, uint64_t now_us, BMotorCanFrame *out
     return false;
 }
 
+/*
+ * ここはHAL送信受付ではなくCAN Tx完了IRQの通知先。
+ * Type3後の返信だけを有効化成功と認め、Type4完了後にSTOPPINGを解除する。
+ * 実際に物理モータが停止したことはこの通知だけでは証明できない。
+ */
 void b_bench_rs06_tx_done(BMotorBench *bench, const BMotorCanFrame *frame,
                           uint64_t now_us)
 {
@@ -193,6 +242,11 @@ void b_bench_rs06_tx_done(BMotorBench *bench, const BMotorCanFrame *frame,
     }
 }
 
+/*
+ * CAN2の共通0x200フレームを毎回構成し、指定1軸以外は0Aにする。
+ * パルス期限切れや受信期限切れではリクエストを0Aへ戻す。
+ * トルク・電流ゼロのCAN指令だけでは電源遮断にならない。
+ */
 bool b_bench_c620_frame(BMotorBench *bench, uint64_t now_us, BMotorCanFrame *out)
 {
     if (!bench || !out) {
