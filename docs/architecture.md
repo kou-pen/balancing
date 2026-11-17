@@ -5,22 +5,21 @@
 ## 全体像
 
 <pre class="mermaid">
-flowchart LR
-    INPUT["操作入力：PS5 / 上位CAN"] --> APP["F446 アプリケーション"]
-    SENSOR["IMU / モータ / 電源の観測値"] --> SNAP["時刻付き入力"]
-    SNAP --> EST["状態推定・脚の運動学"]
-    EST --> CTRL["LQR / PD・PI / VMC"]
-    APP --> CTRL
-    SNAP --> SAFE["安全状態機械"]
-    APP --> SAFE
-    CTRL --> GATE{"出力許可"}
-    SAFE --> GATE
-    GATE --> RS["RS06：CAN1"]
-    GATE --> C620["C620：CAN2"]
-    PWR["F303：電源・非常停止"] --> SAFE
+flowchart TB
+    INPUT["操作・観測・電源状態"] --> APP["Application：周期入力を固定"]
+    APP --> EST["StateEstimator：機体・車体・脚・車輪"]
+    APP --> SEQ["RobotSequence：状態と駆動許可"]
+    EST --> CTRL["BalanceControl：6軸の要求トルク"]
+    EST --> SEQ
+    SEQ --> CTRL
+    CTRL --> CMD["MotorCommand：変換と上限"]
+    CMD --> FINAL["Application：周期の出力を確定"]
+    SEQ --> FINAL
+    FINAL --> MOTOR["MotorService：RS06／C620"]
+    SEQ --> DIAG["DiagnosticsService：PCへCAN診断"]
 </pre>
 
-これは**目標とする論理構成**です。現在のC++入口は非駆動であり、図のすべてが実機へ接続されているわけではありません。[起動・周期・停止の詳細図](diagrams.md)では、各場面を分けて確認できます。
+C++17の設計構成です。現在のC++入口は非駆動です。各型・関数の責務は [公開API設計](design/public-api.md)、呼び出し順は [起動・周期・停止の詳細図](diagrams.md) を参照してください。
 
 ## 処理周期
 
@@ -45,6 +44,6 @@ flowchart LR
 
 ## 安全に関する境界
 
-**DISARMED／BALANCING／FAULT** の3状態を扱います。RS06有効化には各軸の新規応答が必要で、送信要求と送信完了は区別します。ソフトウェアからの停止指令だけでは、バスオフやMCU停止時の安全停止を保証できません。独立した物理非常停止が必要です。
+公開状態は **DISARMED／ARMING／BALANCING／FAULT** です。ARMINGでは全体の絶対期限内に、RS06全4軸のType 3のTx完了後に届く正常応答を確認します。駆動許可が落ちた周期は、旧非ゼロ指令を無効化して停止要求に切り替えます。独立した物理非常停止はソフトウェアとCANの外側で電源を遮断します。
 
 安全条件と数値の正本は [動作仕様](specs/behavior/robot_operation.md)、[F446仕様](specs/boards/f446_control.md)、[F303仕様](specs/boards/f303_power.md) です。未確定のモータ設定やゲインを推測で採用しません。

@@ -1,5 +1,7 @@
 # データ構造とモジュールの責務
 
+このページの `B*` 型は現行C11の比較基準です。C++17の公開型と所有者は [F446 公開API設計](public-api.md) を参照してください。
+
 **対象：** [実機非依存の制御コア](../software-core.md)／[状態推定仕様](../specs/control/state_estimation.md)／[LQR・VMC仕様](../specs/control/balance_vmc.md)／[動作仕様](../specs/behavior/robot_operation.md)
 
 **設計方針：** STM32F446ではC11を使う。C++のクラス・継承・仮想関数は採用せず、「状態を持つ構造体＋それを処理する関数」をモジュールの基本単位にする。**データが使用される場所で意味と単位が分かること**を優先する。

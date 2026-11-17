@@ -1,8 +1,8 @@
 # 図で見る制御システム
 
-**設計図更新：** 2026-11-09（MOTOR-146〜224。実装済みを意味しない）
+**設計図更新** 2026-11-17（F446 C++17公開API、MOTOR-151／197／198）
 
-このページでは、データの流れ、起動・駆動許可、定周期処理、状態遷移、非常停止の関係を示す。**図は設計仕様の視覚化であり、コード実装済み・実機動作検証済みを意味しない。**
+F446の設計上の呼び出し順と通信の流れを示します。現行C11の比較基準は図6にあります。各APIの型と責務は [F446 公開API設計](design/public-api.md) を参照してください。
 
 ## 図の目次
 
@@ -11,10 +11,11 @@
 | 入力からモータ指令まで | 1. 全体データフロー |
 | ARMと送信完了・応答の関係 | 2. ARM要求から倒立開始 |
 | 演算と送信の周期 | 3. 倒立中の周期処理 |
-| DISARMED・BALANCING・FAULT | 4. 状態遷移 |
+| DISARMED・ARMING・BALANCING・FAULT | 4. 状態遷移 |
 | 異常停止と電源遮断 | 5. 非常停止 |
-| ホスト制御コアの接続点 | 6. C制御コアと周辺 |
+| 移行時の比較基準 | 6. 旧C11制御コアと周辺 |
 | 後続のジャンプ | 7. ジャンプ状態機械 |
+| 異常情報のPCへの配信 | 8. CAN診断 |
 
 通信ID・電気的な条件は [CAN総覧](can-id-table.md) と [F446](specs/boards/f446_control.md)・[F303](specs/boards/f303_power.md) の仕様書、状態遷移の条件は [動作仕様](specs/behavior/robot_operation.md) を参照してください。
 
@@ -22,117 +23,145 @@
 
 <pre class="mermaid">
 flowchart TB
-    USB["有線PS5コントローラ"] --> OP["操作入力の受付"]
-    PI["上位機器：Piなど（CAN2）"] --> OP
-    IMU["BNO055（I2C）"] --> SNAP["時刻付きセンサ取得と更新監視"]
-    JOINT["RS06 4台（CAN1受信）"] --> SNAP
-    WHEEL["C620・車輪2台（CAN2受信）"] --> SNAP
-    PWR["F303電源状態（CAN2受信）"] --> SAFE{"状態と保護条件の監視"}
-    SNAP --> EST["状態推定・6節リンク計算（500 Hz）"]
-    SNAP --> SAFE
-    OP --> TARGET["目標速度・脚長の生成、変化率制限"]
-    EST --> CTRL["LQR・脚長PD・Roll PD・Yaw PI・VMC（500 Hz）"]
-    TARGET --> CTRL
-    CTRL --> LIMIT["ガスシリンダ補償・車輪Yaw配分・モータ個別の上限"]
-    LIMIT --> GATE{"駆動許可の判定"}
-    SAFE --> GATE
-    GATE --> RSOUT["RS06へのトルク指令（250 Hz）"]
-    GATE --> WOUT["C620への電流指令（500 Hz）"]
+    IO["IMU・モータ・操作・電源"] --> APP["Application：周期入力を固定"]
+    APP --> EST["StateEstimator"]
+    EST --> KIN["LegKinematics：左右各脚"]
+    KIN -->|脚の解| EST
+    EST -->|ControlSnapshot| CTRL["BalanceControl"]
+    EST -->|推定結果または理由| SEQ["RobotSequence"]
+    APP -->|操作と機器の安全状態| SEQ
+    APP -->|BalanceReference| CTRL
+    SEQ -->|駆動の許可| CTRL
+    CTRL -->|MechanismTorques| CMD["MotorCommand"]
+    CMD -->|MotorTargetsまたは失敗| OUT["Application：6軸の最終指令"]
+    CMD -.->|変換異常| SEQ
+    SEQ -->|DesiredMotorState・ARMセッション番号| OUT
+    OUT --> MS["MotorService"]
+    MS --> RS["CAN1：RS06 4軸"]
+    MS --> WHEEL["CAN2：C620 2軸"]
 </pre>
 
-**読み方：** センサの新規更新頻度と500 Hzの演算周期は同一ではない。安全判定は制御器の出力に対して独立して行い、トルク飽和のみをFAULT扱いしない。実装時には「駆動許可なし」がトルク出力を有効化しないことを検証する。
+`ControlSnapshot` は機体・車体・脚・車輪の変換済み物理状態を持つ。駆動が許可された周期だけトルクを計算する。通常の指令飽和は `MotorCommand` が記録し、停止を要する異常は送信前に `RobotSequence` へ伝える。
 
 ## 2. ARM要求から倒立開始まで
 
 <pre class="mermaid">
 sequenceDiagram
-    autonumber
-    participant USB as 有線PS5
-    participant F446 as F446主制御
-    participant F303 as F303電源
-    participant RS as RS06 4台
-    participant C620 as C620 2台
+    participant APP as Application
+    participant SEQ as RobotSequence
+    participant MS as MotorService
+    participant CAN as CAN1
+    participant RS as RS06 4軸
 
-    F303-->>F446: POWER_STATUS（100 msごと、CAN ID未確定）
-    RS-->>F446: 関節状態・故障・温度（CAN1）
-    C620-->>F446: 車輪状態（CAN2）
-    USB->>F446: OPTIONSを約1秒長押し（ARM要求）
-    F446->>F446: センサ・通信・原点・モデル・制限値の健全性を検査（初期姿勢／脚長範囲のARMゲートなし）
-    alt ARM前提が正常
-        F446->>RS: Type 3 有効化（4台へ送信要求）
-        RS-->>F446: 各軸から有効化後の新しい正常応答
-        alt 4台すべて有効化確認
-            F446->>F446: 現在脚長を目標へ設定・制御器初期化
-            F446->>F446: BALANCINGへ移行（トルク急変制限）
-        else 1台でも有効化失敗
-            F446->>RS: 全4台へ駆動無効化を要求
-            F446->>F446: FAULTへ移行・原因記録
+    APP->>SEQ: 明示ARM要求と事前条件
+    alt 事前条件成立
+        SEQ->>SEQ: ARMING、セッション番号と全体期限を固定
+        SEQ-->>APP: 有効化要求、非ゼロ駆動禁止
+        APP->>MS: 有効化要求とARMセッション番号
+        loop ARMING中は各周期で確認
+            opt 未受付の軸は絶対期限内で再試行
+                MS->>CAN: Type 3送信要求
+                CAN-->>MS: HAL受付結果
+            end
+            opt 実際に送信が完了した軸
+                CAN->>RS: Type 3送信
+                CAN-->>MS: 軸別Type 3のTx完了
+            end
+            opt その軸の新規状態報告
+                RS-->>CAN: 状態報告
+                CAN-->>MS: 受信フレームと時刻
+                MS->>MS: Tx完了より後の正常応答を確認
+            end
+            MS-->>APP: 軸別の有効化結果と異常
+            APP->>SEQ: 今周期の安全状態
         end
-    else ARM前提が不成立
-        F446->>F446: DISARMEDを維持し拒否理由を記録
+        alt 期限前に4軸確認、必須条件成立
+            SEQ-->>APP: BALANCING
+            APP->>APP: 現在の脚長を基準に制御器初期化
+        else 期限到達・確定故障・必須条件消失
+            SEQ-->>APP: FAULT、全軸停止要求
+            APP->>MS: 非ゼロ指令を無効化し停止要求
+        else 異常のない手動DISARM
+            SEQ-->>APP: DISARMED、全軸停止要求
+            APP->>MS: 非ゼロ指令を無効化し停止要求
+        end
+    else 事前条件不成立
+        SEQ-->>APP: DISARMED、拒否理由
     end
 </pre>
 
-**注意：** ARM時の目標脚長は現在の左右脚長から初期化する（MOTOR-159）。自動起立・起き上がりモーションはMOTOR-132として保留。CAN2の電源状態通知と上位操作の具体的ID・DLCは実装照合待ち。
+初期姿勢・脚長の指定範囲外は診断に用いる。機構安全条件は別に確認し、未検証・不成立の場合は非ゼロ駆動を禁止する（MOTOR-151）。ARM全体の絶対期限を検証済み設定から与える。確定故障・必須条件消失・期限到達は、同周期のDISARMや成功より優先する。詳しい境界条件は [動作仕様](specs/behavior/robot_operation.md) を参照。
 
-## 3. 倒立中の周期処理
+## 3. 500 Hz制御周期の処理
 
 <pre class="mermaid">
 sequenceDiagram
-    autonumber
-    participant S as センサ受信割り込み
-    participant F446 as F446：2 ms制御周期
-    participant RS as RS06：CAN1
-    participant C620 as C620：CAN2
-    participant F303 as F303：電源CAN2
+    participant IRQ as タイマーIRQ
+    participant APP as Application
+    participant SE as StateEstimator
+    participant RS as RobotSequence
+    participant MS as MotorService
 
-    loop 2 msごと（500 Hz）
-        S-->>F446: 最新測定値と受信時刻
-        F446->>F446: 更新時刻・状態の有効性を確認
-        F446->>F446: 6節リンク・状態推定・LQR・VMC・保護
-        F446->>C620: 0x200：左右電流指令
-        opt 4 msごと（250 Hz）
-            F446->>RS: Type 1：4台へ最新トルク送信要求（3メールボックスに順次投入）
+    IRQ-->>APP: 2 msごとの実行要求
+    loop メインループで周期実行
+        MS-->>APP: 6軸分のMotorFeedbackSnapshotと安全状態
+        APP->>APP: IMU・操作を含めて入力を固定
+        APP->>SE: update(input, elapsed)
+        SE-->>APP: ControlSnapshotまたはStateEstimateError
+        APP->>RS: 推定結果、操作、機器の安全状態
+        RS-->>APP: DesiredMotorStateとARMセッション番号
+        opt 駆動が許可され制御入力が成立
+            APP->>APP: BalanceControlからMotorCommandへ
+            opt 停止を要する計算・変換異常
+                APP->>RS: 異常を反映して最終の要求を得る
+            end
         end
-    end
-    loop 非同期の受信
-        RS-->>F446: 状態報告（初期100 Hz想定）
-        C620-->>F446: 車輪状態（メーカー既定1 kHz、実測待ち）
-        F303-->>F446: POWER_STATUS（100 msごと）
+        alt 非ゼロ駆動を許可
+            APP->>APP: 今周期の6軸MotorTargetsを採用
+        else 非ゼロ駆動を禁止
+            APP->>APP: 状態に応じてゼロ電流・停止・有効化要求を確定
+        end
+        APP->>MS: DesiredMotorState・ARMセッション番号・6軸指令
+        opt 非ゼロ駆動を禁止
+            MS->>MS: 保持中・送信待ちの非ゼロ指令を無効化
+        end
+        MS->>MS: CANごとに送信調停
     end
 </pre>
 
-**注意：** 図の時間関係は各周期の論理的な相対関係であり、同じ制御tick内の具体的な命令順序・割り込み優先度を固定するものではない。CAN2の電流指令は2台分を**1フレーム（0x200）**に格納する。RS06/M3508とも送信完了とフィードバック受信を別々に監視する。DISARMED中のM3508は0電流を継続送信、RS06は通常のトルク送信を停止。
+| 対象 | 通常送信 |
+|---|---|
+| RS06 | 250 Hz（4 ms）で4軸に最新のType 1を送信要求。CAN1の3メールボックスに順次投入 |
+| C620 | 500 Hz（2 ms）で左右の電流をCAN2の1フレーム（0x200）に格納 |
+| RS06の停止 | 各軸のType 4を優先し、軸別のTx完了まで未完了として追跡 |
 
-**実装と設計図の境界：** Issue #5では上の周期を [HAL非依存CAN送信要求モデル](design/can-scheduler.md) としてホストで検証した。送信要求、HAL受付、TX完了IRQ、RX受信時刻を区別し、CAN1の3メールボックスに4台分を非蓄積で処理する。ただし、`main.c`・`application.cpp`からはまだ呼んでおらず、図に示す実機の通常駆動経路は未完成である。
+受信の更新時刻とCAN送信完了時刻は別に監視する。入力のサンプル時刻と、推定に渡す実測周期間隔も区別する。HAL受付済みフレームとソフトウェア上の送信待ちを区別し、停止要求への切り替えは[送信調停の設計](design/can-scheduler.md)と合わせて扱う。
 
 ## 4. ロボットの状態遷移
 
 <pre class="mermaid">
 stateDiagram-v2
     [*] --> DISARMED: 起動後
-    DISARMED --> BALANCING: ARM要求・安全条件成立・RS06正常応答確認
-    BALANCING --> DISARMED: DISARM要求
-    BALANCING --> FAULT: 重大保護条件／CAN非常停止
+    DISARMED --> ARMING: 明示ARMを受理
+    ARMING --> BALANCING: 期限前にRS06全4軸を確認
+    ARMING --> DISARMED: 異常のない手動DISARM
+    ARMING --> FAULT: 非常停止・期限到達・確定故障・必須条件消失
+    BALANCING --> DISARMED: 手動DISARM
+    BALANCING --> FAULT: 重大保護条件・非常停止
     DISARMED --> FAULT: CAN非常停止
-    FAULT --> DISARMED: 原因解消後にCLEAR_FAULT
-    note right of DISARMED
-      駆動無効
-      センサと通信を監視
-      設定変更はRAMのみ
-    end note
-    note right of BALANCING
-      姿勢保持と移動・旋回
-      操作入力断では目標を減速
+    FAULT --> DISARMED: 原因解消と明示CLEAR_FAULT
+    note right of ARMING
+      Type 3のTx完了と
+      その後の正常応答を全軸で待つ
+      非ゼロ指令は禁止
     end note
     note right of FAULT
-      トルク出力停止
-      原因を記録
-      自動ARM・自動復帰はしない
+      駆動禁止と全軸停止要求
+      主原因・発生時と継続中の異常を記録
     end note
 </pre>
 
-**補足：** FAULTから直接BALANCINGへ遷移しない。原因解消→明示的CLEAR_FAULT→DISARMED→別ARMが必要。物理非常停止はこの状態機械の外側で最優先に駆動を遮断し、解除しても自動ARMしない。電源断後のFAULT状態保持はMOTOR-095として保留。
+復旧には原因解消、明示CLEAR_FAULT、別のARM要求が必要。停止要求が残っている場合はARMを受理しない。独立した物理非常停止は最優先で電源を遮断する。電源断後のFAULT保持はMOTOR-095として保留。
 
 ## 5. 非常停止と電源遮断
 
@@ -158,7 +187,7 @@ sequenceDiagram
 
 **注意：** CAN非常停止に加え、物理非常停止は制御ソフトと独立した遮断手段とする。フレーム番号と送信元認証方式は[電源CAN仕様](specs/protocols/power_can2.md)と[上位CAN仕様](specs/protocols/remote_can2.md)で未確定として管理する。
 
-## 6. 実機非依存のC制御コアと周辺アダプタ
+## 6. 移行時の比較基準：旧C11制御コアと周辺アダプタ
 
 <pre class="mermaid">
 flowchart LR
@@ -182,7 +211,7 @@ flowchart LR
     end
 </pre>
 
-図のアダプタ側は未実装。**LQRの試験係数は実機用ではない。** 詳細は[制御コア設計](software-core.md)。
+旧C11の比較基準。ARM待機はDISARMED内で管理する。アダプタ統合と実機用LQRゲインの検証は未完了。詳細は[制御コア設計](software-core.md)。
 
 ## 7. 後続開発：ジャンプの1つの状態機械
 
@@ -207,6 +236,25 @@ stateDiagram-v2
 </pre>
 
 **後続の仕様のみ：** ジャンプはMOTOR-213の初期実装対象外。どの状態でも非常停止、DISARM、重大FAULTを優先する。離陸・着地誤判定とタイムアウトは[ジャンプ仕様](specs/behavior/jump.md)と[TODO](todo/jump.md)を参照。
+
+## 8. 異常イベントと定期ステータスのPC配信
+
+<pre class="mermaid">
+flowchart TB
+    FAULT["RobotSequence：FAULT記録"] --> EVENT["DiagnosticsService：イベント"]
+    STATUS["システム状態"] --> LAST["最新の定期ステータス"]
+    EVENT --> IMPORTANT["重要イベントFIFO"]
+    EVENT --> NORMAL["通常イベントFIFO"]
+    IMPORTANT --> TX["CanTxScheduler"]
+    NORMAL --> TX
+    LAST --> TX
+    TX --> BUS["CanPort：固定CAN IDで送信"]
+    BUS --> PC["PC：異常とステータスを表示"]
+    BUS -->|各フレームのTx完了| TX
+    TX -->|イベントの送信進捗| EVENT
+</pre>
+
+`FaultEvent` は3フレームで、32 bitのミリ秒時刻を持つ。各フレームのTx完了を個別に追跡し、イベントは全フレーム完了まで保持する。IDの値・バス割当て等は[公開API設計](design/public-api.md)の確定待ち項目を参照。
 
 ## 図の管理
 
