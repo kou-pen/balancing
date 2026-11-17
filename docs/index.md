@@ -8,6 +8,7 @@
 |---|---|
 | ロボット全体の処理と、実装済み／未実装の境界 | [ソフトウェア構成](architecture.md) |
 | 起動、周期処理、状態遷移の図 | [制御システムの図](diagrams.md) |
+| 確定したC++17の公開型・関数・責務 | [F446 公開API設計](design/public-api.md) |
 | 何から実装するか、どこまで終わったか | [開発ロードマップ](todo/roadmap.md) |
 | どの試験が何を証明したか | [検証記録の案内](verification/index.md) |
 
@@ -17,7 +18,7 @@
 |---|---|---|
 | 要求仕様 | [仕様ID索引](spec-index.md) | F446/F303、通信、状態推定、制御、動作 |
 | 通信 | [CAN総覧](can-id-table.md) | バスとIDの一覧。フレーム定義は各プロトコル仕様が正本 |
-| 制御ソフト | [C11制御コア](software-core.md) | 状態機械、LQR計算、公開APIと単位 |
+| 移行時の比較基準 | [旧C11制御コア](software-core.md) | 現行の状態機械、LQR計算、ホスト回帰 |
 | Yaw角速度制御 | [Yaw PI](design/yaw-pi.md) | 積分飽和防止、倒立優先の車輪余力、モードリセット |
 | データ構造 | [データモデル](design/data-model.md) | 所有権、スナップショット、モジュール境界 |
 | 脚運動学 | [閉リンク数学fixture](design/leg-kinematics.md) | 関節角、脚長、ヤコビアン。実機CAD未検証 |

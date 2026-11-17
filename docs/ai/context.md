@@ -20,6 +20,7 @@ routing:
   architecture:
     - docs/architecture.md
     - docs/diagrams.md
+    - docs/design/public-api.md
     - docs/specs/boards/f446_control.md
   control:
     - docs/specs/control/
