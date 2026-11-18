@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from tools.sync_cubeide_cpp import PROJECT, cxx_metadata
@@ -30,15 +31,41 @@ class CubeIdeMetadataTests(unittest.TestCase):
         )
         self.assertEqual(cxx_metadata(self.project, self.cproject)[1], self.cproject)
 
-    def test_c_compilers_have_app_headers(self) -> None:
-        self.assertEqual(self.cproject.count('value="../App/Inc"'), 2)
+    def assert_app_includes(self, cproject: str) -> None:
+        root = ET.fromstring(cproject)
+        prefix = "com.st.stm32cube.ide.mcu.gnu.managedbuild.tool."
+        for language in ("c", "cpp"):
+            compiler = prefix + language + ".compiler"
+            tools = root.findall(f'.//tool[@superClass="{compiler}"]')
+            self.assertEqual(len(tools), 2)
+            for tool in tools:
+                with self.subTest(tool=tool.get("id")):
+                    option = tool.find(f'./option[@superClass="{compiler}.option.includepaths"]')
+                    self.assertIsNotNone(option)
+                    if option is not None:
+                        self.assertEqual(
+                            [entry.get("value") for entry in option].count("../App/Inc"), 1
+                        )
+
+    def test_c_and_cpp_compilers_have_app_headers(self) -> None:
+        self.assert_app_includes(self.cproject)
         self.assertEqual(cxx_metadata(self.project, self.cproject)[1], self.cproject)
 
     def test_missing_app_include_is_repaired(self) -> None:
         stale = self.cproject.replace('<listOptionValue builtIn="false" value="../App/Inc"/>', "")
         repaired = cxx_metadata(self.project, stale)[1]
-        self.assertEqual(repaired.count('value="../App/Inc"'), 2)
+        self.assert_app_includes(repaired)
         self.assertEqual(cxx_metadata(self.project, repaired)[1], repaired)
+
+    def test_missing_cpp_include_option_is_repaired(self) -> None:
+        # CubeIDE can preserve the existing C option while dropping just G++'s.
+        option = (
+            r'\s*<option\b(?=[^>]*superClass="[^"]+\.cpp\.compiler\.option\.includepaths")'
+            r'[^>]*>.*?</option>'
+        )
+        stale, count = re.subn(option, "", self.cproject, flags=re.DOTALL)
+        self.assertEqual(count, 2)
+        self.assertEqual(cxx_metadata(self.project, stale)[1], self.cproject)
 
     def test_firmware_sources_live_inside_cubeide_project(self) -> None:
         root = PROJECT.parents[2]
