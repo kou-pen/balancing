@@ -325,8 +325,7 @@ rs06_service_common = [
 ]
 can1_sources = [
     "-I", str(ROOT / "tests" / "stubs_can1"),
-    str(rs06_source / "app" / "Rs06Can1Link.cpp"),
-    str(rs06_source / "device" / "F446Can1Port.cpp"),
+    str(rs06_source / "communication" / "can" / "CanPort.cpp"),
 ]
 for suffix, flags in [
     ("", []),
@@ -336,7 +335,7 @@ for suffix, flags in [
     subprocess.run(rs06_codec_common + flags + ["-o", str(codec)],
                    check=True, cwd=ROOT, timeout=30)
     for test, extra_sources in (("test_motor_service_rs06", []),
-                                ("test_f446_can1_port", can1_sources)):
+                                ("test_f446_can_port", can1_sources)):
         path = OUT / f"{test}{suffix}"
         print(f"[{test}{suffix}] コンパイル", flush=True)
         source = ROOT / "tests" / f"{test}.cpp"
@@ -348,7 +347,7 @@ for suffix, flags in [
 can1_runtime_common = [
     "g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
     "-I", str(ROOT / "tests" / "stubs_can1"), "-I", str(F446_APP / "Inc"),
-    str(rs06_source / "device" / "F446Can1Port.cpp"),
+    str(rs06_source / "communication" / "can" / "CanPort.cpp"),
     str(rs06_source / "device" / "f446_can1_runtime.cpp"),
     str(ROOT / "tests" / "test_f446_can1_runtime.cpp"),
 ]

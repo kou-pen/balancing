@@ -9,7 +9,7 @@ sequenceDiagram
     participant A as main
     participant C as CAN1とNVIC
     participant R as CAN1 C ABI
-    participant P as F446Can1Port
+    participant P as CanPort
 
     A->>C: MX_CAN1_Init
     A->>R: balancing_f446_can1_start

@@ -1,6 +1,6 @@
 #include "balancing_f446_can1_bridge.h"
 
-#include "balancing/device/F446Can1Port.hpp"
+#include "balancing/communication/can/CanPort.hpp"
 
 #include <array>
 #include <cstdint>
@@ -61,31 +61,31 @@ public:
     void service() noexcept
     {
         sampleClock();
-        balancing::Can1Event event{};
-        for (std::size_t i = 0; i < balancing::F446Can1Port::maxEventsPerCycle &&
+        balancing::CanEvent event{};
+        for (std::size_t i = 0; i < balancing::CanPort::kMaxEventsPerPoll &&
                                 port.popEvent(event); ++i) {
             switch (event.kind) {
-            case balancing::Can1EventKind::Rx:
+            case balancing::CanEventKind::Rx:
                 ++snapshot.rx_frames;
                 snapshot.last_rx_us = event.atUs;
                 break;
-            case balancing::Can1EventKind::RxLost:
+            case balancing::CanEventKind::RxLost:
                 ++snapshot.rx_loss_events;
                 break;
-            case balancing::Can1EventKind::BusOff:
+            case balancing::CanEventKind::BusOff:
                 ++snapshot.bus_off_events;
                 snapshot.bus_off = true;
                 break;
-            case balancing::Can1EventKind::BusRecovered:
+            case balancing::CanEventKind::BusRecovered:
                 snapshot.bus_off = false;
                 break;
-            case balancing::Can1EventKind::Tx:
+            case balancing::CanEventKind::Tx:
                 break;
             }
         }
     }
 
-    balancing::F446Can1Port port;
+    balancing::CanPort port;
     CAN_HandleTypeDef& handle;
     BF446Can1Snapshot snapshot{};
 
