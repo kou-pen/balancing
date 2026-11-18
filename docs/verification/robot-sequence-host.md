@@ -21,4 +21,5 @@
 - `ctest --test-dir build/robot-sequence-debug --output-on-failure` — PASS、13/13件。RobotSequenceの対象テストはReleaseでもPASS。
 - `python3 tools/validate_specs.py` — PASS。仕様ID、文書リンク、API参照を照合。
 - Doxygen 1.9.8 — PASS。RobotSequenceクラスと本ページの生成HTMLを確認。
-- F446クロスビルドと実機試験 — NOT RUN。今回の検証はホスト上の状態機械とモック入力を対象とする。
+- STM32CubeIDE 1.19.0の公式managed clean-build — Debug／ReleaseともにPASS。G++のインクルードパスへ `../App/Inc` を登録し、`python3 tools/regenerate_cubeide_f446.py` で両構成とも警告・エラー0件、RobotSequenceを含む全Appソースのオブジェクトと新規ARM ELFの生成を確認。
+- STM32F446への書き込み、実機CAN通信、モータ駆動 — 未実施。
