@@ -33,48 +33,71 @@ def cxx_metadata(project: str, cproject: str) -> tuple[str, str]:
     elif cproject.count(app_entry) != 2:
         raise ValueError("App source configuration is inconsistent")
 
-    # CubeIDE keeps the GCC and G++ include paths in independent tool options.
-    # C++ App sources need the same public header root as the existing C sources.
-    app_include = '<listOptionValue builtIn="false" value="../App/Inc"/>'
+    # CubeIDE keeps the C and G++ options independent. The CAN1 port includes
+    # STM32 HAL/CMSIS from C++, so both G++ configurations need the F446 headers.
     compiler_prefix = "com.st.stm32cube.ide.mcu.gnu.managedbuild.tool."
+    hal_paths = (
+        "../Core/Inc",
+        "../Drivers/STM32F4xx_HAL_Driver/Inc",
+        "../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy",
+        "../Drivers/CMSIS/Device/ST/STM32F4xx/Include",
+        "../Drivers/CMSIS/Include",
+    )
     for language in ("c", "cpp"):
         compiler_key = compiler_prefix + language + ".compiler"
-        include_key = compiler_key + ".option.includepaths"
         compiler_tool = re.compile(
             rf'(?P<open><tool\b(?=[^>]*superClass="{re.escape(compiler_key)}")[^>]*>)'
             r"(?P<body>.*?)</tool>",
             re.DOTALL,
         )
-        include_option = re.compile(
-            rf'<option\b(?=[^>]*superClass="{re.escape(include_key)}")[^>]*?(?:/>|>.*?</option>)',
-            re.DOTALL,
-        )
 
-        def require_app_include(match: re.Match[str]) -> str:
+        def require_compiler_options(match: re.Match[str]) -> str:
             body = match.group("body")
-            found = include_option.search(body)
-            if found:
-                option = found.group(0)
-                if any(child.get("value") == "../App/Inc" for child in ET.fromstring(option)):
-                    return match.group(0)
-                if option.endswith("/>"):
-                    updated = option[:-2] + ">" + app_include + "</option>"
-                else:
-                    entry = "\t" + app_include + "\n" + "\t" * 8
-                    updated = option.removesuffix("</option>") + entry + "</option>"
-                body = body[: found.start()] + updated + body[found.end() :]
-            else:
-                tool_id = ET.fromstring(match.group("open") + "</tool>").get("id")
-                body = (
-                    "\n" + "\t" * 8
-                    + f'<option id="{tool_id}.includepaths" name="Include paths (-I)" '
-                    + f'superClass="{include_key}" valueType="includePath">'
-                    + "\n" + "\t" * 9 + app_include
-                    + "\n" + "\t" * 8 + "</option>" + body
+            tool_id = ET.fromstring(match.group("open") + "</tool>").get("id")
+            options = [("includepaths", "Include paths (-I)", "includePath", ("../App/Inc",))]
+            if language == "cpp":
+                options[0] = ("includepaths", "Include paths (-I)", "includePath",
+                              ("../App/Inc", *hal_paths))
+                options.append(("definedsymbols", "Define symbols (-D)", "definedSymbols",
+                                ("USE_HAL_DRIVER", "STM32F446xx")))
+
+            for suffix, name, value_type, values in options:
+                key = compiler_key + ".option." + suffix
+                pattern = re.compile(
+                    rf'<option\b(?=[^>]*superClass="{re.escape(key)}")[^>]*?'
+                    r"(?:/>|>.*?</option>)",
+                    re.DOTALL,
                 )
+                found = pattern.search(body)
+                if found:
+                    option = found.group(0)
+                    existing = {child.get("value") for child in ET.fromstring(option)}
+                else:
+                    option = (
+                        f'<option id="{tool_id}.{suffix}" name="{name}" '
+                        f'superClass="{key}" valueType="{value_type}"/>'
+                    )
+                    existing = set()
+
+                missing = [v for v in values if v not in existing]
+                if not missing:
+                    continue
+                entries = "".join(
+                    "\t" * 9 + f'<listOptionValue builtIn="false" value="{value}"/>\n'
+                    for value in missing
+                )
+                # Keep CubeIDE-specific attributes intact, including scanner settings.
+                opening = option[:-2] + ">\n" if option.endswith("/>") else (
+                    option.removesuffix("</option>").rstrip("\t")
+                )
+                updated = opening + entries + "\t" * 8 + "</option>"
+                if found:
+                    body = body[: found.start()] + updated + body[found.end() :]
+                else:
+                    body = "\n" + "\t" * 8 + updated + body
             return match.group("open") + body + "</tool>"
 
-        cproject, count = compiler_tool.subn(require_app_include, cproject)
+        cproject, count = compiler_tool.subn(require_compiler_options, cproject)
         if count != 2:
             raise ValueError(f"Expected two {language} compiler configurations")
 
