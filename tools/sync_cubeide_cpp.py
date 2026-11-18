@@ -33,19 +33,50 @@ def cxx_metadata(project: str, cproject: str) -> tuple[str, str]:
     elif cproject.count(app_entry) != 2:
         raise ValueError("App source configuration is inconsistent")
 
-    # C files in nested App/Src modules include hand-written App/Inc headers.
-    # CubeMX may remove this setting during regeneration; --fix restores it.
-    core_include = '<listOptionValue builtIn="false" value="../Core/Inc"/>'
+    # CubeIDE keeps the GCC and G++ include paths in independent tool options.
+    # C++ App sources need the same public header root as the existing C sources.
     app_include = '<listOptionValue builtIn="false" value="../App/Inc"/>'
-    if cproject.count(core_include) != 2:
-        raise ValueError("Expected two C compiler Core/Inc include paths")
-    if cproject.count(app_include) == 0:
-        cproject = cproject.replace(
-            core_include,
-            core_include + "\n\t\t\t\t\t\t\t\t\t" + app_include,
+    compiler_prefix = "com.st.stm32cube.ide.mcu.gnu.managedbuild.tool."
+    for language in ("c", "cpp"):
+        compiler_key = compiler_prefix + language + ".compiler"
+        include_key = compiler_key + ".option.includepaths"
+        compiler_tool = re.compile(
+            rf'(?P<open><tool\b(?=[^>]*superClass="{re.escape(compiler_key)}")[^>]*>)'
+            r"(?P<body>.*?)</tool>",
+            re.DOTALL,
         )
-    elif cproject.count(app_include) != 2:
-        raise ValueError("App/Inc C include path configuration is inconsistent")
+        include_option = re.compile(
+            rf'<option\b(?=[^>]*superClass="{re.escape(include_key)}")[^>]*?(?:/>|>.*?</option>)',
+            re.DOTALL,
+        )
+
+        def require_app_include(match: re.Match[str]) -> str:
+            body = match.group("body")
+            found = include_option.search(body)
+            if found:
+                option = found.group(0)
+                if any(child.get("value") == "../App/Inc" for child in ET.fromstring(option)):
+                    return match.group(0)
+                if option.endswith("/>"):
+                    updated = option[:-2] + ">" + app_include + "</option>"
+                else:
+                    entry = "\t" + app_include + "\n" + "\t" * 8
+                    updated = option.removesuffix("</option>") + entry + "</option>"
+                body = body[: found.start()] + updated + body[found.end() :]
+            else:
+                tool_id = ET.fromstring(match.group("open") + "</tool>").get("id")
+                body = (
+                    "\n" + "\t" * 8
+                    + f'<option id="{tool_id}.includepaths" name="Include paths (-I)" '
+                    + f'superClass="{include_key}" valueType="includePath">'
+                    + "\n" + "\t" * 9 + app_include
+                    + "\n" + "\t" * 8 + "</option>" + body
+                )
+            return match.group("open") + body + "</tool>"
+
+        cproject, count = compiler_tool.subn(require_app_include, cproject)
+        if count != 2:
+            raise ValueError(f"Expected two {language} compiler configurations")
 
     linker = re.compile(
         r'<tool id="(com\.st\.stm32cube\.ide\.mcu\.gnu\.managedbuild\.tool\.cpp\.linker\.\d+)"'

@@ -109,3 +109,14 @@ target_include_directories(balancing_cpp_app_tests PRIVATE
 )
 target_compile_options(balancing_cpp_app_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_cpp_app_tests COMMAND balancing_cpp_app_tests)
+
+# Host-only ARM/FAULT state sequence with clock and four-axis inputs injected.
+add_executable(balancing_robot_sequence_tests
+    tests/test_robot_sequence.cpp
+    ${F446_APP}/Src/balancing/app/RobotSequence.cpp
+)
+target_include_directories(balancing_robot_sequence_tests PRIVATE
+    ${F446_APP}/Inc
+)
+target_compile_options(balancing_robot_sequence_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME balancing_robot_sequence_tests COMMAND balancing_robot_sequence_tests)
