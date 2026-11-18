@@ -290,6 +290,24 @@ for label, flags in [
     print(f"[{label}] 実行", flush=True)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
+# 仮想時計でARMとFAULTの境界を検証する。実機のCANやモータは使用しない。
+robot_sequence_common = [
+    "g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
+    "-I", str(F446_APP / "Inc"),
+    str(F446_APP / "Src" / "balancing" / "app" / "RobotSequence.cpp"),
+    str(ROOT / "tests" / "test_robot_sequence.cpp"),
+]
+for label, flags in [
+    ("RobotSequence 通常ビルド", []),
+    ("RobotSequence UBSan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"]),
+]:
+    path = OUT / ("test_robot_sequence_ubsan" if flags else "test_robot_sequence")
+    print(f"[{label}] コンパイル", flush=True)
+    subprocess.run(robot_sequence_common + flags + ["-o", str(path)],
+                   check=True, cwd=ROOT, timeout=30)
+    print(f"[{label}] 実行", flush=True)
+    subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
+
 print("[CubeIDE C++設定回帰試験] 実行", flush=True)
 subprocess.run(
     [
