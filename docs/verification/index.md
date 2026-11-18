@@ -8,6 +8,7 @@
 |---|---|---|
 | **2026-11-12 移植前master基準** | [C++17集中移植の事前検証](cpp17-migration-preflight-20261112.md) | PR #24/#25/#26統合後、ホスト通常/UBSan・CTest 12/12・CubeIDE Debug/Release PASS。MOTOR-151/198の既知仕様差分を再現（実機未実施） |
 | C++17のARM・FAULT状態機械 | [RobotSequenceのホスト検証](robot-sequence-host.md) | 仮想時計、RS06 4軸の有効化結果、期限境界、異常記録 |
+| RS06 4軸の有効化と停止 | [MotorServiceの模擬CAN検証](motor-service-rs06-host.md) | Type 3完了と新規応答の照合、4軸別のType 4再試行、バスオフ・期限の故障注入 |
 | F446の11ソース構成 | [Issue #9脚長・Rollホスト検証](issue9-leg-pd-host.md) | Debug/Releaseで新しい脚長PDソースを含むARMクロスビルドPASS（実機未実施） |
 | F446の直前10ソース構成 | [Issue #10ホスト・ARM検証](issue10-observation-host.md) | PR #23時点の10ソース、実機未実施 |
 | CAN周期と送信調停 | [Issue #5ホスト試験](issue5-can-scheduler-host.md) | 仮想時刻・3メールボックス・故障注入 |
