@@ -345,6 +345,23 @@ for suffix, flags in [
                        check=True, cwd=ROOT, timeout=30)
         subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
+can1_runtime_common = [
+    "g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
+    "-I", str(ROOT / "tests" / "stubs_can1"), "-I", str(F446_APP / "Inc"),
+    str(rs06_source / "device" / "F446Can1Port.cpp"),
+    str(rs06_source / "device" / "f446_can1_runtime.cpp"),
+    str(ROOT / "tests" / "test_f446_can1_runtime.cpp"),
+]
+for suffix, flags in [
+    ("", []),
+    ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"]),
+]:
+    path = OUT / f"test_f446_can1_runtime{suffix}"
+    print(f"[test_f446_can1_runtime{suffix}] コンパイル", flush=True)
+    subprocess.run(can1_runtime_common + flags + ["-o", str(path)],
+                   check=True, cwd=ROOT, timeout=30)
+    subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
+
 print("[CubeIDE C++設定回帰試験] 実行", flush=True)
 subprocess.run(
     [
