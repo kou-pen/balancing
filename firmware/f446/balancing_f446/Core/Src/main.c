@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "../../App/Inc/balancing_app_bridge.h"
+#include "../../App/Inc/balancing_f446_can1_bridge.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -110,8 +111,12 @@ int main(void)
   MX_USB_OTG_HS_HCD_Init();
   /* USER CODE BEGIN 2 */
   balancing_app_init();
-  /* CANは受信フィルタ・状態機械の実機検証が完了するまで開始しない。
-   * C++アプリは現在モータ出力なし。 */
+  /* CAN1を開始してRS06の状態報告とバス異常を観測する。
+   * 駆動設定の照合と状態機械の接続は後続のため、指令は送信しない。 */
+  if (!balancing_f446_can1_start(&hcan1))
+  {
+    Error_Handler();
+  }
   if (HAL_TIM_Base_Start_IT(&htim7) != HAL_OK)
   {
     Error_Handler();
@@ -133,6 +138,7 @@ int main(void)
     __set_PRIMASK(primask);
     if (do_control != 0u)
     {
+      balancing_f446_can1_service();
       balancing_app_control_tick();
     }
     balancing_app_poll();
