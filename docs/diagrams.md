@@ -120,6 +120,8 @@ sequenceDiagram
 
 F446のCAN1ポートで実際に使う関数の順序と、現時点の検証範囲は [CAN1ポートとRS06の接続検証](verification/f446-can1-rs06-port-host.md) に示す。
 
+基板側のCAN1初期化から割込み取得までの順序は [CAN1の起動・割込みの検証](verification/f446-can1-runtime-host.md) を参照。
+
 ## 3. 500 Hz制御周期の処理
 
 <pre class="mermaid">

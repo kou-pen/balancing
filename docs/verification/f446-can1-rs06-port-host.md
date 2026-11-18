@@ -25,7 +25,7 @@ sequenceDiagram
     A->>M: onRs06TxResult で受付を記録
 </pre>
 
-HALによるクロック、フィルタ、CAN開始に続いて、CAN1のIRQ入口が `captureInterrupt(atUs)` を呼ぶ構成です。現在の検証ではホスト試験がその入口と制御周期を直接呼びます。F446の生成コード側に割込みをつなぐ工程が残っています。CAN1ポートと `HAL_CAN_IRQHandler` が同じフラグを消費するとイベントが失われるので、接続時は割込み入口を一つにします。
+HALによるクロック、フィルタ、CAN開始に続いて、CAN1のIRQ入口が `captureInterrupt(atUs)` を呼ぶ構成です。現在の検証ではホスト試験がその入口と制御周期を直接呼びます。生成コード側の後続接続は [CAN1の起動・割込みの検証](f446-can1-runtime-host.md) を参照してください。CAN1ポートと `HAL_CAN_IRQHandler` が同じフラグを消費するとイベントが失われるので、接続時は割込み入口を一つにします。
 
 ## 不変条件と試験
 
