@@ -81,7 +81,7 @@ python3 tools/verify_f446_build.py
 
 `tools/verify_f446_build.py` により、CubeIDEの古い生成Makefile/ELFを誤って新構成のPASSと扱うことを防止する。**2026-11-09の初回実行では**Debug/Releaseとも期待どおりNOT VERIFIED（終了コード1）だったが、**2026-11-10のCubeIDE公式管理ビルド後には両構成PASS**になった。
 
-スクリプト単体の模擬フィクスチャ試験（新しいARM ELF32、古い生成Makefile、古い.o、古いELF、非ARMバイナリ）を`tests/test_cubeide_cpp_metadata.py`に追加し、回帰テストは **13/13 PASS**。このPASSは検証スクリプト自体の試験結果であり、実機向けクロスビルド完了を意味しない。
+スクリプト単体の模擬フィクスチャ試験（新しいARM ELF32、古い生成Makefile、古い.o、古いELF、非ARMバイナリ）を `tests/test_cubeide_cpp_metadata.py` に追加し、回帰テストは **13/13 PASS**。このPASSは検証スクリプト自体の試験結果であり、実機向けクロスビルド完了を意味しない。
 
 ## 追加検証：IDE同梱GNU ArmによるDebug/Releaseの全ソース・クロスリンク
 

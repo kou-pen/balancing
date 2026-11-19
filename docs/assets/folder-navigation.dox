@@ -1,0 +1,466 @@
+// @subpage はフォルダを左ツリーと右の一覧に登録する。文書へは元のMarkdownパスでリンクする。
+
+/** @mainpage Balancing リポジトリ
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| @subpage folder_docs "docs/" | 設計、仕様、実装予定、検証記録と開発手順 |
+| @subpage folder_firmware "firmware/" | ファームウェアの公開APIと実装ファイル |
+| [README.md](../../README.md) | プロジェクトの目的、現状と最初のビルド手順 |
+| [CONTRIBUTING.md](../../CONTRIBUTING.md) | 変更の進め方、検証、PRとレビュー |
+| [AGENTS.md](../../AGENTS.md) | AI開発時の作業範囲とコード・文書の規約 |
+*/
+
+/** @page folder_docs docs/
+
+@ref index "リポジトリ" / `docs/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| @subpage folder_docs_ai "ai/" | AIが参照する運用・文書ルータ |
+| @subpage folder_docs_assets "assets/" | Doxygenのフォルダ一覧とMermaid描画に使うファイル |
+| @subpage folder_docs_design "design/" | 構成、実装方式、採用した設計の理由 |
+| @subpage folder_docs_development "development/" | 開発環境、Git・GitHubの使い方と運用 |
+| @subpage folder_docs_specs "specs/" | 仕様IDを持つ要求・動作・通信の正本 |
+| @subpage folder_docs_todo "todo/" | 実装・検証の残作業と受入条件 |
+| @subpage folder_docs_verification "verification/" | 実行した試験、結果と未検証範囲 |
+| [architecture.md](../architecture.md) | F446とF303の構成、制御周期、実装・検証の現状 |
+| [can-id-table.md](../can-id-table.md) | CAN1・CAN2の用途、ID、データと物理単位 |
+| [diagrams.md](../diagrams.md) | 制御のデータフロー、状態遷移、停止と電源遮断の図 |
+| [index.md](../index.md) | GitHubで文書フォルダをたどる入口 |
+| [software-core.md](../software-core.md) | 旧C11の状態機械、制御演算、ホスト回帰 |
+| [spec-index.md](../spec-index.md) | 仕様IDと仕様書の対応表 |
+*/
+
+/** @page folder_docs_ai ai/
+
+@ref folder_docs "docs/" / `ai/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| [context.md](../ai/context.md) | AIが作業時に参照する文書の順序と判断基準 |
+*/
+
+/** @page folder_docs_assets assets/
+
+@ref folder_docs "docs/" / `assets/`
+
+| ファイル | 内容 |
+|---|---|
+| `diagrams.css` | Mermaid図を明るい背景で表示するスタイル |
+| `doxygen-layout.xml` | Doxygenの索引とナビゲーションの設定 |
+| `folder-navigation.dox` | フォルダの階層、ファイル名、内容の一行説明 |
+| `header-example.html` | Doxygenのヘッダーの参考例 |
+| `mermaid-footer.html` | Mermaidを読み込むHTMLフッター |
+| `mermaid-init.js` | Mermaid図の描画設定と初期化 |
+| `mermaid.min.js` | オフラインで使用するMermaidライブラリ |
+| `stylesheet-example.css` | Doxygenの標準スタイルシートの参考例 |
+*/
+
+/** @page folder_docs_design design/
+
+@ref folder_docs "docs/" / `design/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| [attitude-filter.md](../design/attitude-filter.md) | 加速度とジャイロによる姿勢推定、静止バイアスと座標変換 |
+| [can-scheduler.md](../design/can-scheduler.md) | 500 Hz／250 Hz送信周期、メールボックス、優先順の設計 |
+| [cubeide-cpp.md](../design/cubeide-cpp.md) | CubeIDEでのC++設定、Cとの接続、生成コードの再生成 |
+| [data-model.md](../design/data-model.md) | データの所有権、モジュール境界、共有スナップショット |
+| [leg-kinematics.md](../design/leg-kinematics.md) | 六節リンクの脚長・角度・ヤコビアンとホスト試験モデル |
+| [leg-pd-roll.md](../design/leg-pd-roll.md) | 固定脚長PDとRoll支持力、ARM時の脚長目標 |
+| [linear-simulation.md](../design/linear-simulation.md) | 離散線形モデルと実機非依存の制御シミュレーション |
+| [motor-layer.md](../design/motor-layer.md) | RS06・C620のコーデック、単軸試運転、HAL接続 |
+| [observation-snapshot.md](../design/observation-snapshot.md) | 500 Hz制御に渡す観測コピーとセンサ時刻の管理 |
+| [operator-input.md](../design/operator-input.md) | USB／CANの操作元切替、通信断、復帰とニュートラル判定 |
+| [public-api.md](../design/public-api.md) | F446のC++17公開型、関数、モジュールの責務 |
+| [yaw-pi.md](../design/yaw-pi.md) | Yaw角速度PI、積分飽和防止と倒立を優先する出力配分 |
+*/
+
+/** @page folder_docs_development development/
+
+@ref folder_docs "docs/" / `development/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| [editor.md](../development/editor.md) | VS Code、Ruff、clangd、clang-formatの開発環境 |
+| [git.md](../development/git.md) | リポジトリの初回登録とGit運用の記録 |
+| [github-governance.md](../development/github-governance.md) | Issue、PR、タグ、レビュー、マージの運用規約 |
+| [github-setup.md](../development/github-setup.md) | GitHubの初期設定と設定確認 |
+*/
+
+/** @page folder_docs_specs specs/
+
+@ref folder_docs "docs/" / `specs/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| @subpage folder_docs_specs_behavior "behavior/" | 運転、状態遷移、ジャンプの動作仕様 |
+| @subpage folder_docs_specs_boards "boards/" | F446・F303の機能とハードウェア境界 |
+| @subpage folder_docs_specs_control "control/" | 倒立制御と状態推定の仕様 |
+| @subpage folder_docs_specs_protocols "protocols/" | CAN・USB・I2Cの通信形式と単位 |
+*/
+
+/** @page folder_docs_specs_behavior behavior/
+
+@ref folder_docs_specs "docs/specs/" / `behavior/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| [jump.md](../specs/behavior/jump.md) | 後続開発のジャンプ動作、遷移、受入条件 |
+| [robot_operation.md](../specs/behavior/robot_operation.md) | 操作者から見たARM、停止、FAULTと復帰の仕様 |
+*/
+
+/** @page folder_docs_specs_boards boards/
+
+@ref folder_docs_specs "docs/specs/" / `boards/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| [f303_power.md](../specs/boards/f303_power.md) | F303電源基板の機能、信号、安全条件 |
+| [f446_control.md](../specs/boards/f446_control.md) | F446メイン制御基板の入出力、タスク周期、CAN |
+*/
+
+/** @page folder_docs_specs_control control/
+
+@ref folder_docs_specs "docs/specs/" / `control/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| [balance_vmc.md](../specs/control/balance_vmc.md) | 倒立・車輪・脚制御、LQRとVMCの設計仕様 |
+| [state_estimation.md](../specs/control/state_estimation.md) | 状態推定に使う信号と六節リンク運動学 |
+*/
+
+/** @page folder_docs_specs_protocols protocols/
+
+@ref folder_docs_specs "docs/specs/" / `protocols/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| [bno055_i2c.md](../specs/protocols/bno055_i2c.md) | BNO055のI2C通信、データ形式と単位 |
+| [c620_can2.md](../specs/protocols/c620_can2.md) | C620／M3508のCAN2指令・フィードバックとデータ配置 |
+| [power_can2.md](../specs/protocols/power_can2.md) | F446とF303の電源指令・状態報告 |
+| [ps5_usb.md](../specs/protocols/ps5_usb.md) | 有線DualSenseのUSB入力、ボタン・軸と切断時の扱い |
+| [remote_can2.md](../specs/protocols/remote_can2.md) | Raspberry Piなど上位機器から受ける操作指令 |
+| [rs06_can1.md](../specs/protocols/rs06_can1.md) | RS06のCAN1指令・応答、拡張ID、ビット配置と単位 |
+*/
+
+/** @page folder_docs_todo todo/
+
+@ref folder_docs "docs/" / `todo/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| [control.md](../todo/control.md) | 状態推定、LQR、VMC、制御器の残作業と受入条件 |
+| [f303.md](../todo/f303.md) | F303電源基板の残作業と検証項目 |
+| [f446.md](../todo/f446.md) | F446ファームウェアと基板の残作業 |
+| [jump.md](../todo/jump.md) | 後続開発のジャンプ制御の残作業 |
+| [protocols.md](../todo/protocols.md) | 通信実装とプロトコル試験の残作業 |
+| [roadmap.md](../todo/roadmap.md) | 開発段階の順序と各段階の到達条件 |
+| [verification.md](../todo/verification.md) | 統合試験、基板試験、実機試験の残項目 |
+*/
+
+/** @page folder_docs_verification verification/
+
+@ref folder_docs "docs/" / `verification/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| [can-contract-audit.md](../verification/can-contract-audit.md) | CAN ID、DLC、単位、重複と未確定項目の静的照合 |
+| [core-mode-contract-audit.md](../verification/core-mode-contract-audit.md) | C11状態機械とARM・FAULT仕様の差分 |
+| [cpp17-migration-preflight-20261112.md](../verification/cpp17-migration-preflight-20261112.md) | C++17移植前のmaster、ホスト試験とクロスビルドの基準 |
+| [f446-can-event-dispatch-host.md](../verification/f446-can-event-dispatch-host.md) | CAN1・CAN2のイベント配送、終端照合、周期送信、通常FIFO |
+| [f446-can1-rs06-port-host.md](../verification/f446-can1-rs06-port-host.md) | CANポートとRS06の結合、メールボックス再利用とバスオフ |
+| [f446-can1-runtime-host.md](../verification/f446-can1-runtime-host.md) | CAN1の起動、受信フィルタ、割り込み、DWT時計のホスト検証 |
+| [f446-crossbuild-20261109.md](../verification/f446-crossbuild-20261109.md) | 2026年11月9日時点のF446ヘッドレスクロスビルド |
+| [f446-module-layout.md](../verification/f446-module-layout.md) | F446自作C11／C++の機能別配置と移動後の検証 |
+| [f446-source-layout.md](../verification/f446-source-layout.md) | 旧ソース配置の統合とCubeIDEビルド手順 |
+| [index.md](../verification/index.md) | 試験記録の案内、判定の意味、実機未検証の範囲 |
+| [issue10-observation-host.md](../verification/issue10-observation-host.md) | センサ、操作入力、IMUのホスト回帰 |
+| [issue5-can-scheduler-host.md](../verification/issue5-can-scheduler-host.md) | 仮想時計を使うCAN送信周期とメールボックスの検証 |
+| [issue7-kinematics-host.md](../verification/issue7-kinematics-host.md) | 六節リンクの解析ヤコビアンと有限差分の比較 |
+| [issue9-leg-pd-host.md](../verification/issue9-leg-pd-host.md) | 脚長PD、Roll PD、ARM時の目標値と異常入力 |
+| [issue9-yaw-pi-host.md](../verification/issue9-yaw-pi-host.md) | Yaw PIの飽和、倒立優先、モードリセットの検証 |
+| [motor-service-rs06-host.md](../verification/motor-service-rs06-host.md) | RS06 4軸のARM、停止、再試行の模擬CAN検証 |
+| [motorbench-rx-owner.md](../verification/motorbench-rx-owner.md) | 単軸試運転の受信期限とCANポートの責務 |
+| [robot-sequence-host.md](../verification/robot-sequence-host.md) | ARMING、DISARM、FAULT、故障記録の状態遷移 |
+*/
+
+/** @page folder_firmware firmware/
+
+@ref index "リポジトリ" / `firmware/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| @subpage folder_firmware_f446 "f446/" | STM32F446メイン制御基板 |
+*/
+
+/** @page folder_firmware_f446 f446/
+
+@ref folder_firmware "firmware/" / `f446/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| @subpage folder_firmware_f446_balancing_f446 "balancing_f446/" | CubeIDEプロジェクトの自作ファームウェア |
+*/
+
+/** @page folder_firmware_f446_balancing_f446 balancing_f446/
+
+@ref folder_firmware_f446 "firmware/f446/" / `balancing_f446/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| @subpage folder_firmware_f446_balancing_f446_App "App/" | F446のアプリ、制御、通信、デバイス実装 |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App App/
+
+@ref folder_firmware_f446_balancing_f446 "firmware/f446/balancing_f446/" / `App/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| @subpage folder_firmware_f446_balancing_f446_App_Examples "Examples/" | 実装時に参照する記述例 |
+| @subpage folder_firmware_f446_balancing_f446_App_Inc "Inc/" | 公開宣言とC／C++の接続 |
+| @subpage folder_firmware_f446_balancing_f446_App_Src "Src/" | F446側の実装 |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Examples Examples/
+
+@ref folder_firmware_f446_balancing_f446_App "firmware/f446/balancing_f446/App/" / `Examples/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| <a href="documentation__example_8h_source.html">documentation_example.h</a> | 公開APIのDoxygenコメントと仕様IDの記述例 |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Inc Inc/
+
+@ref folder_firmware_f446_balancing_f446_App "firmware/f446/balancing_f446/App/" / `Inc/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing "balancing/" | 機能単位のフォルダ |
+| <a href="balancing__app__bridge_8h_source.html">balancing_app_bridge.h</a> | 生成Cコードからアプリに入る初期化と周期通知の宣言 |
+| <a href="balancing__f446__can1__bridge_8h_source.html">balancing_f446_can1_bridge.h</a> | CAN1の起動、IRQ取り込み、監視値取得をCから呼ぶ宣言 |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Inc_balancing balancing/
+
+@ref folder_firmware_f446_balancing_f446_App_Inc "firmware/f446/balancing_f446/App/Inc/" / `balancing/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_app "app/" | 起動、状態遷移、運転や試運転の管理 |
+| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_communication "communication/" | フレーム変換、CAN送受信とスケジューリング |
+| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_control "control/" | 制御演算と状態推定 |
+| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_core "core/" | 複数モジュールで共用する基礎処理 |
+| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_device "device/" | HALとモータなどの機器への接続 |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_app app/
+
+@ref folder_firmware_f446_balancing_f446_App_Inc_balancing "firmware/f446/balancing_f446/App/Inc/balancing/" / `app/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| <a href="CanEventPoll_8hpp_source.html">CanEventPoll.hpp</a> | CAN1・CAN2からイベントを回収するAPI |
+| <a href="MotorService_8hpp_source.html">MotorService.hpp</a> | RS06 4軸のARM・停止・状態取得をまとめるAPI |
+| <a href="RobotSequence_8hpp_source.html">RobotSequence.hpp</a> | 運転状態、FAULT、要求と結果の公開型 |
+| <a href="balancing__motor__bench_8h_source.html">balancing_motor_bench.h</a> | 単軸試運転の状態・入出力・周期実行の宣言 |
+| <a href="balancing__operator__input_8h_source.html">balancing_operator_input.h</a> | 操作元と指令値、受信・更新APIの宣言 |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_communication communication/
+
+@ref folder_firmware_f446_balancing_f446_App_Inc_balancing "firmware/f446/balancing_f446/App/Inc/balancing/" / `communication/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_communication_can "can/" | CANポート、受信配送、送信順序 |
+| <a href="Rs06Codec_8hpp_source.html">Rs06Codec.hpp</a> | RS06通信の状態型とフレーム変換の宣言 |
+| <a href="balancing__motor__can_8h_source.html">balancing_motor_can.h</a> | C11のRS06／C620フレーム変換API |
+| <a href="balancing__tx__scheduler_8h_source.html">balancing_tx_scheduler.h</a> | 旧C11のCAN周期送信モデルの型と関数 |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_communication_can can/
+
+@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_communication "firmware/f446/balancing_f446/App/Inc/balancing/communication/" / `can/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| <a href="CanPort_8hpp_source.html">CanPort.hpp</a> | 1バスの送受信、IRQ、メールボックスを扱うAPI |
+| <a href="CanRouter_8hpp_source.html">CanRouter.hpp</a> | CANイベントの発生元バス・種別を使う配送API |
+| <a href="CanTxScheduler_8hpp_source.html">CanTxScheduler.hpp</a> | 周期送信の置換、通常FIFO、受付と終端の照合API |
+| <a href="CanTypes_8hpp_source.html">CanTypes.hpp</a> | フレーム、トークン、送信結果、IRQイベントの共通型 |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_control control/
+
+@ref folder_firmware_f446_balancing_f446_App_Inc_balancing "firmware/f446/balancing_f446/App/Inc/balancing/" / `control/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_control_controller "controller/" | 倒立、脚長、Roll、Yawの制御 |
+| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_control_estimator "estimator/" | センサ観測の統合と脚運動学 |
+| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_control_filter "filter/" | 姿勢推定に使うセンサフィルタ |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_control_controller controller/
+
+@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_control "firmware/f446/balancing_f446/App/Inc/balancing/control/" / `controller/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| <a href="balancing__core_8h_source.html">balancing_core.h</a> | 旧C11状態機械と倒立制御演算の型・API |
+| <a href="balancing__leg__pd_8h_source.html">balancing_leg_pd.h</a> | 脚長・Roll PDの入出力と設定 |
+| <a href="balancing__yaw__pi_8h_source.html">balancing_yaw_pi.h</a> | Yaw角速度PIの入出力と状態 |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_control_estimator estimator/
+
+@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_control "firmware/f446/balancing_f446/App/Inc/balancing/control/" / `estimator/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| <a href="balancing__leg__kinematics_8h_source.html">balancing_leg_kinematics.h</a> | 六節リンクの関節角、脚長、ヤコビアンの型とAPI |
+| <a href="balancing__observation_8h_source.html">balancing_observation.h</a> | センサ観測の格納、更新、スナップショットの宣言 |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_control_filter filter/
+
+@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_control "firmware/f446/balancing_f446/App/Inc/balancing/control/" / `filter/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| <a href="balancing__attitude__filter_8h_source.html">balancing_attitude_filter.h</a> | 加速度とジャイロを使う姿勢フィルタの型とAPI |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_core core/
+
+@ref folder_firmware_f446_balancing_f446_App_Inc_balancing "firmware/f446/balancing_f446/App/Inc/balancing/" / `core/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| <a href="StateMachine_8hpp_source.html">StateMachine.hpp</a> | 状態機械で共用する型付きの状態保持 |
+| <a href="balancing__observation__time_8h_source.html">balancing_observation_time.h</a> | 観測の経過時間と鮮度判定で使う関数 |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_device device/
+
+@ref folder_firmware_f446_balancing_f446_App_Inc_balancing "firmware/f446/balancing_f446/App/Inc/balancing/" / `device/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| <a href="Rs06Motor_8hpp_source.html">Rs06Motor.hpp</a> | RS06 1軸の有効化、停止、状態報告のAPI |
+| <a href="balancing__f446__motor__bench__port_8h_source.html">balancing_f446_motor_bench_port.h</a> | F446の試運転ポートを操作するC API |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Src Src/
+
+@ref folder_firmware_f446_balancing_f446_App "firmware/f446/balancing_f446/App/" / `Src/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing "balancing/" | 機能単位のフォルダ |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Src_balancing balancing/
+
+@ref folder_firmware_f446_balancing_f446_App_Src "firmware/f446/balancing_f446/App/Src/" / `balancing/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_app "app/" | 起動、状態遷移、運転や試運転の管理 |
+| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_communication "communication/" | フレーム変換、CAN送受信とスケジューリング |
+| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_control "control/" | 制御演算と状態推定 |
+| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_device "device/" | HALとモータなどの機器への接続 |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Src_balancing_app app/
+
+@ref folder_firmware_f446_balancing_f446_App_Src_balancing "firmware/f446/balancing_f446/App/Src/balancing/" / `app/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| <a href="CanEventPoll_8cpp_source.html">CanEventPoll.cpp</a> | 2バスのイベントを交互に上限付きで回収 |
+| <a href="MotorService_8cpp_source.html">MotorService.cpp</a> | RS06 4軸へARM・停止要求を配り、結果を集約 |
+| <a href="RobotSequence_8cpp_source.html">RobotSequence.cpp</a> | 運転状態の遷移、ARMINGの期限、FAULT記録 |
+| <a href="application_8cpp_source.html">application.cpp</a> | F446のC++側初期化、タイマ通知、メインループ処理 |
+| <a href="balancing__motor__bench_8c_source.html">balancing_motor_bench.c</a> | 単軸試運転のコマンド、状態遷移、停止条件 |
+| <a href="balancing__operator__input_8c_source.html">balancing_operator_input.c</a> | 操作元選択、通信断、ニュートラル確認、指令値の整形 |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Src_balancing_communication communication/
+
+@ref folder_firmware_f446_balancing_f446_App_Src_balancing "firmware/f446/balancing_f446/App/Src/balancing/" / `communication/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_communication_can "can/" | CANポート、受信配送、送信順序 |
+| <a href="Rs06Codec_8cpp_source.html">Rs06Codec.cpp</a> | RS06フレームの符号化、状態報告の復号と検証 |
+| <a href="balancing__motor__can_8c_source.html">balancing_motor_can.c</a> | RS06／C620のC11フレーム生成・解析 |
+| <a href="balancing__tx__scheduler_8c_source.html">balancing_tx_scheduler.c</a> | 旧C11のCAN送信周期、受付、完了を模擬する処理 |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Src_balancing_communication_can can/
+
+@ref folder_firmware_f446_balancing_f446_App_Src_balancing_communication "firmware/f446/balancing_f446/App/Src/balancing/communication/" / `can/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| <a href="CanPort_8cpp_source.html">CanPort.cpp</a> | bxCANレジスタ操作、送受信、IRQイベント回収 |
+| <a href="CanRouter_8cpp_source.html">CanRouter.cpp</a> | 受信、送信終端、バス状態を上位へ振り分ける処理 |
+| <a href="CanTxScheduler_8cpp_source.html">CanTxScheduler.cpp</a> | 通常FIFOと周期フレームの優先順、期限、受付・終端照合 |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Src_balancing_control control/
+
+@ref folder_firmware_f446_balancing_f446_App_Src_balancing "firmware/f446/balancing_f446/App/Src/balancing/" / `control/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_control_controller "controller/" | 倒立、脚長、Roll、Yawの制御 |
+| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_control_estimator "estimator/" | センサ観測の統合と脚運動学 |
+| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_control_filter "filter/" | 姿勢推定に使うセンサフィルタ |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Src_balancing_control_controller controller/
+
+@ref folder_firmware_f446_balancing_f446_App_Src_balancing_control "firmware/f446/balancing_f446/App/Src/balancing/control/" / `controller/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| <a href="balancing__core_8c_source.html">balancing_core.c</a> | 旧C11の運転モードや制御演算 |
+| <a href="balancing__leg__pd_8c_source.html">balancing_leg_pd.c</a> | 脚長とRollのPD演算、出力制限 |
+| <a href="balancing__yaw__pi_8c_source.html">balancing_yaw_pi.c</a> | Yaw角速度PI、積分飽和防止と車輪出力配分 |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Src_balancing_control_estimator estimator/
+
+@ref folder_firmware_f446_balancing_f446_App_Src_balancing_control "firmware/f446/balancing_f446/App/Src/balancing/control/" / `estimator/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| <a href="balancing__leg__kinematics_8c_source.html">balancing_leg_kinematics.c</a> | 閉リンクの幾何計算、脚長、ヤコビアン |
+| <a href="balancing__observation_8c_source.html">balancing_observation.c</a> | センサ値の取り込み、車輪角の折返し、観測コピー |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Src_balancing_control_filter filter/
+
+@ref folder_firmware_f446_balancing_f446_App_Src_balancing_control "firmware/f446/balancing_f446/App/Src/balancing/control/" / `filter/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| <a href="balancing__attitude__filter_8c_source.html">balancing_attitude_filter.c</a> | 加速度とジャイロの相補フィルタ、座標変換、バイアス |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Src_balancing_device device/
+
+@ref folder_firmware_f446_balancing_f446_App_Src_balancing "firmware/f446/balancing_f446/App/Src/balancing/" / `device/`
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| <a href="Rs06Motor_8cpp_source.html">Rs06Motor.cpp</a> | RS06 1軸の有効化・停止フレームと応答の照合 |
+| <a href="balancing__f446__motor__bench__port_8c_source.html">balancing_f446_motor_bench_port.c</a> | F446 HALと単軸試運転の送受信・周期を接続 |
+| <a href="f446__can1__runtime_8cpp_source.html">f446_can1_runtime.cpp</a> | CAN1起動、受信フィルタ、IRQ、DWT時計、監視値の集計 |
+*/

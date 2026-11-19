@@ -20,7 +20,7 @@
 
 ## 再現可能な静的検査
 
-静的検証ツールは [check_can_contract.py](../../tools/check_can_contract.py) です。仕様書を直接読んで検証し、CAN IDの複製レジストリは持ちません。CAN IDの正本は [RS06](../specs/protocols/rs06_can1.md)、[C620](../specs/protocols/c620_can2.md)、[F303](../specs/protocols/power_can2.md)、[遠隔操作](../specs/protocols/remote_can2.md) の各仕様書です。
+静的検証ツールは [check_can_contract.py](https://github.com/kou-pen/balancing/blob/master/tools/check_can_contract.py) です。仕様書を直接読んで検証し、CAN IDの複製レジストリは持ちません。CAN IDの正本は [RS06](../specs/protocols/rs06_can1.md)、[C620](../specs/protocols/c620_can2.md)、[F303](../specs/protocols/power_can2.md)、[遠隔操作](../specs/protocols/remote_can2.md) の各仕様書です。
 
 ```sh
 python3 tools/check_can_contract.py
