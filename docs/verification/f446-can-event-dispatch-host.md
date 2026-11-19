@@ -124,6 +124,44 @@ sequenceDiagram
 
 ここで確認する優先順位は、主ループでメールボックスに入れる順序です。`CanPort` にすでに受け付けられたフレームの送信順序や、物理的な停止は実機側で別途確認します。
 
+## RS06停止・有効化を模擬CAN1へ接続
+
+`Rs06CanLink` は `MotorService::pendingRs06Requests()` と `CanTxScheduler` の間で、フレームとトークンを変換します。Type 3の有効化は現周期に `trySubmit()` で受付を試し、受付できなければ次周期に状態から候補を取り直します。通常FIFOに入れないため、DISARM前のType 3が停止後に残りません。すでに受付済みのType 3については、既存の軸状態が終端を待つ間に、他の軸のType 4を先に進めます。
+
+<pre class="mermaid">
+sequenceDiagram
+    participant A as 制御周期
+    participant L as Rs06CanLink
+    participant S as CanTxScheduler
+    participant R as CanRouter
+    participant M as MotorService
+    A->>R: pollCanEventsで前周期までのイベントを回収
+    R->>L: バスとトークンを照合した終端を配送
+    L->>M: 終端を該当軸へ反映
+    A->>M: RobotSequenceの今回の指令を反映
+    A->>L: submitPending
+    L->>M: 4軸の候補を取得
+    L->>S: Type 4を軸別停止枠へ登録
+    A->>S: serviceでメールボックスへ投入
+    S-->>A: 投入結果
+    A->>L: onScheduledTxProgress
+    L->>M: 実際に投入できた軸だけに受付を通知
+</pre>
+
+停止枠に登録した時点ではシリアルを1軸1件だけ保存し、枠が空くまで同じ要求を再登録しません。送信終端はCAN1・RS06用の発行元タグ・モータID・シリアルで照合します。送信エラーは故障として通知し、仲裁負けや未送信は再試行可能として返します。いずれも再試行時に軸が新しいシリアルを発行します。CAN1の受信欠落は次の制御周期まで異常をラッチします。
+
+| 統合試験で確認する境界 | 観測結果 |
+| --- | --- |
+| 3メールボックスと4軸 | 4軸目を専用枠に保持。終端回収後の空き枠から残りを送信 |
+| ARMと状態報告 | 同時刻の報告と別バスの報告を除外。4軸すべての送信後のType 2でARM成立 |
+| 有効化中のDISARM | 未受付のType 3を破棄。受付済みの軸の停止だけを終端まで待たせる |
+| 停止失敗と競合 | 新シリアルで再試行。旧終端と別バス・別発行元の同値シリアルを除外 |
+| CAN異常 | bus-offから復旧しても軸別の停止待ちを保持。CAN1のRX欠落を次周期に通知 |
+
+接続の検証基準はPR #41の `818e77b` と、このPRのソース差分です。ホストの通常・UBSanとCTest Debug 17/17、CTest ReleaseのCANイベント回収・送信調停が合格しました。CubeIDE 1.19.0のDebug／Releaseはともにエラー・警告0件で、両構成の22ソースとARM ELF32を確認しました。
+
+この接続の起動と制御周期はホスト試験のフィクスチャで構成しています。基板上でCAN1を起動するコードへの接続、CAN2モータ送信、実CAN・駆動試験は後続です。
+
 ## 確認した範囲
 
 | ケース | 確認項目 |
@@ -152,4 +190,4 @@ sequenceDiagram
 | STM32CubeIDE 1.19.0のヘッドレスビルド | VMでDebug／Releaseともエラー・警告0件。 `python3 tools/verify_f446_build.py` で両構成の21ソースとARM ELF32を確認 |
 | `python3 tools/validate_specs.py` とDoxygen 1.9.8 | 仕様ID、文書リンク、API参照、HTML生成を確認 |
 
-イベント回収件数の上限は実行時間の実測値とは別です。実機側の送信要求元、機器サービスへの終端配送、F446上のCAN2起動とモーター送信は後続工程です。実機の割込み負荷と500 Hz下での最悪実行時間は未測定です。
+イベント回収件数の上限は実行時間の実測値とは別です。F446実機でのRS06送受信、CAN2起動とモータ送信は後続工程です。実機の割込み負荷と500 Hz下での最悪実行時間は未測定です。
