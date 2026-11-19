@@ -25,11 +25,12 @@ struct Fixture {
     CAN_HandleTypeDef handle{&registers, HAL_CAN_STATE_LISTENING};
     CanPort port{handle};
 
-    void pushRx(std::uint32_t id, std::uint64_t atUs)
+    void pushRx(std::uint32_t id, std::uint64_t atUs, bool extended = false, std::uint32_t dlc = 1)
     {
         auto& fifo = registers.RF0R;
         assert(fifo.count < 3u);
-        registers.sFIFOMailBox[fifo.count++] = {id << 21u, 1, 0x45u, 0};
+        const auto rawId = extended ? (id << 3u) | CAN_RI0R_IDE : id << 21u;
+        registers.sFIFOMailBox[fifo.count++] = {rawId, dlc, 0x45u, 0};
         port.captureInterrupt(atUs);
     }
 
@@ -47,6 +48,7 @@ struct Entry {
     std::uint64_t atUs{};
     TxToken token{};
     std::uint32_t id{};
+    CanRxTarget target{CanRxTarget::Unmatched};
 };
 
 class Recorder final : public CanEventSink {
@@ -56,14 +58,15 @@ public:
     Fixture* refill1{nullptr};
     Fixture* refill2{nullptr};
 
-    void onCanReceive(CanBus bus, const CanFrame& frame, std::uint64_t atUs) noexcept override
+    void onCanReceive(CanBus bus, CanRxTarget target, const CanFrame& frame,
+                      std::uint64_t atUs) noexcept override
     {
-        assert(!frame.extended && frame.dlc == 1u && frame.data[0] == 0x45);
-        record({bus, CanEventKind::Rx, atUs, {}, frame.id});
+        assert(frame.data[0] == 0x45);
+        record({bus, CanEventKind::Rx, atUs, {}, frame.id, target});
         // 配送ごとにIRQが1件追加する場合でも、同じpoll内で追い続けない。
         auto* refill = bus == CanBus::Can1 ? refill1 : refill2;
         if (refill) {
-            refill->pushRx(frame.id, atUs + 1u);
+            refill->pushRx(frame.id, atUs + 1u, frame.extended, frame.dlc);
         }
     }
 
@@ -144,11 +147,74 @@ void testBothPortsReturnAtLimitAndResumeLater()
     assert(sink.count == 2u * budget + 2u && sink.entries[2 * budget + 1].atUs == 100 + budget);
 }
 
+void testRoutingUsesBusIdentifierFormatAndDlc()
+{
+    Recorder sink;
+    CanRouter router{sink};
+
+    struct Case {
+        CanBus bus;
+        std::uint32_t id;
+        bool extended;
+        std::uint8_t dlc;
+        CanRxTarget target;
+    };
+    // ID下位の主機・軸や状態ビットは配送先の判断に含めない。
+    constexpr std::uint32_t rsStatus = 0x02b4015au;
+    constexpr std::uint32_t rsPeriodic = 0x1800045au;
+    const Case cases[]{
+        {CanBus::Can1, rsStatus, true, 8, CanRxTarget::Rs06Status},
+        {CanBus::Can1, rsPeriodic, true, 8, CanRxTarget::Rs06Status},
+        {CanBus::Can1, rsStatus, true, 7, CanRxTarget::Unmatched},
+        {CanBus::Can1, rsStatus, true, 9, CanRxTarget::Unmatched},
+        {CanBus::Can1, rsStatus, false, 8, CanRxTarget::Unmatched},
+        {CanBus::Can1, rsStatus | (1u << 29u), true, 8, CanRxTarget::Unmatched},
+        {CanBus::Can1, 0x0300015a, true, 8, CanRxTarget::Unmatched},
+        {CanBus::Can2, rsStatus, true, 8, CanRxTarget::Unmatched},
+        {CanBus::Can2, 0x201, false, 8, CanRxTarget::C620LeftFeedback},
+        {CanBus::Can2, 0x202, false, 8, CanRxTarget::C620RightFeedback},
+        {CanBus::Can2, 0x201, true, 8, CanRxTarget::Unmatched},
+        {CanBus::Can2, 0x202, false, 7, CanRxTarget::Unmatched},
+        {CanBus::Can1, 0x201, false, 8, CanRxTarget::Unmatched},
+        {CanBus::Can2, 0x200, false, 8, CanRxTarget::Unmatched},
+        {CanBus::Can2, 0x203, false, 8, CanRxTarget::Unmatched},
+        {CanBus::Can2, 0x600, false, 8, CanRxTarget::Unmatched},
+    };
+    for (const auto& test : cases) {
+        const auto previousCount = sink.count;
+        const auto atUs = 100u + previousCount;
+        CanEvent event{CanEventKind::Rx, atUs};
+        event.frame = {test.id, {0x45}, test.dlc, test.extended};
+        router.dispatch(test.bus, event);
+        assert(sink.count == previousCount + 1u);
+        const auto& received = sink.entries[previousCount];
+        assert(received.bus == test.bus && received.id == test.id && received.atUs == atUs);
+        assert(received.target == test.target);
+    }
+}
+
+void testRoutingFromBothPortQueues()
+{
+    Fixture can1, can2;
+    Recorder sink;
+    CanRouter router{sink};
+    can1.pushRx(0x0200015a, 20, true, 8);
+    can2.pushRx(0x201, 21, false, 8);
+    can2.pushRx(0x202, 22, false, 8);
+    pollCanEvents(&can1.port, &can2.port, router);
+    assert(sink.count == 3);
+    assert(sink.entries[0].target == CanRxTarget::Rs06Status);
+    assert(sink.entries[1].target == CanRxTarget::C620LeftFeedback);
+    assert(sink.entries[2].target == CanRxTarget::C620RightFeedback);
+}
+
 } // namespace
 
 int main()
 {
     testBusAndEventTypeRemainPaired();
     testBothPortsReturnAtLimitAndResumeLater();
-    std::puts("PASS: F446 CAN event dispatch across two bounded ports");
+    testRoutingUsesBusIdentifierFormatAndDlc();
+    testRoutingFromBothPortQueues();
+    std::puts("PASS: F446 bounded CAN dispatch and RX routing");
 }
