@@ -146,9 +146,15 @@ target_link_libraries(balancing_f446_can_port_tests PRIVATE balancing_core m)
 target_compile_options(balancing_f446_can_port_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_can_port_tests COMMAND balancing_f446_can_port_tests)
 
+set(BALANCING_CAN_DISPATCH_SOURCES
+    ${F446_APP}/Src/balancing/app/CanEventPoll.cpp
+    ${F446_APP}/Src/balancing/communication/can/CanRouter.cpp
+)
+
 # Startup, RX observation and IRQ ownership at the STM32F446 CAN1 boundary.
 add_executable(balancing_f446_can1_runtime_tests
     tests/test_f446_can1_runtime.cpp
+    ${BALANCING_CAN_DISPATCH_SOURCES}
     ${F446_APP}/Src/balancing/communication/can/CanPort.cpp
     ${F446_APP}/Src/balancing/device/f446_can1_runtime.cpp
 )
