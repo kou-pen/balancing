@@ -1,6 +1,8 @@
 #include "balancing_f446_can1_bridge.h"
 
+#include "balancing/app/CanEventPoll.hpp"
 #include "balancing/communication/can/CanPort.hpp"
+#include "balancing/communication/can/CanRouter.hpp"
 
 #include <array>
 #include <cstdint>
@@ -37,7 +39,7 @@ bool installFilters(CAN_HandleTypeDef& handle)
     return true;
 }
 
-class Can1Runtime final {
+class Can1Runtime final : private balancing::CanEventSink {
 public:
     Can1Runtime(CAN_HandleTypeDef& handle, std::uint32_t cyclesPerUs) noexcept
         : port{handle}, handle{handle}, cyclesPerUs_{cyclesPerUs}, lastCycle_{DWT->CYCCNT}
@@ -61,28 +63,9 @@ public:
     void service() noexcept
     {
         sampleClock();
-        balancing::CanEvent event{};
-        for (std::size_t i = 0; i < balancing::CanPort::kMaxEventsPerPoll &&
-                                port.popEvent(event); ++i) {
-            switch (event.kind) {
-            case balancing::CanEventKind::Rx:
-                ++snapshot.rx_frames;
-                snapshot.last_rx_us = event.atUs;
-                break;
-            case balancing::CanEventKind::RxLost:
-                ++snapshot.rx_loss_events;
-                break;
-            case balancing::CanEventKind::BusOff:
-                ++snapshot.bus_off_events;
-                snapshot.bus_off = true;
-                break;
-            case balancing::CanEventKind::BusRecovered:
-                snapshot.bus_off = false;
-                break;
-            case balancing::CanEventKind::Tx:
-                break;
-            }
-        }
+        balancing::CanRouter router{*this};
+        // CAN1の観測経路を主ループの共通回収に通す。CAN2の起動・接続は別工程。
+        balancing::pollCanEvents(&port, nullptr, router);
     }
 
     balancing::CanPort port;
@@ -90,6 +73,36 @@ public:
     BF446Can1Snapshot snapshot{};
 
 private:
+    void onCanReceive(balancing::CanBus, const balancing::CanFrame&, std::uint64_t atUs) noexcept override
+    {
+        ++snapshot.rx_frames;
+        snapshot.last_rx_us = atUs;
+    }
+
+    void onCanTransmit(balancing::CanBus, balancing::TxToken, balancing::CanTxOutcome,
+                       std::uint64_t) noexcept override
+    {
+        // 受信監視では送信を登録しない。送信終端の照合は送信サービスを接続する工程で行う。
+    }
+
+    void onCanPortStatus(balancing::CanBus, balancing::CanEventKind kind, std::uint64_t) noexcept override
+    {
+        switch (kind) {
+        case balancing::CanEventKind::RxLost:
+            ++snapshot.rx_loss_events;
+            break;
+        case balancing::CanEventKind::BusOff:
+            ++snapshot.bus_off_events;
+            snapshot.bus_off = true;
+            break;
+        case balancing::CanEventKind::BusRecovered:
+            snapshot.bus_off = false;
+            break;
+        default:
+            break;
+        }
+    }
+
     std::uint32_t cyclesPerUs_;
     std::uint32_t lastCycle_;
     std::uint64_t accumulated_{0};

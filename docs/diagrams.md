@@ -122,6 +122,8 @@ sequenceDiagram
 
 基板側のCAN1初期化から割込み取得までの順序は [CAN1の起動・割込みの検証](verification/f446-can1-runtime-host.md) を参照。
 
+メイン処理でのイベント回収順、1バス当たりの上限と配信先は [CANイベント回収・配送の検証](verification/f446-can-event-dispatch-host.md) を参照。
+
 ## 3. 500 Hz制御周期の処理
 
 <pre class="mermaid">
