@@ -14,6 +14,15 @@ struct CanFrame {
     std::array<std::uint8_t, 8> data{};
     std::uint8_t dlc{0};
     bool extended{false};
+
+    /** @brief 送信可能なデータフレームのID範囲とDLCを検証する。
+     *  @spec{BOARD-F446-001}
+     */
+    constexpr bool validForTransmit() const noexcept
+    {
+        const auto idLimit = extended ? 0x1fffffffu : 0x7ffu;
+        return id <= idLimit && dlc <= data.size();
+    }
 };
 
 /** @brief 上位が発行する、1バス内の送信照合キー。

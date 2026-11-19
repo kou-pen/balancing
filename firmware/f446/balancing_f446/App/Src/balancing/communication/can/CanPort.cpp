@@ -57,8 +57,7 @@ CanPort::CanPort(CAN_HandleTypeDef& handle) noexcept : handle_{handle}
 
 CanTxSubmitResult CanPort::trySend(const CanFrame& frame, TxToken token, std::uint64_t nowUs) noexcept
 {
-    const auto idLimit = frame.extended ? 0x1fffffffu : 0x7ffu;
-    if (token.serial == 0 || frame.dlc > frame.data.size() || frame.id > idLimit) {
+    if (token.serial == 0 || !frame.validForTransmit()) {
         return CanTxSubmitResult::Invalid;
     }
     if (handle_.Instance == nullptr) {

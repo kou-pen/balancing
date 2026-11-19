@@ -324,6 +324,153 @@ void testNonSendTerminalEventsReleaseTheEntry()
     }
 }
 
+PeriodicTxBatch periodicBatch(std::uint64_t generation, std::uint64_t deadline)
+{
+    PeriodicTxBatch batch{generation, deadline};
+    for (std::size_t i = 0; i < batch.requests.size(); ++i) {
+        // 仮想データの先頭バイトを世代と一致させ、投入されたペイロードから新旧を識別する。
+        const CanFrame frame{static_cast<std::uint32_t>(0x100u + i),
+                             {static_cast<std::uint8_t>(generation)}, 1, false};
+        batch.requests[i] = PeriodicTxRequest{frame, {4u * generation + i, 9}};
+    }
+    return batch;
+}
+
+void testFullCan1ReplacesTheFourthPeriodicFrame()
+{
+    Fixture can1;
+    Recorder sink;
+    CanTxScheduler scheduler{can1.port};
+    CanRouter router{sink, &scheduler};
+    const auto first = periodicBatch(1, 4000);
+    assert(scheduler.replacePeriodic(first, 0) == PeriodicBatchResult::Queued);
+    for (std::size_t i = 0; i < 3u; ++i) {
+        const auto tx = scheduler.servicePeriodic(0);
+        assert(tx.result == PeriodicTxResult::Accepted && tx.token == first.requests[i]->token);
+        can1.occupy(i);
+    }
+    assert(scheduler.servicePeriodic(3999).result == PeriodicTxResult::Busy);
+
+    auto second = periodicBatch(2, 8000);
+    // 次周期は4番目の対象だけを更新し、旧周期の4番目がFIFOに残らないことを確認する。
+    second.requests[0].reset();
+    second.requests[1].reset();
+    second.requests[2].reset();
+    assert(scheduler.replacePeriodic(second, 4000) == PeriodicBatchResult::Queued);
+    can1.complete(0, CAN_TSR_TXOK0, 4001);
+    pollCanEvents(&can1.port, nullptr, router);
+    // 空きがあっても、旧周期の受理済みフレームが残る間は新旧を混在させない。
+    assert(sink.count == 1u && sink.entries[0].token == first.requests[0]->token);
+    assert(scheduler.servicePeriodic(4001).result == PeriodicTxResult::Busy);
+
+    can1.complete(1, CAN_TSR_TERR0, 4010);
+    can1.complete(2, CAN_TSR_TXOK0, 4010);
+    assert(scheduler.servicePeriodic(4010).result == PeriodicTxResult::Busy);
+    pollCanEvents(&can1.port, nullptr, router);
+    assert(sink.count == 3u && sink.entries[1].outcome == CanTxOutcome::TransmitError);
+    const auto latest = scheduler.servicePeriodic(4010);
+    assert(latest.result == PeriodicTxResult::Accepted && latest.token == second.requests[3]->token);
+    assert((can1.registers.sTxMailBox[0].TIR >> 21u) == second.requests[3]->frame.id);
+    assert(can1.registers.sTxMailBox[0].TDLR == 2u);
+    assert(scheduler.servicePeriodic(4010).result == PeriodicTxResult::Idle);
+}
+
+void testFourthPeriodicFrameCanUseTheFirstReleasedMailbox()
+{
+    Fixture can1;
+    Recorder sink;
+    CanTxScheduler scheduler{can1.port};
+    CanRouter router{sink, &scheduler};
+    const auto batch = periodicBatch(1, 4000);
+    assert(scheduler.replacePeriodic(batch, 0) == PeriodicBatchResult::Queued);
+    for (std::size_t i = 0; i < 3u; ++i) {
+        assert(scheduler.servicePeriodic(0).result == PeriodicTxResult::Accepted);
+        can1.occupy(i);
+    }
+
+    auto invalidNext = periodicBatch(2, 8000);
+    invalidNext.requests[0]->token = batch.requests[0]->token;
+    assert(scheduler.replacePeriodic(invalidNext, 3998) == PeriodicBatchResult::Invalid);
+    // 同じ周期なら、ほかの2枠が送信中でも最初に空いた枠で4台目を送れる。
+    can1.complete(0, CAN_TSR_TXOK0, 3999);
+    pollCanEvents(&can1.port, nullptr, router);
+    const auto fourth = scheduler.servicePeriodic(3999);
+    assert(fourth.result == PeriodicTxResult::Accepted && fourth.token == batch.requests[3]->token);
+    assert(can1.registers.sTxMailBox[0].TDLR == 1u);
+}
+
+void testPeriodicDeadlineAndAtomicValidation()
+{
+    Fixture can1;
+    CanTxScheduler scheduler{can1.port};
+    const auto first = periodicBatch(1, 4000);
+    assert(scheduler.replacePeriodic(first, 0) == PeriodicBatchResult::Queued);
+    auto second = periodicBatch(2, 8000);
+    second.requests[3]->frame.dlc = 9;
+    assert(scheduler.replacePeriodic(second, 1) == PeriodicBatchResult::Invalid);
+    second.requests[3] = second.requests[0];
+    assert(scheduler.replacePeriodic(second, 1) == PeriodicBatchResult::Invalid);
+    second.requests[3] = first.requests[3];
+    assert(scheduler.replacePeriodic(second, 1) == PeriodicBatchResult::Invalid);
+    assert(scheduler.replacePeriodic(first, 2) == PeriodicBatchResult::StaleGeneration);
+    assert(scheduler.trySubmit(first.requests[0]->frame, first.requests[0]->token, 2) == CanTxSubmitResult::Busy);
+
+    can1.handle.State = HAL_CAN_STATE_READY;
+    assert(scheduler.servicePeriodic(3999).result == PeriodicTxResult::NotReady);
+    can1.handle.State = HAL_CAN_STATE_LISTENING;
+    can1.registers.TSR.bits = 0;
+    assert(scheduler.servicePeriodic(3999).result == PeriodicTxResult::Busy);
+    can1.registers.TSR.bits = CAN_TSR_TME0;
+    // ポートが空いた時刻が期限ちょうどなら送信しない。4件すべて元のトークンで期限切れを返す。
+    for (const auto& request : first.requests) {
+        const auto expired = scheduler.servicePeriodic(4000);
+        assert(expired.result == PeriodicTxResult::Expired && expired.token == request->token);
+    }
+    assert(scheduler.servicePeriodic(4000).result == PeriodicTxResult::Idle);
+    assert(can1.registers.sTxMailBox[0].TIR == 0u);
+
+    second = periodicBatch(2, 8000);
+    assert(scheduler.replacePeriodic(second, 4000) == PeriodicBatchResult::Queued);
+    const auto late = periodicBatch(3, 6000);
+    assert(scheduler.replacePeriodic(late, 6000) == PeriodicBatchResult::Expired);
+    assert(scheduler.replacePeriodic(second, 6000) == PeriodicBatchResult::StaleGeneration);
+    assert(scheduler.servicePeriodic(6000).result == PeriodicTxResult::Idle);
+}
+
+void testPeriodicGenerationIsIndependentOnCan2()
+{
+    Fixture can1, can2;
+    Recorder sink;
+    CanTxScheduler tx1{can1.port}, tx2{can2.port};
+    CanRouter router{sink, &tx1, &tx2};
+    const auto legs = periodicBatch(1, 4000);
+    assert(tx1.replacePeriodic(legs, 0) == PeriodicBatchResult::Queued);
+    assert(tx1.servicePeriodic(0).result == PeriodicTxResult::Accepted);
+    can1.occupy(0);
+
+    // C620共通フレームは左右を別々に待たせず、4バイトを含んだ1件として差し替える。
+    const CanFrame wheels{0x200, {0x11, 0x22, 0x33, 0x44}, 8, false};
+    PeriodicTxBatch wheelBatch{1, 2000};
+    wheelBatch.requests[0] = PeriodicTxRequest{wheels, {4, 9}};
+    assert(tx2.replacePeriodic(wheelBatch, 0) == PeriodicBatchResult::Queued);
+    assert(tx2.servicePeriodic(0).result == PeriodicTxResult::Accepted);
+    can2.occupy(0);
+
+    wheelBatch = {2, 4000};
+    wheelBatch.requests[0] = PeriodicTxRequest{{0x200, {0x55, 0x66, 0x77, 0x88}, 8, false}, {8, 9}};
+    assert(tx2.replacePeriodic(wheelBatch, 2000) == PeriodicBatchResult::Queued);
+    assert(tx2.servicePeriodic(2000).result == PeriodicTxResult::Busy);
+    can1.complete(0, CAN_TSR_TXOK0, 2001);
+    pollCanEvents(&can1.port, &can2.port, router);
+    assert(tx2.servicePeriodic(2001).result == PeriodicTxResult::Busy);
+    can2.complete(0, CAN_TSR_TXOK0, 2002);
+    pollCanEvents(&can1.port, &can2.port, router);
+    const auto wheel = tx2.servicePeriodic(2002);
+    assert(wheel.result == PeriodicTxResult::Accepted && wheel.token == wheelBatch.requests[0]->token);
+    assert(can2.registers.sTxMailBox[0].TDLR == 0x88776655u);
+    assert(tx1.servicePeriodic(2002).token == legs.requests[1]->token);
+}
+
 } // namespace
 
 int main()
@@ -335,5 +482,9 @@ int main()
     testTerminalOnlyReleasesTheOriginatingBus();
     testSchedulerIgnoresUnacceptedAndStaleEvents();
     testNonSendTerminalEventsReleaseTheEntry();
-    std::puts("PASS: F446 bounded CAN dispatch, RX routing and per-bus TX completion");
+    testFullCan1ReplacesTheFourthPeriodicFrame();
+    testFourthPeriodicFrameCanUseTheFirstReleasedMailbox();
+    testPeriodicDeadlineAndAtomicValidation();
+    testPeriodicGenerationIsIndependentOnCan2();
+    std::puts("PASS: F446 bounded CAN dispatch, RX routing, TX completion and periodic replacement");
 }
