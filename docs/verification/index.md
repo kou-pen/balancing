@@ -9,6 +9,7 @@
 | **2026-11-12 移植前master基準** | [C++17集中移植の事前検証](cpp17-migration-preflight-20261112.md) | PR #24/#25/#26統合後、ホスト通常/UBSan・CTest 12/12・CubeIDE Debug/Release PASS。MOTOR-151/198の既知仕様差分を再現（実機未実施） |
 | C++17のARM・FAULT状態機械 | [RobotSequenceのホスト検証](robot-sequence-host.md) | 仮想時計、RS06 4軸の有効化結果、期限境界、異常記録 |
 | F446 CAN1の起動と割込み | [CAN1の起動・割込みの検証](f446-can1-runtime-host.md) | フィルタ、TX／RX0／SCE、DWT時計、受信観測 |
+| F446 CANイベント回収・配送 | [2バスの回収と配送](f446-can-event-dispatch-host.md) | 1バス最大19件、バス付きTX終端、負荷中の交互配送 |
 | F446 CAN1の送受信と軸別トークン | [CAN1ポートとRS06の接続検証](f446-can1-rs06-port-host.md) | メールボックス再利用、受信あふれ、バスオフ、4軸ARMの結合 |
 | RS06 4軸の有効化と停止 | [MotorServiceの模擬CAN検証](motor-service-rs06-host.md) | Type 3完了と新規応答の照合、4軸別のType 4再試行、バスオフ・期限の故障注入 |
 | F446の11ソース構成 | [Issue #9脚長・Rollホスト検証](issue9-leg-pd-host.md) | Debug/Releaseで新しい脚長PDソースを含むARMクロスビルドPASS（実機未実施） |
