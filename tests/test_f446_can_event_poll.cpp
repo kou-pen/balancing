@@ -1,4 +1,6 @@
 #include "balancing/app/CanEventPoll.hpp"
+#include "balancing/app/MotorService.hpp"
+#include "balancing/app/Rs06CanLink.hpp"
 #include "balancing/communication/can/CanPort.hpp"
 #include "balancing/communication/can/CanRouter.hpp"
 #include "balancing/communication/can/CanTxScheduler.hpp"
@@ -737,6 +739,220 @@ void testStopWaitSurvivesNotReadyAndBusOff()
     assert(tx.trySubmit({}, {3, 31}, 50002) == CanTxSubmitResult::Busy);
 }
 
+struct Rs06LinkFixture {
+    // 番号・時刻ともホスト試験専用。対象番号とモータIDが別であることも確認する。
+    static constexpr std::uint8_t hostId = 0xa6;
+    Fixture can1, can2;
+    MotorService motors{{{11, 12, 13, 14}, hostId}};
+    RobotSequence sequence{{1000, true}};
+    CanTxScheduler tx1{can1.port}, tx2{can2.port};
+    Rs06CanLink link{motors, tx1};
+    CanRouter router{link, &tx1, &tx2};
+
+    static constexpr std::uint32_t reportId(std::uint8_t motorId, std::uint32_t mode) noexcept
+    {
+        return (2u << 24u) | (mode << 22u) | (std::uint32_t{motorId} << 8u) | hostId;
+    }
+
+    void poll()
+    {
+        pollCanEvents(&can1.port, &can2.port, router);
+    }
+
+    ScheduledTxProgress service(std::uint64_t nowUs)
+    {
+        const auto progress = tx1.service(nowUs);
+        link.onScheduledTxProgress(progress, nowUs);
+        return progress;
+    }
+
+    RobotState beginCycle(std::uint64_t nowUs, OperatorEvents operations = {})
+    {
+        poll();
+        RobotSequenceInput input{};
+        input.operations = operations;
+        input.interlocks = {true, true, true, true, true, true, MechanismSafety::Safe};
+        input.rs06 = motors.rs06ArmFeedback(nowUs);
+        input.observedFaults = motors.takeObservedFaults(nowUs);
+        const auto result = sequence.update(input, nowUs);
+        motors.applySequence(result, nowUs);
+        link.submitPending(nowUs);
+        return result.state;
+    }
+
+    void expectFrame(std::size_t mailbox, std::uint32_t type, std::uint8_t motorId)
+    {
+        const auto& tx = can1.registers.sTxMailBox[mailbox];
+        assert((tx.TIR & CAN_TI0R_TXRQ) != 0u);
+        assert((tx.TIR & CAN_TI0R_IDE) != 0u);
+        assert((tx.TIR >> 3u) == ((type << 24u) | (std::uint32_t{hostId} << 8u) | motorId));
+        assert(tx.TDTR == 8u && tx.TDLR == 0u && tx.TDHR == 0u);
+        can1.occupy(mailbox);
+    }
+
+    void completeBootStops()
+    {
+        assert(beginCycle(1) == RobotState::Disarmed);
+        // 専用枠への登録はメールボックス受付前なので、候補はまだ軸側にある。
+        assert(motors.pendingRs06Requests()[0].has_value());
+        link.submitPending(2);
+        for (unsigned axis = 0; axis < 3u; ++axis) {
+            assert(service(2).result == ScheduledTxResult::Accepted);
+            expectFrame(axis, 4, static_cast<std::uint8_t>(11u + axis));
+        }
+        assert(service(2).result == ScheduledTxResult::Busy);
+        assert(motors.pendingRs06Requests()[3].has_value());
+        can1.complete(1, CAN_TSR_TXOK0, 3);
+        assert(service(3).result == ScheduledTxResult::Busy);
+        poll();
+        assert(!motors.rs06Status(3)[1].stopPending);
+        assert(service(3).result == ScheduledTxResult::Accepted);
+        expectFrame(1, 4, 14);
+        for (unsigned box = 0; box < 3u; ++box) {
+            can1.complete(box, CAN_TSR_TXOK0, 4);
+        }
+        poll();
+        assert(!motors.rs06ArmFeedback(4).stopPending);
+        assert(motors.takeObservedFaults(4) == FaultFlags::None);
+    }
+};
+
+void testRs06CanLinkArmRequiresNewCan1ReportsAfterTransmission()
+{
+    Rs06LinkFixture f;
+    f.completeBootStops();
+    assert(f.beginCycle(10, OperatorEvents{true}) == RobotState::Arming);
+    for (unsigned box = 0; box < 3u; ++box) {
+        f.expectFrame(box, 3, static_cast<std::uint8_t>(11u + box));
+        f.can1.complete(box, CAN_TSR_TXOK0, 11);
+    }
+    f.can1.pushRx(f.reportId(11, 2), 11, true, 8);
+    assert(f.beginCycle(12) == RobotState::Arming);
+    assert(f.motors.rs06ArmFeedback(12).axes[0] == Rs06ArmStatus::Pending);
+    f.expectFrame(0, 3, 14);
+    f.can1.complete(0, CAN_TSR_TXOK0, 13);
+    for (std::uint8_t motorId : {11, 12, 13}) {
+        f.can1.pushRx(f.reportId(motorId, 2), 14, true, 8);
+    }
+    f.can2.pushRx(f.reportId(14, 2), 14, true, 8);
+    // 3軸が確認済みでも、最後の軸の報告がCAN2ならARMを完了できない。
+    assert(f.beginCycle(15) == RobotState::Arming);
+    assert(f.motors.rs06ArmFeedback(15).axes[2] == Rs06ArmStatus::Confirmed);
+    assert(f.motors.rs06ArmFeedback(15).axes[3] == Rs06ArmStatus::Pending);
+    f.can1.pushRx(f.reportId(14, 2), 16, true, 8);
+    assert(f.beginCycle(16) == RobotState::Balancing);
+}
+
+void testRs06CanLinkDisarmDropsUnacceptedEnableAndWaitsForSameAxis()
+{
+    Rs06LinkFixture f;
+    f.completeBootStops();
+    // Type 3を1軸だけ受付し、残る候補がFIFOに残らない条件を作る。
+    f.can1.registers.TSR.bits = CAN_TSR_TME0;
+    assert(f.beginCycle(10, OperatorEvents{true}) == RobotState::Arming);
+    f.expectFrame(0, 3, 11);
+    const auto unaccepted = f.motors.pendingRs06Requests()[1];
+    assert(unaccepted && unaccepted->command == Rs06Command::Enable);
+    f.can1.registers.TSR.bits |= (CAN_TSR_TME0 << 1u) | (CAN_TSR_TME0 << 2u);
+    assert(f.beginCycle(11, OperatorEvents{false, true}) == RobotState::Disarmed);
+    assert(!f.motors.pendingRs06Requests()[0]);
+    assert(f.service(11).result == ScheduledTxResult::Accepted);
+    f.expectFrame(1, 4, 12);
+    assert(f.service(11).result == ScheduledTxResult::Accepted);
+    f.expectFrame(2, 4, 13);
+    f.can1.complete(1, CAN_TSR_TXOK0, 12);
+    assert(f.beginCycle(12) == RobotState::Disarmed);
+    assert(f.service(12).result == ScheduledTxResult::Accepted);
+    f.expectFrame(1, 4, 14);
+    assert(f.service(12).result == ScheduledTxResult::Busy);
+
+    // メールボックスに入った軸11の有効化の終端を回収してから、その軸を停止する。
+    f.can1.complete(0, CAN_TSR_TXOK0, 13);
+    assert(f.beginCycle(13) == RobotState::Disarmed);
+    assert(f.service(13).result == ScheduledTxResult::Accepted);
+    f.expectFrame(0, 4, 11);
+    for (unsigned box = 0; box < 3u; ++box) {
+        f.can1.complete(box, CAN_TSR_TXOK0, 14);
+    }
+    assert(f.beginCycle(15) == RobotState::Disarmed);
+    assert(!f.motors.rs06ArmFeedback(15).stopPending);
+    assert(f.service(15).result == ScheduledTxResult::Idle);
+}
+
+void testRs06CanLinkRetryAndFeedbackIgnoreForeignEvents()
+{
+    Rs06LinkFixture f;
+    // 発行元の種別が違えば、CAN1で同じ軸番号・シリアルを持つ送信も別物になる。
+    const TxToken foreign{1, 11};
+    assert(f.tx1.trySubmit({}, foreign, 0) == CanTxSubmitResult::Accepted);
+    f.can1.occupy(0);
+    assert(f.beginCycle(1) == RobotState::Disarmed);
+    const auto first = f.service(1);
+    assert(first.result == ScheduledTxResult::Accepted && first.token.serial == foreign.serial);
+    f.expectFrame(1, 4, 11);
+
+    // 別バスに同値トークンを送信させ、Routerが正当に配送してもCAN1の軸に届かないことを確認する。
+    assert(f.tx2.trySubmit({}, first.token, 2) == CanTxSubmitResult::Accepted);
+    f.can2.occupy(0);
+    f.can2.complete(0, CAN_TSR_TXOK0, 2);
+    f.can1.complete(0, CAN_TSR_TXOK0, 2);
+    f.poll();
+    assert(f.motors.rs06Status(2)[0].stopPending);
+    f.can1.complete(1, CAN_TSR_TERR0, 3);
+    assert(f.beginCycle(3) == RobotState::Fault);
+    const auto retry = f.service(3);
+    assert(retry.result == ScheduledTxResult::Accepted);
+    assert(retry.token.origin == first.token.origin && retry.token.serial != first.token.serial);
+    f.expectFrame(0, 4, 11);
+    CanEvent stale{CanEventKind::Tx, 4};
+    stale.token = first.token;
+    stale.outcome = CanTxOutcome::Sent;
+    f.router.dispatch(CanBus::Can1, stale);
+    assert(f.motors.rs06Status(4)[0].stopPending);
+    f.can1.complete(0, CAN_TSR_TXOK0, 5);
+    f.poll();
+    assert(!f.motors.rs06Status(5)[0].stopPending && f.motors.rs06Status(5)[1].stopPending);
+
+    // 無効化は停止送信後に同じバスから届いたType 2でだけ確認できる。
+    const auto resetReport = f.reportId(11, 0);
+    f.can1.pushRx(resetReport, 5, true, 8);
+    f.can2.pushRx(resetReport, 6, true, 8);
+    f.poll();
+    assert(!f.motors.rs06Status(6)[0].disableConfirmed);
+    f.can1.pushRx(resetReport, 7, true, 8);
+    f.poll();
+    assert(f.motors.rs06Status(7)[0].disableConfirmed);
+}
+
+void testRs06CanLinkCan1BusOffRecoveryAndRxLoss()
+{
+    Rs06LinkFixture f;
+    assert(f.beginCycle(1) == RobotState::Disarmed);
+    f.can2.registers.ESR = CAN_ESR_BOFF;
+    f.can2.registers.RF0R.flags = CAN_RF0R_FOVR0;
+    f.can2.port.captureInterrupt(2);
+    f.poll();
+    assert(f.motors.takeObservedFaults(2) == FaultFlags::None);
+    f.can1.registers.ESR = CAN_ESR_BOFF;
+    f.can1.port.captureInterrupt(3);
+    f.poll();
+    assert(f.motors.takeObservedFaults(3) == FaultFlags::BusOff);
+    assert(!f.motors.pendingRs06Requests()[0]);
+    assert(f.service(3).result == ScheduledTxResult::Busy);
+    f.can1.registers.ESR = 0u;
+    f.can1.port.captureInterrupt(4);
+    f.poll();
+    assert(f.motors.takeObservedFaults(4) == FaultFlags::None);
+    assert(f.service(4).result == ScheduledTxResult::Accepted);
+    f.expectFrame(0, 4, 11); // バスオフの間も停止枠を保持していた。
+
+    f.can1.registers.RF0R.flags = CAN_RF0R_FOVR0;
+    f.can1.port.captureInterrupt(5);
+    f.poll();
+    assert(f.motors.takeObservedFaults(6) == FaultFlags::ExternalFault);
+    assert(f.motors.takeObservedFaults(6) == FaultFlags::None);
+}
+
 } // namespace
 
 int main()
@@ -757,5 +973,9 @@ int main()
     testFourStopsHavePriorityWhileTheNormalFifoIsFull();
     testFailedStopsRequireNewTokensAndAreIndependentBetweenBuses();
     testStopWaitSurvivesNotReadyAndBusOff();
-    std::puts("PASS: F446 CAN dispatch, periodic replacement, normal FIFO and stop priority");
+    testRs06CanLinkArmRequiresNewCan1ReportsAfterTransmission();
+    testRs06CanLinkDisarmDropsUnacceptedEnableAndWaitsForSameAxis();
+    testRs06CanLinkRetryAndFeedbackIgnoreForeignEvents();
+    testRs06CanLinkCan1BusOffRecoveryAndRxLoss();
+    std::puts("PASS: F446 CAN dispatch, TX scheduling and RS06 arm/stop link");
 }

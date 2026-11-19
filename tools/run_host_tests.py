@@ -315,14 +315,16 @@ rs06_codec_common = [
     "-I", str(F446_APP / "Inc"), "-c",
     str(rs06_source / "communication" / "balancing_motor_can.c"),
 ]
-rs06_service_common = [
-    "g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
-    "-I", str(F446_APP / "Inc"),
+rs06_service_sources = [
     str(rs06_source / "app" / "RobotSequence.cpp"),
     str(rs06_source / "app" / "MotorService.cpp"),
     str(rs06_source / "device" / "Rs06Motor.cpp"),
     str(rs06_source / "communication" / "Rs06Codec.cpp"),
 ]
+rs06_service_common = [
+    "g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
+    "-I", str(F446_APP / "Inc"),
+] + rs06_service_sources
 can1_sources = [
     "-I", str(ROOT / "tests" / "stubs_can1"),
     str(rs06_source / "communication" / "can" / "CanPort.cpp"),
@@ -354,7 +356,7 @@ can_dispatch_common = [
 ]
 for test, extra_sources in [
     ("test_f446_can1_runtime", [str(rs06_source / "device" / "f446_can1_runtime.cpp")]),
-    ("test_f446_can_event_poll", []),
+    ("test_f446_can_event_poll", rs06_service_sources + [str(rs06_source / "app" / "Rs06CanLink.cpp")]),
 ]:
     for suffix, flags in [
         ("", []),
@@ -362,9 +364,13 @@ for test, extra_sources in [
     ]:
         path = OUT / f"{test}{suffix}"
         source = ROOT / "tests" / f"{test}.cpp"
+        link_libraries = []
+        if test == "test_f446_can_event_poll":
+            link_libraries = [str(OUT / f"motor_service_rs06_codec{suffix}.o"), "-lm"]
         print(f"[{test}{suffix}] コンパイル", flush=True)
         subprocess.run(can_dispatch_common + extra_sources + flags +
-                       [str(source), "-o", str(path)], check=True, cwd=ROOT, timeout=30)
+                       [str(source)] + link_libraries + ["-o", str(path)],
+                       check=True, cwd=ROOT, timeout=30)
         subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
 print("[CubeIDE C++設定回帰試験] 実行", flush=True)
