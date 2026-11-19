@@ -120,6 +120,8 @@ sequenceDiagram
 
 共通 `CanPort` の2バス独立性と、RS06とのホスト試験での呼び出し順は [共通CANポートとRS06のホスト検証](verification/f446-can1-rs06-port-host.md) に示す。
 
+基板側のCAN1初期化から割込み取得までの順序は [CAN1の起動・割込みの検証](verification/f446-can1-runtime-host.md) を参照。
+
 ## 3. 500 Hz制御周期の処理
 
 <pre class="mermaid">

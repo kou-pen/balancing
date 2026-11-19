@@ -29,6 +29,8 @@ sequenceDiagram
 
 `trySend` は投入結果、`popEvent` はハードウェアの送信終端を返します。ポートは `TxToken` の発行元キーとシリアルを、担当バス内で照合します。図中のRS06型への変換と `MotorService` への直接接続は試験内の処理です。実行時のフレーム配送と送信調停は、今後 `Application`、`CanRouter`、バス別 `CanTxScheduler` から行います。
 
+F446基板側のCAN1起動と割込み入口の接続は [CAN1の起動・割込みの検証](f446-can1-runtime-host.md) を参照します。
+
 ## 不変条件と試験
 
 | 場面 | 確認した契約 |

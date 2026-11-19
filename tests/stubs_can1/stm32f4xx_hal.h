@@ -86,3 +86,37 @@ inline void __HAL_CAN_CLEAR_FLAG(CAN_HandleTypeDef* h, std::uint32_t flag)
 std::uint32_t __get_PRIMASK();
 void __disable_irq();
 void __enable_irq();
+
+
+constexpr std::uint32_t CAN_IT_TX_MAILBOX_EMPTY = 0x1u;
+constexpr std::uint32_t CAN_IT_RX_FIFO0_MSG_PENDING = 0x2u;
+constexpr std::uint32_t CAN_IT_RX_FIFO0_OVERRUN = 0x8u;
+constexpr std::uint32_t CAN_IT_BUSOFF = 0x400u;
+constexpr std::uint32_t CAN_IT_ERROR = 0x8000u;
+constexpr std::uint32_t CAN_FILTERMODE_IDMASK = 0u;
+constexpr std::uint32_t CAN_FILTERSCALE_32BIT = 1u;
+constexpr std::uint32_t CAN_FILTER_FIFO0 = 0u;
+constexpr std::uint32_t ENABLE = 1u;
+constexpr std::uint32_t CoreDebug_DEMCR_TRCENA_Msk = 1u << 24u;
+constexpr std::uint32_t DWT_CTRL_NOCYCCNT_Msk = 1u << 25u;
+constexpr std::uint32_t DWT_CTRL_CYCCNTENA_Msk = 1u;
+
+struct CAN_FilterTypeDef {
+    std::uint32_t FilterIdHigh, FilterIdLow, FilterMaskIdHigh, FilterMaskIdLow;
+    std::uint32_t FilterFIFOAssignment, FilterBank, FilterMode, FilterScale;
+    std::uint32_t FilterActivation, SlaveStartFilterBank;
+};
+enum HAL_StatusTypeDef { HAL_OK, HAL_ERROR };
+HAL_StatusTypeDef HAL_CAN_ConfigFilter(CAN_HandleTypeDef*, const CAN_FilterTypeDef*);
+HAL_StatusTypeDef HAL_CAN_Start(CAN_HandleTypeDef*);
+HAL_StatusTypeDef HAL_CAN_Stop(CAN_HandleTypeDef*);
+HAL_StatusTypeDef HAL_CAN_ActivateNotification(CAN_HandleTypeDef*, std::uint32_t);
+void __HAL_CAN_DISABLE_IT(CAN_HandleTypeDef*, std::uint32_t);
+void __set_PRIMASK(std::uint32_t);
+
+struct TestDwtRegisters { std::uint32_t CTRL, CYCCNT; };
+struct TestCoreDebugRegisters { std::uint32_t DEMCR; };
+extern TestDwtRegisters* DWT;
+extern TestCoreDebugRegisters* CoreDebug;
+extern std::uint32_t SystemCoreClock;
+extern CAN_TypeDef* CAN1;
