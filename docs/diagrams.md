@@ -118,6 +118,8 @@ sequenceDiagram
 
 この送受信順序と軸ごとの再試行は[RS06 4軸の模擬CAN試験](verification/motor-service-rs06-host.md)で検証する。実CANへの接続では、メールボックスの解放・キャンセル完了とトークンを一致させ、各受信を同じ単調時計で記録する。
 
+共通 `CanPort` の2バス独立性と、RS06とのホスト試験での呼び出し順は [共通CANポートとRS06のホスト検証](verification/f446-can1-rs06-port-host.md) に示す。
+
 ## 3. 500 Hz制御周期の処理
 
 <pre class="mermaid">

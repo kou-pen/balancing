@@ -65,7 +65,45 @@ class CubeIdeMetadataTests(unittest.TestCase):
         )
         stale, count = re.subn(option, "", self.cproject, flags=re.DOTALL)
         self.assertEqual(count, 2)
-        self.assertEqual(cxx_metadata(self.project, stale)[1], self.cproject)
+        repaired = cxx_metadata(self.project, stale)[1]
+        self.assert_app_includes(repaired)
+        self.assert_cpp_hal_options(repaired)
+        self.assertEqual(cxx_metadata(self.project, repaired)[1], repaired)
+
+    def assert_cpp_hal_options(self, cproject: str) -> None:
+        root = ET.fromstring(cproject)
+        compiler = "com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler"
+        tools = root.findall(f'.//tool[@superClass="{compiler}"]')
+        self.assertEqual(len(tools), 2)
+        expected = {
+            "includepaths": {
+                "../Core/Inc",
+                "../Drivers/STM32F4xx_HAL_Driver/Inc",
+                "../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy",
+                "../Drivers/CMSIS/Device/ST/STM32F4xx/Include",
+                "../Drivers/CMSIS/Include",
+            },
+            "definedsymbols": {"USE_HAL_DRIVER", "STM32F446xx"},
+        }
+        for tool in tools:
+            for option, values in expected.items():
+                with self.subTest(tool=tool.get("id"), option=option):
+                    entry = tool.find(f'./option[@superClass="{compiler}.option.{option}"]')
+                    self.assertIsNotNone(entry)
+                    if entry is not None:
+                        self.assertLessEqual(values, {child.get("value") for child in entry})
+
+    def test_regeneration_repairs_cpp_hal_flags(self) -> None:
+        self.assert_cpp_hal_options(self.cproject)
+        option = (
+            r'\s*<option\b(?=[^>]*superClass="[^"]+\.cpp\.compiler\.option\.definedsymbols")'
+            r'[^>]*>.*?</option>'
+        )
+        stale, count = re.subn(option, "", self.cproject, flags=re.DOTALL)
+        self.assertEqual(count, 2)
+        repaired = cxx_metadata(self.project, stale)[1]
+        self.assert_cpp_hal_options(repaired)
+        self.assertEqual(cxx_metadata(self.project, repaired)[1], repaired)
 
     def test_firmware_sources_live_inside_cubeide_project(self) -> None:
         root = PROJECT.parents[2]

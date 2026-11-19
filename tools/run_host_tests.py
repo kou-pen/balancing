@@ -322,20 +322,27 @@ rs06_service_common = [
     str(rs06_source / "app" / "MotorService.cpp"),
     str(rs06_source / "device" / "Rs06Motor.cpp"),
     str(rs06_source / "communication" / "Rs06Codec.cpp"),
-    str(ROOT / "tests" / "test_motor_service_rs06.cpp"),
+]
+can1_sources = [
+    "-I", str(ROOT / "tests" / "stubs_can1"),
+    str(rs06_source / "communication" / "can" / "CanPort.cpp"),
 ]
 for suffix, flags in [
     ("", []),
     ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"]),
 ]:
     codec = OUT / f"motor_service_rs06_codec{suffix}.o"
-    path = OUT / f"test_motor_service_rs06{suffix}"
-    print(f"[MotorService RS06{suffix}] コンパイル", flush=True)
     subprocess.run(rs06_codec_common + flags + ["-o", str(codec)],
                    check=True, cwd=ROOT, timeout=30)
-    subprocess.run(rs06_service_common + flags + [str(codec), "-lm", "-o", str(path)],
-                   check=True, cwd=ROOT, timeout=30)
-    subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
+    for test, extra_sources in (("test_motor_service_rs06", []),
+                                ("test_f446_can_port", can1_sources)):
+        path = OUT / f"{test}{suffix}"
+        print(f"[{test}{suffix}] コンパイル", flush=True)
+        source = ROOT / "tests" / f"{test}.cpp"
+        subprocess.run(rs06_service_common + extra_sources + flags +
+                       [str(source), str(codec), "-lm", "-o", str(path)],
+                       check=True, cwd=ROOT, timeout=30)
+        subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
 print("[CubeIDE C++設定回帰試験] 実行", flush=True)
 subprocess.run(

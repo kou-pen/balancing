@@ -131,3 +131,17 @@ add_executable(balancing_motor_service_rs06_tests
 target_link_libraries(balancing_motor_service_rs06_tests PRIVATE balancing_core m)
 target_compile_options(balancing_motor_service_rs06_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_motor_service_rs06_tests COMMAND balancing_motor_service_rs06_tests)
+
+# F446 bxCAN register behavior and RS06 service connection with an isolated host stub.
+add_executable(balancing_f446_can_port_tests
+    tests/test_f446_can_port.cpp
+    ${F446_APP}/Src/balancing/app/RobotSequence.cpp
+    ${F446_APP}/Src/balancing/app/MotorService.cpp
+    ${F446_APP}/Src/balancing/communication/can/CanPort.cpp
+    ${F446_APP}/Src/balancing/device/Rs06Motor.cpp
+    ${F446_APP}/Src/balancing/communication/Rs06Codec.cpp
+)
+target_include_directories(balancing_f446_can_port_tests PRIVATE tests/stubs_can1)
+target_link_libraries(balancing_f446_can_port_tests PRIVATE balancing_core m)
+target_compile_options(balancing_f446_can_port_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME balancing_f446_can_port_tests COMMAND balancing_f446_can_port_tests)
