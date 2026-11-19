@@ -73,8 +73,10 @@ public:
     BF446Can1Snapshot snapshot{};
 
 private:
-    void onCanReceive(balancing::CanBus, const balancing::CanFrame&, std::uint64_t atUs) noexcept override
+    void onCanReceive(balancing::CanBus, balancing::CanRxTarget, const balancing::CanFrame&,
+                      std::uint64_t atUs) noexcept override
     {
+        // 監視値はポートが回収した受信の集計。機器の鮮度や正常応答の判定には使わない。
         ++snapshot.rx_frames;
         snapshot.last_rx_us = atUs;
     }
