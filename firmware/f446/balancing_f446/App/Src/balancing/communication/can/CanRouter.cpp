@@ -52,9 +52,10 @@ void CanRouter::dispatch(CanBus bus, const CanEvent& event) noexcept
         sink_.onCanReceive(bus, classifyReceive(bus, event.frame), event.frame, event.atUs);
         break;
     case CanEventKind::Tx: {
-        // トークンの値がバス間で一致しても、発生元のポートに対応する1組だけを照合する。
+        // バスとトークンで終端を照合し、停止ではSentだけを完了として扱う。
+        // 失敗の通知時点でメールボックスの枠は返却済みなので、要求元は再登録できる。
         auto* const scheduler = bus == CanBus::Can1 ? can1Tx_ : can2Tx_;
-        if (!scheduler || scheduler->consumeTerminal(event.token, event.atUs)) {
+        if (!scheduler || scheduler->consumeTerminal(event.token, event.outcome, event.atUs)) {
             sink_.onCanTransmit(bus, event.token, event.outcome, event.atUs);
         }
         break;
