@@ -120,3 +120,14 @@ target_include_directories(balancing_robot_sequence_tests PRIVATE
 )
 target_compile_options(balancing_robot_sequence_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_robot_sequence_tests COMMAND balancing_robot_sequence_tests)
+# Four-axis RS06 handshake, bound to RobotSequence through simulated CAN events.
+add_executable(balancing_motor_service_rs06_tests
+    tests/test_motor_service_rs06.cpp
+    ${F446_APP}/Src/balancing/app/RobotSequence.cpp
+    ${F446_APP}/Src/balancing/app/MotorService.cpp
+    ${F446_APP}/Src/balancing/device/Rs06Motor.cpp
+    ${F446_APP}/Src/balancing/communication/Rs06Codec.cpp
+)
+target_link_libraries(balancing_motor_service_rs06_tests PRIVATE balancing_core m)
+target_compile_options(balancing_motor_service_rs06_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME balancing_motor_service_rs06_tests COMMAND balancing_motor_service_rs06_tests)

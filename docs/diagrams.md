@@ -92,6 +92,32 @@ sequenceDiagram
 
 初期姿勢・脚長の指定範囲外は診断に用いる。機構安全条件は別に確認し、未検証・不成立の場合は非ゼロ駆動を禁止する（MOTOR-151）。ARM全体の絶対期限を検証済み設定から与える。確定故障・必須条件消失・期限到達は、同周期のDISARMや成功より優先する。詳しい境界条件は [動作仕様](specs/behavior/robot_operation.md) を参照。
 
+### RS06 1軸の停止送信
+
+<pre class="mermaid">
+sequenceDiagram
+    participant MS as MotorService
+    participant AX as Rs06Motor
+    participant CAN as CAN1送信ポート
+    MS->>AX: StopAllを反映
+    opt 同じ軸のType 3が受付済み
+        CAN-->>AX: 旧トークンのTx完了または送信中止
+        Note over MS,CAN: 他軸の停止送信は先に進められる
+    end
+    AX-->>MS: Type 4の送信候補
+    MS->>CAN: Type 4を送信要求
+    alt メールボックス満杯・再試行可能な失敗
+        CAN-->>AX: 停止未完了、送信可能になったら再試行
+    else Type 4のTx完了
+        CAN-->>AX: 停止の送信完了
+        opt その後に正常なリセットモードを受信
+            CAN-->>AX: モータの無効化を確認
+        end
+    end
+</pre>
+
+この送受信順序と軸ごとの再試行は[RS06 4軸の模擬CAN試験](verification/motor-service-rs06-host.md)で検証する。実CANへの接続では、メールボックスの解放・キャンセル完了とトークンを一致させ、各受信を同じ単調時計で記録する。
+
 ## 3. 500 Hz制御周期の処理
 
 <pre class="mermaid">

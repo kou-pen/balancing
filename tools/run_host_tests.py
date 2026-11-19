@@ -308,6 +308,35 @@ for label, flags in [
     print(f"[{label}] 実行", flush=True)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
+# C11のcodecをgccでコンパイルし、C++17の4軸ハンドシェイクとリンクする。
+rs06_source = F446_APP / "Src" / "balancing"
+rs06_codec_common = [
+    "gcc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
+    "-I", str(F446_APP / "Inc"), "-c",
+    str(rs06_source / "communication" / "balancing_motor_can.c"),
+]
+rs06_service_common = [
+    "g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
+    "-I", str(F446_APP / "Inc"),
+    str(rs06_source / "app" / "RobotSequence.cpp"),
+    str(rs06_source / "app" / "MotorService.cpp"),
+    str(rs06_source / "device" / "Rs06Motor.cpp"),
+    str(rs06_source / "communication" / "Rs06Codec.cpp"),
+    str(ROOT / "tests" / "test_motor_service_rs06.cpp"),
+]
+for suffix, flags in [
+    ("", []),
+    ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"]),
+]:
+    codec = OUT / f"motor_service_rs06_codec{suffix}.o"
+    path = OUT / f"test_motor_service_rs06{suffix}"
+    print(f"[MotorService RS06{suffix}] コンパイル", flush=True)
+    subprocess.run(rs06_codec_common + flags + ["-o", str(codec)],
+                   check=True, cwd=ROOT, timeout=30)
+    subprocess.run(rs06_service_common + flags + [str(codec), "-lm", "-o", str(path)],
+                   check=True, cwd=ROOT, timeout=30)
+    subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
+
 print("[CubeIDE C++設定回帰試験] 実行", flush=True)
 subprocess.run(
     [
