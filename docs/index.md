@@ -1,45 +1,25 @@
-# ドキュメント案内
+# docs/
 
-このページは**人間が目的から文書を探す入口**です。概要を読んだあと、必要な技術詳細だけ開ける構成にしています。
-
-## まず全体をつかむ
-
-| 何を知りたいか | 読むページ |
+| フォルダ | 内容 |
 |---|---|
-| ロボット全体の処理と、実装済み／未実装の境界 | [ソフトウェア構成](architecture.md) |
-| 起動、周期処理、状態遷移の図 | [制御システムの図](diagrams.md) |
-| 確定したC++17の公開型・関数・責務 | [F446 公開API設計](design/public-api.md) |
-| 何から実装するか、どこまで終わったか | [開発ロードマップ](todo/roadmap.md) |
-| どの試験が何を証明したか | [検証記録の案内](verification/index.md) |
+| `design/` | 設計の理由、実装方法、公開API |
+| `specs/` | 仕様IDを持つ要求。配下の `boards/`、`behavior/`、`control/`、`protocols/` に分かれる |
+| `todo/` | 作業順と受入条件 |
+| `verification/` | 実施済みの試験、その結果と未検証事項 |
+| `development/` | 開発環境、Git・GitHubの手順と運用規約 |
+| `ai/` | AIの作業で参照する文書の順序 |
+| `assets/` | Doxygenのフォルダ一覧とMermaid描画に使うファイル |
 
-## 詳細を探す
-
-| 分野 | 入口 | 内容 |
-|---|---|---|
-| 要求仕様 | [仕様ID索引](spec-index.md) | F446/F303、通信、状態推定、制御、動作 |
-| 通信 | [CAN総覧](can-id-table.md) | バスとIDの一覧。フレーム定義は各プロトコル仕様が正本 |
-| 移行時の比較基準 | [旧C11制御コア](software-core.md) | 現行の状態機械、LQR計算、ホスト回帰 |
-| Yaw角速度制御 | [Yaw PI](design/yaw-pi.md) | 積分飽和防止、倒立優先の車輪余力、モードリセット |
-| データ構造 | [データモデル](design/data-model.md) | 所有権、スナップショット、モジュール境界 |
-| 脚運動学 | [閉リンク数学fixture](design/leg-kinematics.md) | 関節角、脚長、ヤコビアン。実機CAD未検証 |
-| 固定脚長制御 | [脚長PD・Roll PD](design/leg-pd-roll.md) | ARM前の脚長目標、支持力の抽象演算、未検証境界 |
-| センサの時刻管理 | [観測スナップショット](design/observation-snapshot.md) | 新規測定、車輪折返し、500 Hzでの固定コピー |
-| 操作入力 | [USB/CAN操作元](design/operator-input.md) | 通信断・復帰、ニュートラル確認、自動ARM禁止 |
-| 姿勢推定 | [IMU相補フィルタ](design/attitude-filter.md) | 静止バイアス、取付軸の数学的変換、Pitch・Roll |
-| F446ファームウェア | [CubeIDE開発](design/cubeide-cpp.md) | CとC++の境界、生成コードの扱い |
-| CAN実装 | [モータ通信層](design/motor-layer.md) | コーデック、試運転、HAL接続条件 |
-| PCでの検証 | [離散線形シミュレーション](design/linear-simulation.md) | 数学テスト用モデルと再現方法 |
-
-## 文書の役割
-
-| 場所 | 位置付け |
+| ファイル | 内容 |
 |---|---|
-| `specs/` | **要求の正本**。確定事項はここで管理 |
-| `todo/` | 実装順序と受入条件の正本 |
-| `design/` | 設計の理由・実装方法の技術解説 |
-| `verification/` | 実行した試験、環境、結果、未検証事項の証拠 |
-| `development/` | エディタ、Git、GitHubの運用手順 |
+| [architecture.md](architecture.md) | F446とF303の構成、制御周期、実装・検証の現状 |
+| [can-id-table.md](can-id-table.md) | CAN1・CAN2の用途、ID、データと物理単位 |
+| [diagrams.md](diagrams.md) | 制御のデータフロー、状態遷移、停止と電源遮断の図 |
+| [software-core.md](software-core.md) | 旧C11の状態機械、制御演算、ホスト回帰 |
+| [spec-index.md](spec-index.md) | 仕様IDと仕様書の対応表 |
 
-設計図や仕様があっても、機能の実装・実機検証が済んだとは限りません。進捗判断は [検証記録](verification/index.md) とGitHubのIssue/PRを使います。
+Doxygenでは、左のツリーからフォルダを開き、右の表で直下のファイル名と概要を確認できます。
 
-AI向けの作業契約や参照順序は [AGENTS.md](../AGENTS.md) と [AI文書ルータ](ai/context.md) にまとめ、人間向けの概要には展開しません。
+文書やソースを追加・移動したときは `docs/assets/folder-navigation.dox` の該当フォルダを更新します。フォルダの追加・移動は `docs/assets/doxygen-layout.xml` のツリーにも反映します。
+
+試験結果の読み方は [verification/index.md](verification/index.md)、AIの作業規約は [AGENTS.md](../AGENTS.md) を参照してください。
