@@ -345,11 +345,11 @@ void testFullCan1ReplacesTheFourthPeriodicFrame()
     const auto first = periodicBatch(1, 4000);
     assert(scheduler.replacePeriodic(first, 0) == PeriodicBatchResult::Queued);
     for (std::size_t i = 0; i < 3u; ++i) {
-        const auto tx = scheduler.servicePeriodic(0);
-        assert(tx.result == PeriodicTxResult::Accepted && tx.token == first.requests[i]->token);
+        const auto tx = scheduler.service(0);
+        assert(tx.result == ScheduledTxResult::Accepted && tx.token == first.requests[i]->token);
         can1.occupy(i);
     }
-    assert(scheduler.servicePeriodic(3999).result == PeriodicTxResult::Busy);
+    assert(scheduler.service(3999).result == ScheduledTxResult::Busy);
 
     auto second = periodicBatch(2, 8000);
     // 次周期は4番目の対象だけを更新し、旧周期の4番目がFIFOに残らないことを確認する。
@@ -361,18 +361,18 @@ void testFullCan1ReplacesTheFourthPeriodicFrame()
     pollCanEvents(&can1.port, nullptr, router);
     // 空きがあっても、旧周期の受理済みフレームが残る間は新旧を混在させない。
     assert(sink.count == 1u && sink.entries[0].token == first.requests[0]->token);
-    assert(scheduler.servicePeriodic(4001).result == PeriodicTxResult::Busy);
+    assert(scheduler.service(4001).result == ScheduledTxResult::Busy);
 
     can1.complete(1, CAN_TSR_TERR0, 4010);
     can1.complete(2, CAN_TSR_TXOK0, 4010);
-    assert(scheduler.servicePeriodic(4010).result == PeriodicTxResult::Busy);
+    assert(scheduler.service(4010).result == ScheduledTxResult::Busy);
     pollCanEvents(&can1.port, nullptr, router);
     assert(sink.count == 3u && sink.entries[1].outcome == CanTxOutcome::TransmitError);
-    const auto latest = scheduler.servicePeriodic(4010);
-    assert(latest.result == PeriodicTxResult::Accepted && latest.token == second.requests[3]->token);
+    const auto latest = scheduler.service(4010);
+    assert(latest.result == ScheduledTxResult::Accepted && latest.token == second.requests[3]->token);
     assert((can1.registers.sTxMailBox[0].TIR >> 21u) == second.requests[3]->frame.id);
     assert(can1.registers.sTxMailBox[0].TDLR == 2u);
-    assert(scheduler.servicePeriodic(4010).result == PeriodicTxResult::Idle);
+    assert(scheduler.service(4010).result == ScheduledTxResult::Idle);
 }
 
 void testFourthPeriodicFrameCanUseTheFirstReleasedMailbox()
@@ -384,7 +384,7 @@ void testFourthPeriodicFrameCanUseTheFirstReleasedMailbox()
     const auto batch = periodicBatch(1, 4000);
     assert(scheduler.replacePeriodic(batch, 0) == PeriodicBatchResult::Queued);
     for (std::size_t i = 0; i < 3u; ++i) {
-        assert(scheduler.servicePeriodic(0).result == PeriodicTxResult::Accepted);
+        assert(scheduler.service(0).result == ScheduledTxResult::Accepted);
         can1.occupy(i);
     }
 
@@ -394,8 +394,8 @@ void testFourthPeriodicFrameCanUseTheFirstReleasedMailbox()
     // 同じ周期なら、ほかの2枠が送信中でも最初に空いた枠で4台目を送れる。
     can1.complete(0, CAN_TSR_TXOK0, 3999);
     pollCanEvents(&can1.port, nullptr, router);
-    const auto fourth = scheduler.servicePeriodic(3999);
-    assert(fourth.result == PeriodicTxResult::Accepted && fourth.token == batch.requests[3]->token);
+    const auto fourth = scheduler.service(3999);
+    assert(fourth.result == ScheduledTxResult::Accepted && fourth.token == batch.requests[3]->token);
     assert(can1.registers.sTxMailBox[0].TDLR == 1u);
 }
 
@@ -416,17 +416,17 @@ void testPeriodicDeadlineAndAtomicValidation()
     assert(scheduler.trySubmit(first.requests[0]->frame, first.requests[0]->token, 2) == CanTxSubmitResult::Busy);
 
     can1.handle.State = HAL_CAN_STATE_READY;
-    assert(scheduler.servicePeriodic(3999).result == PeriodicTxResult::NotReady);
+    assert(scheduler.service(3999).result == ScheduledTxResult::NotReady);
     can1.handle.State = HAL_CAN_STATE_LISTENING;
     can1.registers.TSR.bits = 0;
-    assert(scheduler.servicePeriodic(3999).result == PeriodicTxResult::Busy);
+    assert(scheduler.service(3999).result == ScheduledTxResult::Busy);
     can1.registers.TSR.bits = CAN_TSR_TME0;
     // ポートが空いた時刻が期限ちょうどなら送信しない。4件すべて元のトークンで期限切れを返す。
     for (const auto& request : first.requests) {
-        const auto expired = scheduler.servicePeriodic(4000);
-        assert(expired.result == PeriodicTxResult::Expired && expired.token == request->token);
+        const auto expired = scheduler.service(4000);
+        assert(expired.result == ScheduledTxResult::Expired && expired.token == request->token);
     }
-    assert(scheduler.servicePeriodic(4000).result == PeriodicTxResult::Idle);
+    assert(scheduler.service(4000).result == ScheduledTxResult::Idle);
     assert(can1.registers.sTxMailBox[0].TIR == 0u);
 
     second = periodicBatch(2, 8000);
@@ -434,7 +434,7 @@ void testPeriodicDeadlineAndAtomicValidation()
     const auto late = periodicBatch(3, 6000);
     assert(scheduler.replacePeriodic(late, 6000) == PeriodicBatchResult::Expired);
     assert(scheduler.replacePeriodic(second, 6000) == PeriodicBatchResult::StaleGeneration);
-    assert(scheduler.servicePeriodic(6000).result == PeriodicTxResult::Idle);
+    assert(scheduler.service(6000).result == ScheduledTxResult::Idle);
 }
 
 void testPeriodicGenerationIsIndependentOnCan2()
@@ -445,7 +445,7 @@ void testPeriodicGenerationIsIndependentOnCan2()
     CanRouter router{sink, &tx1, &tx2};
     const auto legs = periodicBatch(1, 4000);
     assert(tx1.replacePeriodic(legs, 0) == PeriodicBatchResult::Queued);
-    assert(tx1.servicePeriodic(0).result == PeriodicTxResult::Accepted);
+    assert(tx1.service(0).result == ScheduledTxResult::Accepted);
     can1.occupy(0);
 
     // C620共通フレームは左右を別々に待たせず、4バイトを含んだ1件として差し替える。
@@ -453,22 +453,115 @@ void testPeriodicGenerationIsIndependentOnCan2()
     PeriodicTxBatch wheelBatch{1, 2000};
     wheelBatch.requests[0] = PeriodicTxRequest{wheels, {4, 9}};
     assert(tx2.replacePeriodic(wheelBatch, 0) == PeriodicBatchResult::Queued);
-    assert(tx2.servicePeriodic(0).result == PeriodicTxResult::Accepted);
+    assert(tx2.service(0).result == ScheduledTxResult::Accepted);
     can2.occupy(0);
 
     wheelBatch = {2, 4000};
     wheelBatch.requests[0] = PeriodicTxRequest{{0x200, {0x55, 0x66, 0x77, 0x88}, 8, false}, {8, 9}};
     assert(tx2.replacePeriodic(wheelBatch, 2000) == PeriodicBatchResult::Queued);
-    assert(tx2.servicePeriodic(2000).result == PeriodicTxResult::Busy);
+    assert(tx2.service(2000).result == ScheduledTxResult::Busy);
     can1.complete(0, CAN_TSR_TXOK0, 2001);
     pollCanEvents(&can1.port, &can2.port, router);
-    assert(tx2.servicePeriodic(2001).result == PeriodicTxResult::Busy);
+    assert(tx2.service(2001).result == ScheduledTxResult::Busy);
     can2.complete(0, CAN_TSR_TXOK0, 2002);
     pollCanEvents(&can1.port, &can2.port, router);
-    const auto wheel = tx2.servicePeriodic(2002);
-    assert(wheel.result == PeriodicTxResult::Accepted && wheel.token == wheelBatch.requests[0]->token);
+    const auto wheel = tx2.service(2002);
+    assert(wheel.result == ScheduledTxResult::Accepted && wheel.token == wheelBatch.requests[0]->token);
     assert(can2.registers.sTxMailBox[0].TDLR == 0x88776655u);
-    assert(tx1.servicePeriodic(2002).token == legs.requests[1]->token);
+    assert(tx1.service(2002).token == legs.requests[1]->token);
+}
+
+EventTxRequest eventRequest(std::uint32_t id, std::uint64_t serial, std::uint64_t deadline)
+{
+    return {{id, {static_cast<std::uint8_t>(serial)}, 1, false}, {serial, 19}, deadline};
+}
+
+void testNormalEventsFinishInOrderBeforePeriodicTx()
+{
+    Fixture can1, can2;
+    Recorder sink;
+    std::array<EventTxRequest, 2> fifo1{}, fifo2{};
+    CanTxScheduler tx1{can1.port, fifo1}, tx2{can2.port, fifo2};
+    CanRouter router{sink, &tx1, &tx2};
+    const auto cycle = periodicBatch(1, 4000);
+    assert(tx1.replacePeriodic(cycle, 0) == PeriodicBatchResult::Queued);
+
+    // 小さいIDを後ろに入れる。同時にTXRQを立てる実装だと、後続が先に送られ得る。
+    const auto first = eventRequest(0x700, 1, 1000);
+    const auto second = eventRequest(0x101, 2, 1000);
+    assert(tx1.enqueueEvent(first, 0) == EventEnqueueResult::Queued);
+    assert(tx1.enqueueEvent(second, 0) == EventEnqueueResult::Queued);
+    assert(tx2.enqueueEvent(first, 0) == EventEnqueueResult::Queued);
+    assert(tx1.trySubmit({}, {99, 19}, 0) == CanTxSubmitResult::Busy);
+    assert(tx1.service(0).token == first.token);
+    assert((can1.registers.sTxMailBox[0].TIR >> 21u) == first.frame.id);
+    can1.occupy(0);
+    assert(tx2.service(0).token == first.token);
+    can2.occupy(0);
+    can2.complete(0, CAN_TSR_TXOK0, 1);
+    pollCanEvents(&can1.port, &can2.port, router);
+    assert(sink.count == 1u && sink.entries[0].bus == CanBus::Can2);
+    assert(tx1.service(1).result == ScheduledTxResult::Busy);
+    assert(can1.registers.sTxMailBox[1].TIR == 0u);
+
+    can1.complete(0, CAN_TSR_TERR0, 2);
+    assert(tx1.service(2).result == ScheduledTxResult::Busy);
+    pollCanEvents(&can1.port, &can2.port, router);
+    assert(sink.count == 2u && sink.entries[1].bus == CanBus::Can1);
+    assert(sink.entries[1].token == first.token && sink.entries[1].outcome == CanTxOutcome::TransmitError);
+    assert(tx1.service(2).token == second.token);
+    assert((can1.registers.sTxMailBox[0].TIR >> 21u) == second.frame.id);
+    can1.occupy(0);
+    // FIFOが空になっても、通常イベントが実際に終端するまで周期を待たせる。
+    assert(tx1.service(3).result == ScheduledTxResult::Busy);
+    assert(can1.registers.sTxMailBox[1].TIR == 0u);
+    can1.complete(0, CAN_TSR_TXOK0, 4);
+    pollCanEvents(&can1.port, &can2.port, router);
+    assert(sink.count == 3u && sink.entries[2].token == second.token);
+    assert(tx1.service(4).token == cycle.requests[0]->token);
+}
+
+void testNormalEventFifoFullExpiryAndWrap()
+{
+    Fixture can1, can2;
+    Recorder sink;
+    std::array<EventTxRequest, 2> fifo{};
+    CanTxScheduler tx{can1.port, fifo}, withoutQueue{can2.port};
+    CanRouter router{sink, &tx};
+    const auto first = eventRequest(0x503, 1, 20);
+    const auto second = eventRequest(0x502, 2, 60);
+    const auto third = eventRequest(0x501, 3, 70);
+    assert(withoutQueue.enqueueEvent(first, 10) == EventEnqueueResult::QueueFull);
+    assert(tx.enqueueEvent(first, 10) == EventEnqueueResult::Queued);
+    assert(tx.enqueueEvent(second, 10) == EventEnqueueResult::Queued);
+    assert(tx.enqueueEvent(second, 11) == EventEnqueueResult::Invalid);
+    assert(tx.enqueueEvent(third, 11) == EventEnqueueResult::QueueFull);
+
+    auto collision = periodicBatch(1, 4000);
+    collision.requests[0]->token = second.token;
+    assert(tx.replacePeriodic(collision, 11) == PeriodicBatchResult::Invalid);
+
+    can1.handle.State = HAL_CAN_STATE_READY;
+    assert(tx.service(19).result == ScheduledTxResult::NotReady);
+    const auto expired = tx.service(20);
+    assert(expired.result == ScheduledTxResult::Expired && expired.token == first.token);
+    assert(tx.enqueueEvent(first, 20) == EventEnqueueResult::Expired);
+    assert(tx.enqueueEvent(third, 20) == EventEnqueueResult::Queued);
+
+    can1.handle.State = HAL_CAN_STATE_LISTENING;
+    can1.registers.TSR.bits = 0u;
+    assert(tx.service(21).result == ScheduledTxResult::Busy);
+    can1.registers.TSR.bits = CAN_TSR_TME0;
+    // 期限切れと満杯で後続の順序が変わらず、末尾を循環再利用できる。
+    assert(tx.service(22).token == second.token);
+    assert(can1.registers.sTxMailBox[0].TDLR == 2u);
+    can1.occupy(0);
+    const auto overdue = tx.service(70);
+    assert(overdue.result == ScheduledTxResult::Expired && overdue.token == third.token);
+    can1.complete(0, CAN_TSR_TXOK0, 71);
+    pollCanEvents(&can1.port, nullptr, router);
+    assert(sink.count == 1u && sink.entries[0].token == second.token);
+    assert(tx.service(72).result == ScheduledTxResult::Idle);
 }
 
 } // namespace
@@ -486,5 +579,7 @@ int main()
     testFourthPeriodicFrameCanUseTheFirstReleasedMailbox();
     testPeriodicDeadlineAndAtomicValidation();
     testPeriodicGenerationIsIndependentOnCan2();
-    std::puts("PASS: F446 bounded CAN dispatch, RX routing, TX completion and periodic replacement");
+    testNormalEventsFinishInOrderBeforePeriodicTx();
+    testNormalEventFifoFullExpiryAndWrap();
+    std::puts("PASS: F446 CAN dispatch, periodic replacement and normal event FIFO");
 }
