@@ -3,6 +3,7 @@
 #include "balancing/app/CanEventPoll.hpp"
 #include "balancing/communication/can/CanPort.hpp"
 #include "balancing/communication/can/CanRouter.hpp"
+#include "balancing/communication/can/CanTxScheduler.hpp"
 
 #include <array>
 #include <cstdint>
@@ -63,7 +64,7 @@ public:
     void service() noexcept
     {
         sampleClock();
-        balancing::CanRouter router{*this};
+        balancing::CanRouter router{*this, &tx_};
         // CAN1の観測経路を主ループの共通回収に通す。CAN2の起動・接続は別工程。
         balancing::pollCanEvents(&port, nullptr, router);
     }
@@ -84,7 +85,7 @@ private:
     void onCanTransmit(balancing::CanBus, balancing::TxToken, balancing::CanTxOutcome,
                        std::uint64_t) noexcept override
     {
-        // 受信監視では送信を登録しない。送信終端の照合は送信サービスを接続する工程で行う。
+        // 現在の監視プロファイルには送信要求元がない。機器サービスの結果通知は別途接続する。
     }
 
     void onCanPortStatus(balancing::CanBus, balancing::CanEventKind kind, std::uint64_t) noexcept override
@@ -105,6 +106,7 @@ private:
         }
     }
 
+    balancing::CanTxScheduler tx_{port};
     std::uint32_t cyclesPerUs_;
     std::uint32_t lastCycle_;
     std::uint64_t accumulated_{0};

@@ -4,6 +4,8 @@
 
 namespace balancing {
 
+class CanTxScheduler;
+
 /** @brief 回収したイベントの発生元。標準／拡張IDと独立に識別する。
  *  @spec{BOARD-F446-001}
  */
@@ -55,10 +57,15 @@ protected:
  */
 class CanRouter final {
 public:
-    /** @brief ルーターの生存期間を通して有効な配送先を受け取る。
+    /** @brief ルーターの生存期間を通して有効な配送先とバス別の照合先を受け取る。
+     *  @param[in,out] sink 受信・送信終端・バス状態の配送先。
+     *  @param[in,out] can1Tx CAN1の照合先。nullptrの場合はポートからのTX終端を直接配送する。
+     *  @param[in,out] can2Tx CAN2の照合先。nullptrの場合はポートからのTX終端を直接配送する。
+     *  @pre 各照合先には、同じバスの CanPort を割り当てる。
      *  @spec{BOARD-F446-001}
      */
-    explicit CanRouter(CanEventSink& sink) noexcept;
+    explicit CanRouter(CanEventSink& sink, CanTxScheduler* can1Tx = nullptr,
+                       CanTxScheduler* can2Tx = nullptr) noexcept;
 
     /** @brief 主ループで採取済みイベントを1件配送する。
      *  @param[in] bus 発生元のバス。
@@ -69,6 +76,8 @@ public:
 
 private:
     CanEventSink& sink_;
+    CanTxScheduler* can1Tx_;
+    CanTxScheduler* can2Tx_;
 };
 
 } // namespace balancing

@@ -1,5 +1,7 @@
 #include "balancing/communication/can/CanRouter.hpp"
 
+#include "balancing/communication/can/CanTxScheduler.hpp"
+
 namespace balancing {
 namespace {
 
@@ -36,7 +38,8 @@ CanRxTarget classifyReceive(CanBus bus, const CanFrame& frame) noexcept
 
 } // namespace
 
-CanRouter::CanRouter(CanEventSink& sink) noexcept : sink_{sink}
+CanRouter::CanRouter(CanEventSink& sink, CanTxScheduler* can1Tx, CanTxScheduler* can2Tx) noexcept
+    : sink_{sink}, can1Tx_{can1Tx}, can2Tx_{can2Tx}
 {
 }
 
@@ -48,9 +51,14 @@ void CanRouter::dispatch(CanBus bus, const CanEvent& event) noexcept
     case CanEventKind::Rx:
         sink_.onCanReceive(bus, classifyReceive(bus, event.frame), event.frame, event.atUs);
         break;
-    case CanEventKind::Tx:
-        sink_.onCanTransmit(bus, event.token, event.outcome, event.atUs);
+    case CanEventKind::Tx: {
+        // トークンの値がバス間で一致しても、発生元のポートに対応する1組だけを照合する。
+        auto* const scheduler = bus == CanBus::Can1 ? can1Tx_ : can2Tx_;
+        if (!scheduler || scheduler->consumeTerminal(event.token, event.atUs)) {
+            sink_.onCanTransmit(bus, event.token, event.outcome, event.atUs);
+        }
         break;
+    }
     case CanEventKind::BusOff:
     case CanEventKind::BusRecovered:
     case CanEventKind::RxLost:

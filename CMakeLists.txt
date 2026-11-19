@@ -149,6 +149,7 @@ add_test(NAME balancing_f446_can_port_tests COMMAND balancing_f446_can_port_test
 set(BALANCING_CAN_DISPATCH_SOURCES
     ${F446_APP}/Src/balancing/app/CanEventPoll.cpp
     ${F446_APP}/Src/balancing/communication/can/CanRouter.cpp
+    ${F446_APP}/Src/balancing/communication/can/CanTxScheduler.cpp
 )
 
 # Startup, RX observation and IRQ ownership at the STM32F446 CAN1 boundary.
