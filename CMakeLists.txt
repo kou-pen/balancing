@@ -164,3 +164,16 @@ target_include_directories(balancing_f446_can1_runtime_tests PRIVATE
 )
 target_compile_options(balancing_f446_can1_runtime_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_can1_runtime_tests COMMAND balancing_f446_can1_runtime_tests)
+
+# A shared main-loop poll with separate bxCAN IRQ sources.
+add_executable(balancing_f446_can_event_poll_tests
+    tests/test_f446_can_event_poll.cpp
+    ${BALANCING_CAN_DISPATCH_SOURCES}
+    ${F446_APP}/Src/balancing/communication/can/CanPort.cpp
+)
+target_include_directories(balancing_f446_can_event_poll_tests PRIVATE
+    tests/stubs_can1
+    ${F446_APP}/Inc
+)
+target_compile_options(balancing_f446_can_event_poll_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME balancing_f446_can_event_poll_tests COMMAND balancing_f446_can_event_poll_tests)
