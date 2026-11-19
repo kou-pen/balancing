@@ -35,6 +35,8 @@ struct PeriodicTxBatch {
 enum class PeriodicBatchResult : std::uint8_t { Queued, Expired, Invalid, StaleGeneration };
 
 /** @brief 通常イベント1件のフレーム・照合キー・絶対送信期限 [us]。
+ *  @note expiresAtUsは未受付の要求を破棄する境界。CanPortが受け付けた後は
+ *        期限を過ぎても終端通知を元のtokenで照合する。
  *  @spec{BOARD-F446-001}
  */
 struct EventTxRequest {
@@ -44,6 +46,7 @@ struct EventTxRequest {
 };
 
 /** @brief 通常イベントをFIFOに登録した結果。
+ *  @note Queuedは送信待ちへの登録。メールボックスの受付結果はservice()から受け取る。
  *  @spec{BOARD-F446-001}
  */
 enum class EventEnqueueResult : std::uint8_t { Queued, QueueFull, Expired, Invalid };
@@ -54,7 +57,8 @@ enum class EventEnqueueResult : std::uint8_t { Queued, QueueFull, Expired, Inval
 enum class ScheduledTxResult : std::uint8_t { Idle, Accepted, Expired, Busy, NotReady, Invalid };
 
 /** @brief 待ち要求の受付または破棄の通知。
- *  @note tokenはAccepted・Expired・Invalidで有効。終端はCanRouterが別途配送する。
+ *  @note tokenはAccepted・Expired・Invalidで有効。Busy・NotReady・Idleでは通知対象がない。
+ *        Accepted後の結果は、CanRouterがバスとトークンを組にして配送する。
  *  @spec{BOARD-F446-001}
  */
 struct ScheduledTxProgress {
@@ -63,7 +67,8 @@ struct ScheduledTxProgress {
 };
 
 /** @brief 1バスの送信待ちと送信受付・終端の照合を主ループで扱う。
- *  @note 最大4件の周期送信待ちと、最大3件の受付済み要求をバスごとに保持する。
+ *  @note 通常FIFOと最大4件の周期送信待ちを保持し、受付済みの最大3件を別に記録する。
+ *        IRQはCanPortにイベントを記録し、このクラスの状態は主ループだけが更新する。
  *  @spec{BOARD-F446-001}
  */
 class CanTxScheduler final {
@@ -78,6 +83,7 @@ public:
      *  @param[in,out] port このインスタンスが使用するポート。
      *  @param[in,out] storage スケジューラより長寿命で、他と共有しない待ち領域。
      *  @note Nは未受付イベント数の上限。0件なら通常イベントを受け付けない。
+     *        FIFOの領域はスケジューラを通じて更新し、受付済みのイベントは3枠の照合表で管理する。
      *  @spec{BOARD-F446-001}
      */
     template<std::size_t N>
@@ -112,16 +118,19 @@ public:
     /** @brief 期限内の通常イベントをFIFO末尾に追加する。
      *  @param[in] request フレーム、固有トークン、絶対送信期限 [us]。
      *  @param[in] nowUs CanPortと共通の単調時計の時刻 [us]。
-     *  @return QueuedのみFIFOを更新。QueueFullは既存の要求を保持する。
+     *  @return Queuedで末尾にコピーする。QueueFullでは既存の順序と内容を保持する。
+     *          Expiredは nowUs >= expiresAtUs、Invalidはフレームまたはトークンの不正を表す。
+     *  @note 同じバスで待機中または受付済みのトークンは重複登録できない。
      *  @spec{BOARD-F446-001}
      */
     EventEnqueueResult enqueueEvent(const EventTxRequest& request, std::uint64_t nowUs) noexcept;
 
     /** @brief 期限切れを最大1件返すか、通常イベントを優先してフレームを最大1件投入する。
      *  @param[in] nowUs CanPortと共通の単調時計の時刻 [us]。期限ちょうどから破棄する。
-     *  @return Busy・NotReadyでは待ちを保持する。Acceptedは受付のみ。
+     *  @return Busy・NotReadyでは待ちを保持する。Acceptedはメールボックス受付を表す。
      *  @pre 主ループでCAN終端を回収し、周期の新規要求があれば置換した後に呼ぶ。
-     *  @note すでに受付済みの通常イベントが終端するまで次のフレームを投入しない。
+     *  @note 通常イベントの先頭だけを参照し、受付済みの通常イベントの終端まで次の投入を待つ。
+     *        待機中でも先頭の期限切れは返せる。すでに受付済みのフレームは終端まで照合を続ける。
      *  @spec{BOARD-F446-001}
      */
     ScheduledTxProgress service(std::uint64_t nowUs) noexcept;
@@ -132,6 +141,7 @@ private:
     // 終端の配送より先に枠を空ける。配送先が次の要求を投入しても、完了済みの枠が残らない。
     bool consumeTerminal(TxToken token, std::uint64_t atUs) noexcept;
 
+    // CanPortが受け付けた要求だけを保持する。終端回収後に同じメールボックスを再利用できる。
     struct AcceptedTx {
         TxToken token{};
         std::uint64_t acceptedAtUs{0};
@@ -151,6 +161,7 @@ private:
     CanPort& port_;
     std::array<AcceptedTx, 3> accepted_{};
     PeriodicTxBatch periodic_{};
+    // 呼出側の固定領域をリングとして利用する。有効範囲は先頭からeventCount_件。
     EventTxRequest* events_{nullptr};
     std::size_t eventCapacity_{0};
     std::size_t eventHead_{0};

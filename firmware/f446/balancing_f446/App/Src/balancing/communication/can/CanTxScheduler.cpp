@@ -13,7 +13,8 @@ CanTxScheduler::CanTxScheduler(CanPort& port) noexcept : port_{port}
 CanTxSubmitResult CanTxScheduler::trySubmit(const CanFrame& frame, TxToken token,
                                             std::uint64_t nowUs) noexcept
 {
-    // 受付済みの通常イベントも優先し、後から直送した小さいIDが追い越すのを防ぐ。
+    // 直送経路でも通常FIFOの優先順位を適用する。最後の通常イベントがすでにFIFOから
+    // 外れていても、小さいIDを持つ次のフレームの投入は終端回収まで待つ。
     if (eventCount_ != 0 || hasEventInFlight() || hasQueuedPeriodic(token)) {
         return CanTxSubmitResult::Busy;
     }
@@ -89,6 +90,8 @@ PeriodicBatchResult CanTxScheduler::replacePeriodic(const PeriodicTxBatch& batch
 EventEnqueueResult CanTxScheduler::enqueueEvent(const EventTxRequest& request, std::uint64_t nowUs) noexcept
 {
     const auto token = request.token;
+    // 終端の照合キーは同じバスの全送信経路で共有する。待機中も含めて重複を防ぐと、
+    // 周期フレームと通常イベントのどちらの結果かを要求元が特定できる。
     if (token.serial == 0 || !request.frame.validForTransmit() || isAccepted(token) ||
         hasQueuedPeriodic(token) || hasQueuedEvent(token)) {
         return EventEnqueueResult::Invalid;
@@ -96,10 +99,12 @@ EventEnqueueResult CanTxScheduler::enqueueEvent(const EventTxRequest& request, s
     if (nowUs >= request.expiresAtUs) {
         return EventEnqueueResult::Expired;
     }
+    // 満杯なら登録元に再試行の判断を返す。先に登録された操作を上書きすると順序が失われる。
     if (eventCount_ == eventCapacity_) {
         return EventEnqueueResult::QueueFull;
     }
 
+    // 空き確認後に末尾を求めるので、記憶領域が0件でも剰余演算やアクセスを行わない。
     events_[(eventHead_ + eventCount_) % eventCapacity_] = request;
     ++eventCount_;
     return EventEnqueueResult::Queued;
@@ -108,7 +113,8 @@ EventEnqueueResult CanTxScheduler::enqueueEvent(const EventTxRequest& request, s
 ScheduledTxProgress CanTxScheduler::service(std::uint64_t nowUs) noexcept
 {
     if (eventCount_ == 0) {
-        // 通常イベントは終端まで優先する。後から投入するフレームとのID優先度による逆転を防ぐ。
+        // 受付時点でFIFOの枠は返すため、FIFOが空でもメールボックスに通常イベントが残り得る。
+        // 周期フレームを投入できるのは、その送信結果を回収して照合表を空けた後。
         if (hasEventInFlight()) {
             return {ScheduledTxResult::Busy, {}};
         }
@@ -118,7 +124,8 @@ ScheduledTxProgress CanTxScheduler::service(std::uint64_t nowUs) noexcept
     const auto& request = events_[eventHead_];
     const auto token = request.token;
     if (nowUs >= request.expiresAtUs) {
-        // ポートの状態に関係なく、未受付の先頭要求は期限に達した時点で破棄できる。
+        // 期限はソフトウェア内の待ちに対して評価する。先行送信やポート復旧を待ってから
+        // 判定すると、すでに無効な操作がFIFOの先頭に居続ける。
         popEvent();
         return {ScheduledTxResult::Expired, token};
     }
@@ -127,6 +134,8 @@ ScheduledTxProgress CanTxScheduler::service(std::uint64_t nowUs) noexcept
         return {ScheduledTxResult::Busy, {}};
     }
 
+    // 受付済みの要求はsubmit()が照合表へ移す。起動前や空きなしで未受付なら
+    // 同じ先頭を残し、次の呼び出しで期限を再確認する。
     const auto result = submitScheduled(request.frame, {token, nowUs, 0, true});
     if (result.result == ScheduledTxResult::Accepted || result.result == ScheduledTxResult::Invalid) {
         popEvent();
@@ -136,6 +145,7 @@ ScheduledTxProgress CanTxScheduler::service(std::uint64_t nowUs) noexcept
 
 void CanTxScheduler::popEvent() noexcept
 {
+    // 先頭だけを進める。途中の要素を移動させず、循環しても登録順を維持できる。
     eventHead_ = (eventHead_ + 1) % eventCapacity_;
     --eventCount_;
 }
@@ -148,6 +158,7 @@ bool CanTxScheduler::hasEventInFlight() const noexcept
 
 bool CanTxScheduler::hasQueuedEvent(TxToken token) const noexcept
 {
+    // 使用中の範囲だけを調べる。取り出し済み領域の値は循環用の空きとして扱う。
     for (std::size_t i = 0; i < eventCount_; ++i) {
         if (events_[(eventHead_ + i) % eventCapacity_].token == token) {
             return true;
@@ -223,7 +234,8 @@ bool CanTxScheduler::consumeTerminal(TxToken token, std::uint64_t atUs) noexcept
         return false;
     }
 
-    // 送信失敗もメールボックスの終端。結果ごとの動作は通知を受けた要求元が決める。
+    // 送信失敗も終端として照合表を解放する。CanRouterは元のトークンと結果を通知し、
+    // 再送の要否は要求元が決める。ここでFIFOに戻すと後続操作の順序と期限が変わる。
     *accepted = {};
     return true;
 }
