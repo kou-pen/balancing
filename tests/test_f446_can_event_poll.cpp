@@ -1,6 +1,7 @@
 #include "balancing/app/CanEventPoll.hpp"
 #include "balancing/communication/can/CanPort.hpp"
 #include "balancing/communication/can/CanRouter.hpp"
+#include "balancing/communication/can/CanTxScheduler.hpp"
 
 #ifdef NDEBUG
 #undef NDEBUG
@@ -34,11 +35,25 @@ struct Fixture {
         port.captureInterrupt(atUs);
     }
 
+    void occupy(std::size_t box)
+    {
+        assert((registers.sTxMailBox[box].TIR & CAN_TI0R_TXRQ) != 0u);
+        registers.TSR.bits &= ~(CAN_TSR_TME0 << box);
+    }
+
+    void complete(std::size_t box, std::uint32_t flags, std::uint64_t atUs)
+    {
+        assert((registers.TSR.bits & (CAN_TSR_TME0 << box)) == 0u);
+        registers.TSR.bits |= (CAN_TSR_TME0 << box) | ((CAN_TSR_RQCP0 | flags) << (8u * box));
+        registers.sTxMailBox[box].TIR &= ~CAN_TI0R_TXRQ;
+        port.captureInterrupt(atUs);
+    }
+
     void finish(TxToken token, std::uint64_t atUs)
     {
         assert(port.trySend({}, token, atUs) == CanTxSubmitResult::Accepted);
-        registers.TSR.bits |= CAN_TSR_TME0 | CAN_TSR_RQCP0 | CAN_TSR_TXOK0;
-        port.captureInterrupt(atUs);
+        occupy(0);
+        complete(0, CAN_TSR_TXOK0, atUs);
     }
 };
 
@@ -49,6 +64,7 @@ struct Entry {
     TxToken token{};
     std::uint32_t id{};
     CanRxTarget target{CanRxTarget::Unmatched};
+    CanTxOutcome outcome{CanTxOutcome::NotTransmitted};
 };
 
 class Recorder final : public CanEventSink {
@@ -72,8 +88,9 @@ public:
 
     void onCanTransmit(CanBus bus, TxToken token, CanTxOutcome outcome, std::uint64_t atUs) noexcept override
     {
-        assert(outcome == CanTxOutcome::Sent);
-        record({bus, CanEventKind::Tx, atUs, token});
+        Entry entry{bus, CanEventKind::Tx, atUs, token};
+        entry.outcome = outcome;
+        record(entry);
     }
 
     void onCanPortStatus(CanBus bus, CanEventKind kind, std::uint64_t atUs) noexcept override
@@ -208,6 +225,105 @@ void testRoutingFromBothPortQueues()
     assert(sink.entries[2].target == CanRxTarget::C620RightFeedback);
 }
 
+void testTerminalOnlyReleasesTheOriginatingBus()
+{
+    Fixture can1, can2;
+    Recorder sink;
+    CanTxScheduler tx1{can1.port}, tx2{can2.port};
+    CanRouter router{sink, &tx1, &tx2};
+    for (std::size_t box = 0; box < 3; ++box) {
+        // 発行元も番号も同じにして、バスの区別だけで別々に管理できるかを見る。
+        const TxToken token{box + 1u, 9};
+        assert(tx1.trySubmit({}, token, 10) == CanTxSubmitResult::Accepted);
+        assert(tx2.trySubmit({}, token, 10) == CanTxSubmitResult::Accepted);
+        can1.occupy(box);
+        can2.occupy(box);
+    }
+
+    const TxToken fourth{4, 9};
+    can2.complete(0, CAN_TSR_TERR0, 12);
+    assert(tx2.trySubmit({}, fourth, 13) == CanTxSubmitResult::Busy);
+    assert(sink.count == 0u);
+    pollCanEvents(&can1.port, &can2.port, router);
+    assert(sink.count == 1u && sink.entries[0].bus == CanBus::Can2);
+    const TxToken first{1, 9};
+    assert(sink.entries[0].token == first && sink.entries[0].atUs == 12u);
+    assert(sink.entries[0].outcome == CanTxOutcome::TransmitError);
+
+    // CAN2のエラー終端でCAN2だけに空きができる。CAN1の同値トークンは依然として有効。
+    assert(tx2.trySubmit({}, fourth, 13) == CanTxSubmitResult::Accepted);
+    assert(tx1.trySubmit({}, fourth, 13) == CanTxSubmitResult::Busy);
+    can1.complete(0, CAN_TSR_TXOK0, 14);
+    pollCanEvents(&can1.port, &can2.port, router);
+    assert(sink.count == 2u && sink.entries[1].bus == CanBus::Can1);
+    assert(sink.entries[1].token == first && sink.entries[1].atUs == 14u);
+    assert(sink.entries[1].outcome == CanTxOutcome::Sent);
+    assert(tx1.trySubmit({}, fourth, 15) == CanTxSubmitResult::Accepted);
+}
+
+void testSchedulerIgnoresUnacceptedAndStaleEvents()
+{
+    Fixture can1;
+    Recorder sink;
+    CanTxScheduler scheduler{can1.port};
+    CanRouter router{sink, &scheduler};
+    const TxToken token{1, 9};
+    CanEvent event{CanEventKind::Tx, 11};
+    event.token = token;
+    event.outcome = CanTxOutcome::Sent;
+
+    can1.handle.State = HAL_CAN_STATE_READY;
+    assert(scheduler.trySubmit({}, token, 10) == CanTxSubmitResult::NotReady);
+    router.dispatch(CanBus::Can1, event);
+    can1.handle.State = HAL_CAN_STATE_LISTENING;
+    CanFrame invalid{};
+    invalid.dlc = 9;
+    assert(scheduler.trySubmit(invalid, token, 10) == CanTxSubmitResult::Invalid);
+    router.dispatch(CanBus::Can1, event);
+    can1.registers.TSR.bits = 0;
+    assert(scheduler.trySubmit({}, token, 10) == CanTxSubmitResult::Busy);
+    router.dispatch(CanBus::Can1, event);
+    assert(sink.count == 0u);
+
+    can1.registers.TSR.bits = CAN_TSR_TME0;
+    assert(scheduler.trySubmit({}, token, 12) == CanTxSubmitResult::Accepted);
+    can1.occupy(0);
+    router.dispatch(CanBus::Can1, event); // 一致するトークンでも受付より前なら無効。
+    event.atUs = 12;
+    event.token.origin = 10;
+    router.dispatch(CanBus::Can1, event); // 番号だけが同じで発行元が違う。
+    assert(scheduler.trySubmit({}, token, 12) == CanTxSubmitResult::Busy);
+    assert(sink.count == 0u);
+
+    can1.complete(0, CAN_TSR_TXOK0, 12);
+    pollCanEvents(&can1.port, nullptr, router);
+    assert(sink.count == 1u && sink.entries[0].atUs == 12u);
+    event.token = token;
+    router.dispatch(CanBus::Can1, event);
+    assert(sink.count == 1u);
+}
+
+void testNonSendTerminalEventsReleaseTheEntry()
+{
+    Fixture can2;
+    Recorder sink;
+    CanTxScheduler scheduler{can2.port};
+    CanRouter router{sink, nullptr, &scheduler};
+    const std::array<std::uint32_t, 2> flags{CAN_TSR_ALST0, 0u};
+    const std::array<CanTxOutcome, 2> outcomes{CanTxOutcome::ArbitrationLost, CanTxOutcome::NotTransmitted};
+    for (std::size_t i = 0; i < 8u; ++i) {
+        // 各失敗を3枠より多く再現する。枠を返し忘れた実装では途中で満杯になる。
+        const auto kind = i % flags.size();
+        const TxToken token{i + 1u, 9};
+        assert(scheduler.trySubmit({}, token, 20u + i * 2u) == CanTxSubmitResult::Accepted);
+        can2.occupy(0);
+        can2.complete(0, flags[kind], 21u + i * 2u);
+        pollCanEvents(nullptr, &can2.port, router);
+        assert(sink.count == i + 1u);
+        assert(sink.entries[i].token == token && sink.entries[i].outcome == outcomes[kind]);
+    }
+}
+
 } // namespace
 
 int main()
@@ -216,5 +332,8 @@ int main()
     testBothPortsReturnAtLimitAndResumeLater();
     testRoutingUsesBusIdentifierFormatAndDlc();
     testRoutingFromBothPortQueues();
-    std::puts("PASS: F446 bounded CAN dispatch and RX routing");
+    testTerminalOnlyReleasesTheOriginatingBus();
+    testSchedulerIgnoresUnacceptedAndStaleEvents();
+    testNonSendTerminalEventsReleaseTheEntry();
+    std::puts("PASS: F446 bounded CAN dispatch, RX routing and per-bus TX completion");
 }
