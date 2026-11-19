@@ -3,6 +3,7 @@
 #include "balancing/communication/can/CanTypes.hpp"
 
 #include <array>
+#include <cstddef>
 #include <optional>
 
 namespace balancing {
@@ -33,21 +34,35 @@ struct PeriodicTxBatch {
  */
 enum class PeriodicBatchResult : std::uint8_t { Queued, Expired, Invalid, StaleGeneration };
 
-/** @brief 周期送信を1件処理した結果。
+/** @brief 通常イベント1件のフレーム・照合キー・絶対送信期限 [us]。
  *  @spec{BOARD-F446-001}
  */
-enum class PeriodicTxResult : std::uint8_t { Idle, Accepted, Expired, Busy, NotReady, Invalid };
+struct EventTxRequest {
+    CanFrame frame{};
+    TxToken token{};
+    std::uint64_t expiresAtUs{0};
+};
 
-/** @brief 周期送信の受付または破棄の通知。
+/** @brief 通常イベントをFIFOに登録した結果。
+ *  @spec{BOARD-F446-001}
+ */
+enum class EventEnqueueResult : std::uint8_t { Queued, QueueFull, Expired, Invalid };
+
+/** @brief 通常イベントまたは周期送信を最大1件処理した結果。
+ *  @spec{BOARD-F446-001}
+ */
+enum class ScheduledTxResult : std::uint8_t { Idle, Accepted, Expired, Busy, NotReady, Invalid };
+
+/** @brief 待ち要求の受付または破棄の通知。
  *  @note tokenはAccepted・Expired・Invalidで有効。終端はCanRouterが別途配送する。
  *  @spec{BOARD-F446-001}
  */
-struct PeriodicTxProgress {
-    PeriodicTxResult result{PeriodicTxResult::Idle};
+struct ScheduledTxProgress {
+    ScheduledTxResult result{ScheduledTxResult::Idle};
     TxToken token{};
 };
 
-/** @brief 1バスの周期送信待ちと送信受付・終端の照合を主ループで扱う。
+/** @brief 1バスの送信待ちと送信受付・終端の照合を主ループで扱う。
  *  @note 最大4件の周期送信待ちと、最大3件の受付済み要求をバスごとに保持する。
  *  @spec{BOARD-F446-001}
  */
@@ -59,6 +74,18 @@ public:
      *  @spec{BOARD-F446-001}
      */
     explicit CanTxScheduler(CanPort& port) noexcept;
+    /** @brief 通常イベントFIFO用の固定領域を指定する。
+     *  @param[in,out] port このインスタンスが使用するポート。
+     *  @param[in,out] storage スケジューラより長寿命で、他と共有しない待ち領域。
+     *  @note Nは未受付イベント数の上限。0件なら通常イベントを受け付けない。
+     *  @spec{BOARD-F446-001}
+     */
+    template<std::size_t N>
+    CanTxScheduler(CanPort& port, std::array<EventTxRequest, N>& storage) noexcept
+        : port_{port}, events_{storage.data()}, eventCapacity_{N}
+    {
+    }
+
     CanTxScheduler(const CanTxScheduler&) = delete;
     CanTxScheduler& operator=(const CanTxScheduler&) = delete;
 
@@ -67,7 +94,7 @@ public:
      *  @param[in] token 送信元と非ゼロの番号。同じバス・送信元で終端済みの番号は再利用しない。
      *  @param[in] nowUs CanPortと共通の単調時計の時刻 [us]。
      *  @return Acceptedは受付のみ。枠不足または受付済みトークンの再投入はBusy。
-     *  @note Busy・Invalid・NotReadyでは新しいトークンを登録しない。
+     *  @note 通常イベントが待機中または受付済みならBusy。待ち順を直送で迂回しない。
      *  @spec{BOARD-F446-001}
      */
     CanTxSubmitResult trySubmit(const CanFrame& frame, TxToken token, std::uint64_t nowUs) noexcept;
@@ -82,13 +109,22 @@ public:
      */
     PeriodicBatchResult replacePeriodic(const PeriodicTxBatch& batch, std::uint64_t nowUs) noexcept;
 
-    /** @brief 期限切れを1件破棄するか、期限内の周期フレームを最大1件投入する。
-     *  @param[in] nowUs CanPortと共通の単調時計の時刻 [us]。nowUs >= expiresAtUsで期限切れ。
-     *  @return Busy・NotReadyでは待ちを保持する。返されるAcceptedは受付のみ。
-     *  @pre 主ループでCAN終端を回収し、その周期に新規要求があれば置換した後に呼ぶ。
+    /** @brief 期限内の通常イベントをFIFO末尾に追加する。
+     *  @param[in] request フレーム、固有トークン、絶対送信期限 [us]。
+     *  @param[in] nowUs CanPortと共通の単調時計の時刻 [us]。
+     *  @return QueuedのみFIFOを更新。QueueFullは既存の要求を保持する。
      *  @spec{BOARD-F446-001}
      */
-    PeriodicTxProgress servicePeriodic(std::uint64_t nowUs) noexcept;
+    EventEnqueueResult enqueueEvent(const EventTxRequest& request, std::uint64_t nowUs) noexcept;
+
+    /** @brief 期限切れを最大1件返すか、通常イベントを優先してフレームを最大1件投入する。
+     *  @param[in] nowUs CanPortと共通の単調時計の時刻 [us]。期限ちょうどから破棄する。
+     *  @return Busy・NotReadyでは待ちを保持する。Acceptedは受付のみ。
+     *  @pre 主ループでCAN終端を回収し、周期の新規要求があれば置換した後に呼ぶ。
+     *  @note すでに受付済みの通常イベントが終端するまで次のフレームを投入しない。
+     *  @spec{BOARD-F446-001}
+     */
+    ScheduledTxProgress service(std::uint64_t nowUs) noexcept;
 
 private:
     friend class CanRouter;
@@ -96,19 +132,29 @@ private:
     // 終端の配送より先に枠を空ける。配送先が次の要求を投入しても、完了済みの枠が残らない。
     bool consumeTerminal(TxToken token, std::uint64_t atUs) noexcept;
 
-    CanTxSubmitResult submit(const CanFrame& frame, TxToken token, std::uint64_t nowUs,
-                             std::uint64_t periodicGeneration) noexcept;
-    bool isAccepted(TxToken token) const noexcept;
-
     struct AcceptedTx {
         TxToken token{};
         std::uint64_t acceptedAtUs{0};
         std::uint64_t periodicGeneration{0};
+        bool normalEvent{false};
     };
+
+    CanTxSubmitResult submit(const CanFrame& frame, AcceptedTx accepted) noexcept;
+    ScheduledTxProgress submitScheduled(const CanFrame& frame, AcceptedTx accepted) noexcept;
+    ScheduledTxProgress servicePeriodic(std::uint64_t nowUs) noexcept;
+    bool isAccepted(TxToken token) const noexcept;
+    bool hasEventInFlight() const noexcept;
+    bool hasQueuedEvent(TxToken token) const noexcept;
+    bool hasQueuedPeriodic(TxToken token) const noexcept;
+    void popEvent() noexcept;
 
     CanPort& port_;
     std::array<AcceptedTx, 3> accepted_{};
     PeriodicTxBatch periodic_{};
+    EventTxRequest* events_{nullptr};
+    std::size_t eventCapacity_{0};
+    std::size_t eventHead_{0};
+    std::size_t eventCount_{0};
 };
 
 } // namespace balancing
