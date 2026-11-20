@@ -9,20 +9,20 @@ namespace balancing {
 class MotorService;
 struct ScheduledTxProgress;
 
-/** @brief CAN1の転送型とRS06の軸別要求・結果を主ループで接続する。
+/** @brief 両バスの軸別フィードバックと、CAN1のRS06送信を主ループで接続する。
  *  @note 停止枠の登録、メールボックス受付、送信終端の3段階を区別する。
  *        同じCAN1スケジューラをCanRouterのTX照合先にも渡す。
  *  @spec{PROTO-RS06-001}
  *  @spec{BEHAV-001}
  */
-class Rs06CanLink final : public CanEventSink {
+class MotorCanLink final : public CanEventSink {
 public:
     /** @brief 軸の所有者とCAN1の送信調停を参照で受け取る。
-     *  @param[in,out] motors RS06を管理するサービス。リンクより長寿命とする。
+     *  @param[in,out] motors RS06とC620を管理するサービス。リンクより長寿命とする。
      *  @param[in,out] can1Tx CAN1専用のスケジューラ。その停止枠0〜3をリンクが使う。
      *  @spec{PROTO-RS06-001}
      */
-    Rs06CanLink(MotorService& motors, CanTxScheduler& can1Tx) noexcept;
+    MotorCanLink(MotorService& motors, CanTxScheduler& can1Tx) noexcept;
 
     /** @brief 現周期の4軸の送信候補を1回ずつ処理する。
      *  @param[in] nowUs CAN採取と共通の単調時計 [us]。
@@ -41,8 +41,9 @@ public:
      */
     void onScheduledTxProgress(const ScheduledTxProgress& progress, std::uint64_t nowUs) noexcept;
 
-    /** @brief CAN1で分類済みのRS06状態報告を採取時刻付きで配送する。
+    /** @brief CAN1のRS06報告とCAN2のC620報告を採取時刻付きで配送する。
      *  @spec{PROTO-RS06-001}
+     *  @spec{PROTO-C620-001}
      */
     void onCanReceive(CanBus bus, CanRxTarget target, const CanFrame& frame,
                       std::uint64_t atUs) noexcept override;

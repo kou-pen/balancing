@@ -81,6 +81,24 @@ void MotorService::onRs06Frame(const BMotorCanFrame& frame, std::uint64_t receiv
     }
 }
 
+void MotorService::onC620Frame(const BMotorCanFrame& frame, std::uint64_t receivedAtUs) noexcept
+{
+    BC620Feedback report{};
+    // 共通C11デコーダはID1〜4を扱う。本機の観測対象は先頭の2車輪だけ。
+    if (b_c620_parse_feedback(&frame, &report) && report.motor_id <= c620_.size()) {
+        c620_[report.motor_id - 1u].onFeedback(report, receivedAtUs);
+    }
+}
+
+MotorFeedbackSnapshot MotorService::feedback(std::uint64_t nowUs) const noexcept
+{
+    // 各軸の受信時刻は違うが、期限は全軸とも同じ周期時刻で評価する。
+    return {nowUs,
+            {rs06_[0].feedback(nowUs), rs06_[1].feedback(nowUs),
+             rs06_[2].feedback(nowUs), rs06_[3].feedback(nowUs)},
+            {c620_[0].feedback(nowUs), c620_[1].feedback(nowUs)}};
+}
+
 void MotorService::setCan1BusOff(bool busOff) noexcept
 {
     // バスオフ中は候補の投入を止める。ハードウェアが占有中のトークンは、

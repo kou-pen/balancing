@@ -191,12 +191,10 @@ ScheduledTxProgress CanTxScheduler::serviceStop(std::uint64_t nowUs) noexcept
     if (pending == stops_.end()) {
         return {ScheduledTxResult::Busy, {}};
     }
+    // フレームとキーは登録時に検証済み。再試行待ちへの遷移は送信終端で扱う。
     const auto progress = submitScheduled(pending->frame, {pending->token, nowUs});
     if (progress.result == ScheduledTxResult::Accepted) {
         pending->state = StopState::InFlight;
-    } else if (progress.result == ScheduledTxResult::Invalid) {
-        // 恒久的な受付拒否は要求元へ返す。他の停止先を進めつつ、当該対象は未完了に保つ。
-        pending->state = StopState::RetryRequired;
     }
     return progress;
 }

@@ -1,4 +1,4 @@
-#include "balancing/app/Rs06CanLink.hpp"
+#include "balancing/app/MotorCanLink.hpp"
 
 #include "balancing/app/MotorService.hpp"
 #include "balancing/communication/can/CanTxScheduler.hpp"
@@ -46,12 +46,12 @@ Rs06TxResult toRs06Outcome(CanTxOutcome outcome) noexcept
 
 } // namespace
 
-Rs06CanLink::Rs06CanLink(MotorService& motors, CanTxScheduler& can1Tx) noexcept
+MotorCanLink::MotorCanLink(MotorService& motors, CanTxScheduler& can1Tx) noexcept
     : motors_{motors}, can1Tx_{can1Tx}
 {
 }
 
-void Rs06CanLink::submitPending(std::uint64_t nowUs) noexcept
+void MotorCanLink::submitPending(std::uint64_t nowUs) noexcept
 {
     const auto requests = motors_.pendingRs06Requests();
     for (std::size_t axis = 0; axis < requests.size(); ++axis) {
@@ -88,11 +88,9 @@ void Rs06CanLink::submitPending(std::uint64_t nowUs) noexcept
     }
 }
 
-void Rs06CanLink::onScheduledTxProgress(const ScheduledTxProgress& progress, std::uint64_t nowUs) noexcept
+void MotorCanLink::onScheduledTxProgress(const ScheduledTxProgress& progress, std::uint64_t nowUs) noexcept
 {
-    const auto result = progress.result;
-    if (progress.token.serial == 0u ||
-        (result != ScheduledTxResult::Accepted && result != ScheduledTxResult::Invalid)) {
+    if (progress.result != ScheduledTxResult::Accepted) {
         return;
     }
     const auto queued = std::find(queuedStops_.begin(), queuedStops_.end(), progress.token);
@@ -101,29 +99,27 @@ void Rs06CanLink::onScheduledTxProgress(const ScheduledTxProgress& progress, std
     }
 
     // 受付後は軸側とスケジューラが同じトークンで終端を待つ。
-    // Invalidでも専用枠は再試行待ちへ移るので、軸が新しいシリアルを発行できる。
     *queued = {};
-    const auto rs06Result = result == ScheduledTxResult::Accepted
-                                ? Rs06TxResult::Accepted : Rs06TxResult::Failed;
-    motors_.onRs06TxResult(decodeToken(progress.token), rs06Result, nowUs);
+    motors_.onRs06TxResult(decodeToken(progress.token), Rs06TxResult::Accepted, nowUs);
 }
 
-void Rs06CanLink::onCanReceive(CanBus bus, CanRxTarget target, const CanFrame& frame,
+void MotorCanLink::onCanReceive(CanBus bus, CanRxTarget target, const CanFrame& frame,
                               std::uint64_t atUs) noexcept
 {
-    if (bus != CanBus::Can1 || target != CanRxTarget::Rs06Status) {
+    // RouterがバスとIDで分類済み。内容の復号と軸への割り当てはMotorServiceに任せる。
+    if (target == CanRxTarget::Unmatched) {
         return;
     }
-    // Routerはバスとフレーム外形を絞る。軸、主機ID、故障ビットはCodecとServiceで扱う。
-    BMotorCanFrame report{};
-    report.id = frame.id;
-    report.dlc = frame.dlc;
-    report.extended = frame.extended;
+    BMotorCanFrame report{frame.id, {}, frame.dlc, frame.extended};
     std::copy(frame.data.begin(), frame.data.end(), report.data);
-    motors_.onRs06Frame(report, atUs);
+    if (bus == CanBus::Can1 && target == CanRxTarget::Rs06Status) {
+        motors_.onRs06Frame(report, atUs);
+    } else if (bus == CanBus::Can2) {
+        motors_.onC620Frame(report, atUs);
+    }
 }
 
-void Rs06CanLink::onCanTransmit(CanBus bus, TxToken token, CanTxOutcome outcome,
+void MotorCanLink::onCanTransmit(CanBus bus, TxToken token, CanTxOutcome outcome,
                                std::uint64_t atUs) noexcept
 {
     // 同じモータIDとシリアルを含んでいても、別バスや他の発行元は軸の状態を進めない。
@@ -132,7 +128,7 @@ void Rs06CanLink::onCanTransmit(CanBus bus, TxToken token, CanTxOutcome outcome,
     }
 }
 
-void Rs06CanLink::onCanPortStatus(CanBus bus, CanEventKind kind, std::uint64_t) noexcept
+void MotorCanLink::onCanPortStatus(CanBus bus, CanEventKind kind, std::uint64_t) noexcept
 {
     if (bus != CanBus::Can1) {
         return;

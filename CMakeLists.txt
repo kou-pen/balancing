@@ -124,6 +124,7 @@ set(BALANCING_RS06_SERVICE_SOURCES
     ${F446_APP}/Src/balancing/app/RobotSequence.cpp
     ${F446_APP}/Src/balancing/app/MotorService.cpp
     ${F446_APP}/Src/balancing/device/Rs06Motor.cpp
+    ${F446_APP}/Src/balancing/device/C620Motor.cpp
     ${F446_APP}/Src/balancing/communication/Rs06Codec.cpp
 )
 # Four-axis RS06 handshake, bound to RobotSequence through simulated CAN events.
@@ -171,7 +172,7 @@ add_executable(balancing_f446_can_event_poll_tests
     tests/test_f446_can_event_poll.cpp
     ${BALANCING_CAN_DISPATCH_SOURCES}
     ${BALANCING_RS06_SERVICE_SOURCES}
-    ${F446_APP}/Src/balancing/app/Rs06CanLink.cpp
+    ${F446_APP}/Src/balancing/app/MotorCanLink.cpp
     ${F446_APP}/Src/balancing/communication/can/CanPort.cpp
 )
 target_include_directories(balancing_f446_can_event_poll_tests PRIVATE
