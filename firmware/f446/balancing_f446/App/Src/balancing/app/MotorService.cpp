@@ -91,6 +91,12 @@ void MotorService::setCan1BusOff(bool busOff) noexcept
     }
 }
 
+void MotorService::reportCan1RxLost() noexcept
+{
+    // 次の受信が正常でも、欠落した報告の内容は分からない。制御周期まで異常を保持する。
+    pendingFaults_ = pendingFaults_ | FaultFlags::ExternalFault;
+}
+
 std::array<Rs06MotorStatus, 4> MotorService::rs06Status(std::uint64_t nowUs) const noexcept
 {
     return {rs06_[0].status(nowUs), rs06_[1].status(nowUs),

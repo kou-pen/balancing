@@ -60,6 +60,11 @@ public:
      */
     void setCan1BusOff(bool busOff) noexcept;
 
+    /** @brief CAN1の受信欠落を次回のtakeObservedFaults()まで保持する。
+     *  @spec{BOARD-F446-001}
+     */
+    void reportCan1RxLost() noexcept;
+
     /** @brief 軸別の安全判断を順序固定のコピーで返す。
      *  @param[in] nowUs 制御周期の単調時刻 [us]。
      *  @spec{PROTO-RS06-001}

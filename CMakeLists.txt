@@ -120,13 +120,16 @@ target_include_directories(balancing_robot_sequence_tests PRIVATE
 )
 target_compile_options(balancing_robot_sequence_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_robot_sequence_tests COMMAND balancing_robot_sequence_tests)
-# Four-axis RS06 handshake, bound to RobotSequence through simulated CAN events.
-add_executable(balancing_motor_service_rs06_tests
-    tests/test_motor_service_rs06.cpp
+set(BALANCING_RS06_SERVICE_SOURCES
     ${F446_APP}/Src/balancing/app/RobotSequence.cpp
     ${F446_APP}/Src/balancing/app/MotorService.cpp
     ${F446_APP}/Src/balancing/device/Rs06Motor.cpp
     ${F446_APP}/Src/balancing/communication/Rs06Codec.cpp
+)
+# Four-axis RS06 handshake, bound to RobotSequence through simulated CAN events.
+add_executable(balancing_motor_service_rs06_tests
+    tests/test_motor_service_rs06.cpp
+    ${BALANCING_RS06_SERVICE_SOURCES}
 )
 target_link_libraries(balancing_motor_service_rs06_tests PRIVATE balancing_core m)
 target_compile_options(balancing_motor_service_rs06_tests PRIVATE -Wall -Wextra -Wpedantic)
@@ -135,11 +138,8 @@ add_test(NAME balancing_motor_service_rs06_tests COMMAND balancing_motor_service
 # F446 bxCAN register behavior and RS06 service connection with an isolated host stub.
 add_executable(balancing_f446_can_port_tests
     tests/test_f446_can_port.cpp
-    ${F446_APP}/Src/balancing/app/RobotSequence.cpp
-    ${F446_APP}/Src/balancing/app/MotorService.cpp
+    ${BALANCING_RS06_SERVICE_SOURCES}
     ${F446_APP}/Src/balancing/communication/can/CanPort.cpp
-    ${F446_APP}/Src/balancing/device/Rs06Motor.cpp
-    ${F446_APP}/Src/balancing/communication/Rs06Codec.cpp
 )
 target_include_directories(balancing_f446_can_port_tests PRIVATE tests/stubs_can1)
 target_link_libraries(balancing_f446_can_port_tests PRIVATE balancing_core m)
@@ -170,11 +170,14 @@ add_test(NAME balancing_f446_can1_runtime_tests COMMAND balancing_f446_can1_runt
 add_executable(balancing_f446_can_event_poll_tests
     tests/test_f446_can_event_poll.cpp
     ${BALANCING_CAN_DISPATCH_SOURCES}
+    ${BALANCING_RS06_SERVICE_SOURCES}
+    ${F446_APP}/Src/balancing/app/Rs06CanLink.cpp
     ${F446_APP}/Src/balancing/communication/can/CanPort.cpp
 )
 target_include_directories(balancing_f446_can_event_poll_tests PRIVATE
     tests/stubs_can1
     ${F446_APP}/Inc
 )
+target_link_libraries(balancing_f446_can_event_poll_tests PRIVATE balancing_core m)
 target_compile_options(balancing_f446_can_event_poll_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_can_event_poll_tests COMMAND balancing_f446_can_event_poll_tests)
