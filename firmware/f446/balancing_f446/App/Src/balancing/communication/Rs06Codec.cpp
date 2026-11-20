@@ -12,7 +12,9 @@ std::optional<Rs06StateReport> Rs06Codec::decodeFeedback(const BMotorCanFrame& f
     }
     return Rs06StateReport{decoded.motor_id, decoded.host_id,
                            static_cast<Rs06Report>(frame.id >> 24),
-                           static_cast<Rs06Mode>(decoded.mode), decoded.fault_bits};
+                           static_cast<Rs06Mode>(decoded.mode), decoded.fault_bits,
+                           decoded.angle_rad, decoded.velocity_rad_s,
+                           decoded.torque_nm, decoded.temperature_c};
 }
 
 std::optional<BMotorCanFrame> Rs06Codec::encodeControl(

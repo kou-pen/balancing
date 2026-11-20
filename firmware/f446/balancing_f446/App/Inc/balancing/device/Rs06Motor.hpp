@@ -33,6 +33,16 @@ struct Rs06MotorStatus {
     bool stopTxFailed;
 };
 
+struct Rs06FeedbackSample {
+    Rs06StateReport report;
+    std::uint64_t receivedAtUs;
+};
+
+struct Rs06AxisFeedback {
+    std::optional<Rs06FeedbackSample> latest;
+    bool fresh;
+};
+
 class Rs06Motor final {
 public:
     /** @brief 軸のCAN宛先を保持し、停止要求未完了で開始する。
@@ -84,17 +94,27 @@ public:
      */
     Rs06MotorStatus status(std::uint64_t nowUs) const noexcept;
 
+    /** @brief 軸の最新報告と、今周期の時刻で評価した鮮度を返す。
+     *  @param[in] nowUs 制御周期で固定した単調時刻 [us]。
+     *  @return 未受信ではlatestが空。期限切れでも最終受信値と受信時刻は保持する。
+     *  @spec{PROTO-RS06-001}
+     */
+    Rs06AxisFeedback feedback(std::uint64_t nowUs) const noexcept;
+
 private:
     enum class Phase : std::uint8_t { StopQueued, StopSent, EnableQueued, EnableSent, Failed };
     struct AcceptedTx {
         std::uint64_t serial;
         std::uint64_t acceptedAtUs;
     };
-    struct StampedReport {
-        Rs06StateReport report;
+    struct StatusConfirmation {
+        Rs06Mode mode;
+        std::uint8_t faultBits;
         std::uint64_t receivedAtUs;
     };
 
+    bool hasReportAt(std::uint64_t nowUs) const noexcept;
+    bool feedbackFresh(std::uint64_t nowUs) const noexcept;
     void advanceToken() noexcept;
     void completeCurrent(Rs06TxResult result, std::uint64_t atUs) noexcept;
 
@@ -104,8 +124,8 @@ private:
     std::uint64_t serial_{1};
     std::uint64_t txCompletedAtUs_{0};
     std::optional<AcceptedTx> accepted_{};
-    std::optional<StampedReport> latest_{};
-    std::optional<StampedReport> latestStatus_{};
+    std::optional<Rs06FeedbackSample> latest_{};
+    std::optional<StatusConfirmation> latestStatus_{};
     bool stopTxFailed_{false};
 };
 

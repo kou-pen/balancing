@@ -102,18 +102,18 @@ bool Rs06Motor::onFeedback(const Rs06StateReport& feedback, std::uint64_t receiv
         (latest_ && receivedAtUs < latest_->receivedAtUs)) {
         return false;
     }
-    latest_ = StampedReport{feedback, receivedAtUs};
+    latest_ = Rs06FeedbackSample{feedback, receivedAtUs};
     if (feedback.report == Rs06Report::Status) {
-        latestStatus_ = latest_;
+        // Type 24が届いた後もType 2の照合情報は必要。物理量は最新報告だけに保持する。
+        latestStatus_ = StatusConfirmation{feedback.mode, feedback.faultBits, receivedAtUs};
     }
     return true;
 }
 
 Rs06MotorStatus Rs06Motor::status(std::uint64_t nowUs) const noexcept
 {
-    const bool hasReport = latest_ && latest_->receivedAtUs <= nowUs;
-    const bool fresh = hasReport && nowUs - latest_->receivedAtUs < feedbackTimeoutUs;
-    const bool fault = hasReport && latest_->report.faultBits != 0;
+    const bool fresh = feedbackFresh(nowUs);
+    const bool fault = hasReportAt(nowUs) && latest_->report.faultBits != 0;
     const auto confirms = [&](Rs06Mode mode) {
         // Type 24の定期報告は鮮度・故障監視に使う。Tx後の状態遷移は
         // Type 2で確認し、より新しい報告のモードや故障とも一致させる。
@@ -121,7 +121,7 @@ Rs06MotorStatus Rs06Motor::status(std::uint64_t nowUs) const noexcept
                latestStatus_->receivedAtUs > txCompletedAtUs_ &&
                latestStatus_->receivedAtUs <= nowUs &&
                nowUs - latestStatus_->receivedAtUs < feedbackTimeoutUs &&
-               latestStatus_->report.mode == mode && latestStatus_->report.faultBits == 0;
+               latestStatus_->mode == mode && latestStatus_->faultBits == 0;
     };
     auto enabled = Rs06EnableStatus::Pending;
     if (phase_ == Phase::Failed || serial_ == 0) {
@@ -133,6 +133,22 @@ Rs06MotorStatus Rs06Motor::status(std::uint64_t nowUs) const noexcept
     return {enabled, phase_ == Phase::StopQueued ||
                          (phase_ == Phase::StopSent && !stoppedSent),
             stoppedSent && confirms(Rs06Mode::Reset), fresh, fault, stopTxFailed_ || serial_ == 0};
+}
+
+Rs06AxisFeedback Rs06Motor::feedback(std::uint64_t nowUs) const noexcept
+{
+    return {latest_, feedbackFresh(nowUs)};
+}
+
+bool Rs06Motor::hasReportAt(std::uint64_t nowUs) const noexcept
+{
+    return latest_ && latest_->receivedAtUs <= nowUs;
+}
+
+bool Rs06Motor::feedbackFresh(std::uint64_t nowUs) const noexcept
+{
+    // ARM判定と周期スナップショットが同じ受信時刻と期限を使う。30 msちょうどで期限切れ。
+    return hasReportAt(nowUs) && nowUs - latest_->receivedAtUs < feedbackTimeoutUs;
 }
 
 void Rs06Motor::advanceToken() noexcept
