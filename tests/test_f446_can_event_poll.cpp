@@ -564,6 +564,179 @@ void testNormalEventFifoFullExpiryAndWrap()
     assert(tx.service(72).result == ScheduledTxResult::Idle);
 }
 
+void testFourStopsHavePriorityWhileTheNormalFifoIsFull()
+{
+    Fixture can1;
+    Recorder sink;
+    std::array<EventTxRequest, 2> fifo{};
+    CanTxScheduler tx{can1.port, fifo};
+    CanRouter router{sink, &tx};
+    const auto oldCycle = periodicBatch(1, 4000);
+    assert(tx.replacePeriodic(oldCycle, 0) == PeriodicBatchResult::Queued);
+    const auto normal = eventRequest(0x110, 1, 1000);
+    const auto waiting = eventRequest(0x111, 2, 1000);
+    const auto secondWaiting = eventRequest(0x112, 3, 1000);
+
+    // 通常イベントを1つだけハードへ置き、残りの通常FIFOも満杯にする。
+    // 停止はFIFOの残量にも、受付済み通常イベントの終端にも依存せず空き枠を使う。
+    assert(tx.enqueueEvent(normal, 0) == EventEnqueueResult::Queued);
+    assert(tx.service(0).token == normal.token);
+    can1.occupy(0);
+    assert(tx.enqueueEvent(waiting, 1) == EventEnqueueResult::Queued);
+    assert(tx.enqueueEvent(secondWaiting, 1) == EventEnqueueResult::Queued);
+    assert(tx.enqueueEvent(eventRequest(0x113, 4, 1000), 1) == EventEnqueueResult::QueueFull);
+    assert(tx.enqueueStop(0, normal.frame, waiting.token) == StopEnqueueResult::Invalid);
+    assert(tx.enqueueStop(0, normal.frame, oldCycle.requests[0]->token) == StopEnqueueResult::Invalid);
+    assert(tx.enqueueStop(0, normal.frame, normal.token) == StopEnqueueResult::Invalid);
+
+    const std::array<TxToken, 4> stops{{{21, 9}, {22, 9}, {23, 9}, {24, 9}}};
+    for (std::size_t i = stops.size(); i > 0; --i) {
+        // 実機のIDを仮定せず、対象番号と投入順がペイロードからも区別できるようにする。
+        const auto axis = i - 1;
+        const CanFrame frame{0x210u, {static_cast<std::uint8_t>(axis)}, 1, false};
+        assert(tx.enqueueStop(axis, frame, stops[axis]) == StopEnqueueResult::Queued);
+    }
+    assert(tx.enqueueStop(stops.size(), {}, {25, 9}) == StopEnqueueResult::Invalid);
+    assert(tx.enqueueStop(0, {}, {25, 9}) == StopEnqueueResult::TargetBusy);
+    assert(tx.enqueueStop(0, {}, stops[0]) == StopEnqueueResult::Invalid);
+    assert(tx.enqueueEvent({{}, stops[0], 1000}, 2) == EventEnqueueResult::Invalid);
+    auto collision = periodicBatch(2, 4000);
+    collision.requests[0]->token = stops[3];
+    assert(tx.replacePeriodic(collision, 2) == PeriodicBatchResult::Invalid);
+    const auto duringStop = periodicBatch(2, 4000);
+    assert(tx.replacePeriodic(duringStop, 2) == PeriodicBatchResult::StopPending);
+
+    for (std::size_t i = 0; i < 2; ++i) {
+        assert(tx.service(2).token == stops[i]);
+        assert(can1.registers.sTxMailBox[i + 1].TDLR == i);
+        can1.occupy(i + 1);
+    }
+    assert(tx.service(2).result == ScheduledTxResult::Busy);
+    can1.complete(1, CAN_TSR_TXOK0, 3);
+    assert(tx.service(3).result == ScheduledTxResult::Busy); // IRQの採取だけではまだ枠を再利用しない。
+    pollCanEvents(&can1.port, nullptr, router);
+    assert(tx.service(3).token == stops[2]);
+    can1.occupy(1);
+    can1.complete(0, CAN_TSR_TXOK0, 4);
+    pollCanEvents(&can1.port, nullptr, router);
+    assert(tx.service(4).token == stops[3]);
+    can1.occupy(0);
+
+    // 二つの停止が先に終端しても、最後の対象が終端するまで通常FIFOを進めない。
+    can1.complete(1, CAN_TSR_TXOK0, 5);
+    can1.complete(2, CAN_TSR_TXOK0, 5);
+    pollCanEvents(&can1.port, nullptr, router);
+    assert(tx.service(5).result == ScheduledTxResult::Busy);
+    can1.complete(0, CAN_TSR_TXOK0, 6);
+    pollCanEvents(&can1.port, nullptr, router);
+    assert(tx.replacePeriodic(duringStop, 6) == PeriodicBatchResult::StaleGeneration);
+
+    assert(tx.service(6).token == waiting.token);
+    can1.occupy(0);
+    can1.complete(0, CAN_TSR_TXOK0, 7);
+    pollCanEvents(&can1.port, nullptr, router);
+    assert(tx.service(7).token == secondWaiting.token);
+    can1.occupy(0);
+    can1.complete(0, CAN_TSR_TXOK0, 8);
+    pollCanEvents(&can1.port, nullptr, router);
+    assert(tx.service(8).result == ScheduledTxResult::Idle);
+    const auto nextCycle = periodicBatch(3, 4000);
+    assert(tx.replacePeriodic(nextCycle, 8) == PeriodicBatchResult::Queued);
+    assert(tx.service(8).token == nextCycle.requests[0]->token);
+}
+
+void testFailedStopsRequireNewTokensAndAreIndependentBetweenBuses()
+{
+    Fixture can1, can2;
+    Recorder sink;
+    CanTxScheduler tx1{can1.port}, tx2{can2.port};
+    CanRouter router{sink, &tx1, &tx2};
+    const TxToken shared{1, 31};
+    assert(tx1.enqueueStop(0, {}, shared) == StopEnqueueResult::Queued);
+    assert(tx2.enqueueStop(0, {}, shared) == StopEnqueueResult::Queued);
+    assert(tx1.service(10).token == shared);
+    assert(tx2.service(10).token == shared);
+    can1.occupy(0);
+    can2.occupy(0);
+    can2.complete(0, CAN_TSR_TXOK0, 11);
+    pollCanEvents(&can1.port, &can2.port, router);
+    assert(sink.count == 1u && sink.entries[0].bus == CanBus::Can2);
+    assert(tx1.enqueueStop(0, {}, {2, 31}) == StopEnqueueResult::TargetBusy);
+    assert(tx1.trySubmit({}, {2, 31}, 11) == CanTxSubmitResult::Busy);
+    assert(tx2.service(11).result == ScheduledTxResult::Idle);
+    assert(tx2.trySubmit({}, {2, 31}, 11) == CanTxSubmitResult::Accepted);
+
+    const std::array<std::uint32_t, 3> failures{CAN_TSR_TERR0, CAN_TSR_ALST0, 0u};
+    const std::array<CanTxOutcome, 3> outcomes{
+        CanTxOutcome::TransmitError, CanTxOutcome::ArbitrationLost, CanTxOutcome::NotTransmitted,
+    };
+    auto active = shared;
+    for (std::size_t i = 0; i < failures.size(); ++i) {
+        const auto finishAt = 12u + i * 2u;
+        // 失敗の種類にかかわらず、空きメールボックスは返すが通常送信は保留する。
+        can1.complete(0, failures[i], finishAt);
+        pollCanEvents(&can1.port, &can2.port, router);
+        assert(sink.count == i + 2 && sink.entries[i + 1].bus == CanBus::Can1);
+        assert(sink.entries[i + 1].token == active && sink.entries[i + 1].outcome == outcomes[i]);
+        assert(tx1.service(finishAt).result == ScheduledTxResult::Busy);
+        assert(tx1.enqueueStop(0, {}, active) == StopEnqueueResult::Invalid);
+        assert(tx1.enqueueStop(1, {}, active) == StopEnqueueResult::Invalid);
+        const TxToken retry{active.serial + 1u, active.origin};
+        assert(tx1.enqueueStop(0, {}, retry) == StopEnqueueResult::Queued);
+        assert(tx1.service(finishAt + 1u).token == retry);
+        can1.occupy(0);
+
+        CanEvent stale{CanEventKind::Tx, finishAt + 1u};
+        stale.token = active;
+        stale.outcome = CanTxOutcome::Sent;
+        router.dispatch(CanBus::Can1, stale);
+        assert(sink.count == i + 2);
+        assert(tx1.trySubmit({}, {95, 31}, finishAt + 1u) == CanTxSubmitResult::Busy);
+        active = retry;
+    }
+    can1.complete(0, CAN_TSR_TXOK0, 18);
+    pollCanEvents(&can1.port, &can2.port, router);
+    assert(sink.count == 5u && sink.entries[4].token == active && sink.entries[4].outcome == CanTxOutcome::Sent);
+    assert(tx1.trySubmit({}, {95, 31}, 18) == CanTxSubmitResult::Accepted);
+}
+
+void testStopWaitSurvivesNotReadyAndBusOff()
+{
+    Fixture can1;
+    Recorder sink;
+    CanTxScheduler tx{can1.port};
+    CanRouter router{sink, &tx};
+    const TxToken first{1, 31}, second{2, 31};
+    const CanFrame invalid{0x800u, {}, 8, false};
+    assert(tx.enqueueStop(0, invalid, first) == StopEnqueueResult::Invalid);
+    assert(tx.enqueueStop(0, {}, {}) == StopEnqueueResult::Invalid);
+    assert(tx.enqueueStop(0, {}, first) == StopEnqueueResult::Queued);
+    assert(tx.enqueueStop(1, {}, second) == StopEnqueueResult::Queued);
+    can1.handle.State = HAL_CAN_STATE_READY;
+    assert(tx.service(1).result == ScheduledTxResult::NotReady);
+    can1.handle.State = HAL_CAN_STATE_LISTENING;
+    can1.registers.ESR = CAN_ESR_BOFF;
+    can1.port.captureInterrupt(2);
+    pollCanEvents(&can1.port, nullptr, router);
+    assert(tx.service(2).result == ScheduledTxResult::Busy);
+    can1.registers.ESR = 0;
+    can1.port.captureInterrupt(50000);
+    pollCanEvents(&can1.port, nullptr, router);
+    assert(sink.entries[0].kind == CanEventKind::BusOff);
+    assert(sink.entries[1].kind == CanEventKind::BusRecovered);
+
+    // 停止待ちは経過時間で捨てない。旧トークンの送信失敗があっても別対象は進む。
+    assert(tx.service(50000).token == first);
+    can1.occupy(0);
+    can1.complete(0, CAN_TSR_TERR0, 50001);
+    pollCanEvents(&can1.port, nullptr, router);
+    assert(tx.service(50001).token == second);
+    can1.occupy(0);
+    can1.complete(0, CAN_TSR_TXOK0, 50002);
+    pollCanEvents(&can1.port, nullptr, router);
+    assert(tx.trySubmit({}, {3, 31}, 50002) == CanTxSubmitResult::Busy);
+}
+
 } // namespace
 
 int main()
@@ -581,5 +754,8 @@ int main()
     testPeriodicGenerationIsIndependentOnCan2();
     testNormalEventsFinishInOrderBeforePeriodicTx();
     testNormalEventFifoFullExpiryAndWrap();
-    std::puts("PASS: F446 CAN dispatch, periodic replacement and normal event FIFO");
+    testFourStopsHavePriorityWhileTheNormalFifoIsFull();
+    testFailedStopsRequireNewTokensAndAreIndependentBetweenBuses();
+    testStopWaitSurvivesNotReadyAndBusOff();
+    std::puts("PASS: F446 CAN dispatch, periodic replacement, normal FIFO and stop priority");
 }

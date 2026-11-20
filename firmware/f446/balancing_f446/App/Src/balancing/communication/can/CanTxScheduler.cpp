@@ -13,9 +13,9 @@ CanTxScheduler::CanTxScheduler(CanPort& port) noexcept : port_{port}
 CanTxSubmitResult CanTxScheduler::trySubmit(const CanFrame& frame, TxToken token,
                                             std::uint64_t nowUs) noexcept
 {
-    // 直送経路でも通常FIFOの優先順位を適用する。最後の通常イベントがすでにFIFOから
-    // 外れていても、小さいIDを持つ次のフレームの投入は終端回収まで待つ。
-    if (eventCount_ != 0 || hasEventInFlight() || hasQueuedPeriodic(token)) {
+    // 直送も停止の優先順位を守る。通常イベントでFIFOがすでに空でも、その終端まで
+    // 次のフレームは待つ。先に投入すると小さいCAN IDが通常イベントを追い越し得る。
+    if (hasStop() || eventCount_ != 0 || hasEventInFlight() || hasQueuedPeriodic(token)) {
         return CanTxSubmitResult::Busy;
     }
     return submit(frame, {token, nowUs});
@@ -25,6 +25,23 @@ bool CanTxScheduler::isAccepted(TxToken token) const noexcept
 {
     const auto sameToken = [token](const AcceptedTx& entry) { return entry.token == token; };
     return std::any_of(accepted_.begin(), accepted_.end(), sameToken);
+}
+
+bool CanTxScheduler::isKnownToken(TxToken token) const noexcept
+{
+    // 送信結果はバス・トークンで配送するため、同じバスの待機列が違ってもキーは共有する。
+    // 停止が失敗した直後のキーも保持し、遅い終端を再試行の結果として使わない。
+    const auto sameToken = [token](const StopSlot& slot) {
+        return slot.state != StopState::Idle && slot.token == token;
+    };
+    return isAccepted(token) || hasQueuedPeriodic(token) || hasQueuedEvent(token) ||
+           std::any_of(stops_.begin(), stops_.end(), sameToken);
+}
+
+bool CanTxScheduler::hasStop() const noexcept
+{
+    return std::any_of(stops_.begin(), stops_.end(),
+                       [](const StopSlot& slot) { return slot.state != StopState::Idle; });
 }
 
 CanTxSubmitResult CanTxScheduler::submit(const CanFrame& frame, AcceptedTx accepted) noexcept
@@ -71,17 +88,18 @@ PeriodicBatchResult CanTxScheduler::replacePeriodic(const PeriodicTxBatch& batch
         const auto& request = **entry;
         const auto token = request.token;
         const auto sameToken = [token](const auto& other) { return other && other->token == token; };
-        if (token.serial == 0u || !request.frame.validForTransmit() || isAccepted(token) ||
-            std::any_of(batch.requests.begin(), entry, sameToken) ||
-            hasQueuedPeriodic(token) || hasQueuedEvent(token)) {
+        if (token.serial == 0u || !request.frame.validForTransmit() || isKnownToken(token) ||
+            std::any_of(batch.requests.begin(), entry, sameToken)) {
             return PeriodicBatchResult::Invalid;
         }
     }
 
-    if (nowUs >= batch.expiresAtUs) {
-        // 新世代がすでに期限切れでも、古い指令へ戻らないように世代を進める。
+    const auto stopping = hasStop();
+    if (stopping || nowUs >= batch.expiresAtUs) {
+        // 停止中や期限切れのフレームは保持しない。世代だけを進め、停止完了後に
+        // 呼出側が停止中の同じフレームを再登録しても復活しないようにする。
         periodic_ = {batch.generation, batch.expiresAtUs, {}};
-        return PeriodicBatchResult::Expired;
+        return stopping ? PeriodicBatchResult::StopPending : PeriodicBatchResult::Expired;
     }
     periodic_ = batch;
     return PeriodicBatchResult::Queued;
@@ -92,8 +110,7 @@ EventEnqueueResult CanTxScheduler::enqueueEvent(const EventTxRequest& request, s
     const auto token = request.token;
     // 終端の照合キーは同じバスの全送信経路で共有する。待機中も含めて重複を防ぐと、
     // 周期フレームと通常イベントのどちらの結果かを要求元が特定できる。
-    if (token.serial == 0 || !request.frame.validForTransmit() || isAccepted(token) ||
-        hasQueuedPeriodic(token) || hasQueuedEvent(token)) {
+    if (token.serial == 0 || !request.frame.validForTransmit() || isKnownToken(token)) {
         return EventEnqueueResult::Invalid;
     }
     if (nowUs >= request.expiresAtUs) {
@@ -110,8 +127,30 @@ EventEnqueueResult CanTxScheduler::enqueueEvent(const EventTxRequest& request, s
     return EventEnqueueResult::Queued;
 }
 
+StopEnqueueResult CanTxScheduler::enqueueStop(std::size_t target, const CanFrame& frame,
+                                               TxToken token) noexcept
+{
+    if (target >= stops_.size() || token.serial == 0u || !frame.validForTransmit() || isKnownToken(token)) {
+        return StopEnqueueResult::Invalid;
+    }
+    auto& stop = stops_[target];
+    // InFlightのキーを上書きすると、古い終端が新しい要求を解除したり、
+    // 対応先が分からなくなったりする。終端後の再試行だけが同じ枠を再登録できる。
+    if (stop.state == StopState::Pending || stop.state == StopState::InFlight) {
+        return StopEnqueueResult::TargetBusy;
+    }
+    stop = {frame, token, StopState::Pending};
+    // 受付済みの送信はaccepted_に残る。ここで取り消せるのはソフトウェアの待ちだけ。
+    // 周期フレームは停止完了後のモータ出力に使わないよう、世代を保持したまま取り除く。
+    periodic_.requests = {};
+    return StopEnqueueResult::Queued;
+}
+
 ScheduledTxProgress CanTxScheduler::service(std::uint64_t nowUs) noexcept
 {
+    if (hasStop()) {
+        return serviceStop(nowUs);
+    }
     if (eventCount_ == 0) {
         // 受付時点でFIFOの枠は返すため、FIFOが空でもメールボックスに通常イベントが残り得る。
         // 周期フレームを投入できるのは、その送信結果を回収して照合表を空けた後。
@@ -141,6 +180,25 @@ ScheduledTxProgress CanTxScheduler::service(std::uint64_t nowUs) noexcept
         popEvent();
     }
     return result;
+}
+
+ScheduledTxProgress CanTxScheduler::serviceStop(std::uint64_t nowUs) noexcept
+{
+    // 別の軸が終端待ち・再試行待ちでも、まだ受付されていない停止先を進められる。
+    // 空き枠は通常イベントの終端を待たず利用する。既にHWにあるフレームの順序は変えない。
+    const auto pending = std::find_if(stops_.begin(), stops_.end(),
+                                      [](const StopSlot& slot) { return slot.state == StopState::Pending; });
+    if (pending == stops_.end()) {
+        return {ScheduledTxResult::Busy, {}};
+    }
+    const auto progress = submitScheduled(pending->frame, {pending->token, nowUs});
+    if (progress.result == ScheduledTxResult::Accepted) {
+        pending->state = StopState::InFlight;
+    } else if (progress.result == ScheduledTxResult::Invalid) {
+        // 恒久的な受付拒否は要求元へ返す。他の停止先を進めつつ、当該対象は未完了に保つ。
+        pending->state = StopState::RetryRequired;
+    }
+    return progress;
 }
 
 void CanTxScheduler::popEvent() noexcept
@@ -221,7 +279,7 @@ ScheduledTxProgress CanTxScheduler::servicePeriodic(std::uint64_t nowUs) noexcep
     return progress;
 }
 
-bool CanTxScheduler::consumeTerminal(TxToken token, std::uint64_t atUs) noexcept
+bool CanTxScheduler::consumeTerminal(TxToken token, CanTxOutcome outcome, std::uint64_t atUs) noexcept
 {
     if (token.serial == 0u) {
         return false;
@@ -234,8 +292,20 @@ bool CanTxScheduler::consumeTerminal(TxToken token, std::uint64_t atUs) noexcept
         return false;
     }
 
-    // 送信失敗も終端として照合表を解放する。CanRouterは元のトークンと結果を通知し、
-    // 再送の要否は要求元が決める。ここでFIFOに戻すと後続操作の順序と期限が変わる。
+    // 停止の送信失敗もメールボックスの終端になるが、停止要求は残す。要求元が新しい
+    // キーで再試行する前に通常送信が再開すると、停止できなかった対象へ指令を出し得る。
+    const auto sameStop = [token](const StopSlot& slot) {
+        return slot.state == StopState::InFlight && slot.token == token;
+    };
+    const auto stop = std::find_if(stops_.begin(), stops_.end(), sameStop);
+    if (stop != stops_.end()) {
+        if (outcome == CanTxOutcome::Sent) {
+            *stop = {};
+        } else {
+            stop->state = StopState::RetryRequired;
+        }
+    }
+    // 配送前に枠を返す。CanRouterの通知を受けた要求元が、その場で再登録できる。
     *accepted = {};
     return true;
 }
