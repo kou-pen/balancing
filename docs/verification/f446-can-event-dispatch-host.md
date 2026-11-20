@@ -126,12 +126,12 @@ sequenceDiagram
 
 ## RS06停止・有効化を模擬CAN1へ接続
 
-`Rs06CanLink` は `MotorService::pendingRs06Requests()` と `CanTxScheduler` の間で、フレームとトークンを変換します。Type 3の有効化は現周期に `trySubmit()` で受付を試し、受付できなければ次周期に状態から候補を取り直します。通常FIFOに入れないため、DISARM前のType 3が停止後に残りません。すでに受付済みのType 3については、既存の軸状態が終端を待つ間に、他の軸のType 4を先に進めます。
+`MotorCanLink` は `MotorService::pendingRs06Requests()` と `CanTxScheduler` の間で、フレームとトークンを変換します。Type 3の有効化は現周期に `trySubmit()` で受付を試し、受付できなければ次周期に状態から候補を取り直します。通常FIFOに入れないため、DISARM前のType 3が停止後に残りません。すでに受付済みのType 3については、既存の軸状態が終端を待つ間に、他の軸のType 4を先に進めます。
 
 <pre class="mermaid">
 sequenceDiagram
     participant A as 制御周期
-    participant L as Rs06CanLink
+    participant L as MotorCanLink
     participant S as CanTxScheduler
     participant R as CanRouter
     participant M as MotorService
@@ -161,6 +161,32 @@ sequenceDiagram
 接続の検証基準はPR #41の `818e77b` と、このPRのソース差分です。ホストの通常・UBSanとCTest Debug 17/17、CTest ReleaseのCANイベント回収・送信調停が合格しました。CubeIDE 1.19.0のDebug／Releaseはともにエラー・警告0件で、両構成の22ソースとARM ELF32を確認しました。
 
 この接続の起動と制御周期はホスト試験のフィクスチャで構成しています。基板上でCAN1を起動するコードへの接続、CAN2モータ送信、実CAN・駆動試験は後続です。
+
+## 6軸のフィードバックを1周期分取得
+
+<pre class="mermaid">
+flowchart TB
+    LEG["CAN1：脚4軸のType 2・24"] --> ROUTER["CANイベント回収と分類"]
+    WHEEL["CAN2：左右車輪の0x201・0x202"] --> ROUTER
+    ROUTER --> LINK["MotorCanLink：採取時刻付きで配送"]
+    LINK --> AXES["MotorService：軸ごとの最新値を保持"]
+    AXES --> CYCLE["MotorFeedbackSnapshot：1周期時刻で全軸を評価"]
+</pre>
+
+主ループは両バスのイベントを回収してから `MotorService::feedback(nowUs)` を呼びます。RS06の角度・速度・トルク・温度と、C620のロータ角生値・RPM・電流生値・温度を既存のC11デコーダで復号します。左右と軸の順序はAPIで固定し、設定された主機ID・軸IDと一致するRS06報告のみ該当軸に保持します。
+
+スナップショットには周期の評価時刻と、各軸の受信時刻が入ります。未受信の軸は空で、期限が切れた軸は最終値と時刻を保持したまま `fresh == false` を返します。受信時刻からRS06では30 ms、C620では20 msで期限切れになります。RS06のARMと停止の確認に使うType 2の状態・時刻はType 24を受けても維持します。
+
+停止要求は登録時にフレームとトークンを検証します。停止枠からはメールボックスに受付できたときだけ軸へ進捗を返します。実際のCAN送信失敗では既存の終端経路で軸に結果を通知し、停止枠を再試行待ちにします。
+
+| 模擬CANで確認したケース | 結果 |
+| --- | --- |
+| 受信前と、両バスから6軸分を回収した周期 | 受信前は空。回収後は各軸に正しい値と受信時刻があり、評価時刻は1つ |
+| 別バスの報告、RS06の主機違い・予約モード、C620の対象外ID・範囲外ロータ角 | 既存値と鮮度を更新しない |
+| 期限の直前とちょうど、次周期にスナップショットを取得 | 直前は新鮮。ちょうどで期限切れ。取得済みの前周期コピーは変化しない |
+| ARMからDISARM、停止失敗・bus-offから復旧 | 既存のCAN1試験と停止再試行の回帰に合格 |
+
+ソース・テストの検証基準は `8eb9f42` からの差分です。 `python3 tools/run_host_tests.py` の通常とUBSan、CTest Debug 17/17、CTest ReleaseのCANイベント回収1/1が合格しました。CubeIDE 1.19.0のDebug／Releaseともにエラー・警告0件で、全AppソースのコンパイルとARM ELFを確認しました。仕様リンク・CubeIDE設定監査も合格しました。Doxygen 1.9.8でHTMLを生成し、新規・改名ファイルの一覧リンクと両ページのMermaidブロックを確認しました。実機CANでの受信、物理換算値の照合、実機駆動は未検証です。
 
 ## 確認した範囲
 
