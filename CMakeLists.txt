@@ -206,3 +206,17 @@ add_executable(balancing_f446_state_estimator_tests
 target_link_libraries(balancing_f446_state_estimator_tests PRIVATE balancing_core m)
 target_compile_options(balancing_f446_state_estimator_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_state_estimator_tests COMMAND balancing_f446_state_estimator_tests)
+
+# Controller math and SIL state transition through 500 Hz snapshots.
+# Test only: no CAN/HAL actuator output is linked into the executable.
+add_executable(balancing_f446_sil_control_cycle_tests
+    tests/test_f446_sil_control_cycle.cpp
+    ${F446_APP}/Src/balancing/control/controller/BalanceControl.cpp
+    ${F446_APP}/Src/balancing/control/estimator/StateEstimator.cpp
+    ${F446_APP}/Src/balancing/control/estimator/LegKinematics.cpp
+    ${F446_APP}/Src/balancing/control/estimator/WheelOdometry.cpp
+    ${BALANCING_RS06_SERVICE_SOURCES}
+)
+target_link_libraries(balancing_f446_sil_control_cycle_tests PRIVATE balancing_core m)
+target_compile_options(balancing_f446_sil_control_cycle_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME balancing_f446_sil_control_cycle_tests COMMAND balancing_f446_sil_control_cycle_tests)

@@ -428,6 +428,46 @@ for suffix, flags in [
     )
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
+
+# A host-only 500Hz SIL sequence; it compiles C++17 math but has no CAN actuator.
+for suffix, flags in [
+    ("", []),
+    ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"]),
+]:
+    path = OUT / f"test_f446_sil_control_cycle{suffix}"
+    sources = [
+        str(rs06_source / "control" / "controller" / "BalanceControl.cpp"),
+        str(rs06_source / "control" / "estimator" / "StateEstimator.cpp"),
+        str(rs06_source / "control" / "estimator" / "LegKinematics.cpp"),
+        str(rs06_source / "control" / "estimator" / "WheelOdometry.cpp"),
+        str(ROOT / "tests" / "test_f446_sil_control_cycle.cpp"),
+    ]
+    codec = OUT / f"motor_service_rs06_codec{suffix}.o"
+    c_math = OUT / f"estimator_c_math{suffix}.o"
+    c_attitude = OUT / f"estimator_c_attitude{suffix}.o"
+    c_ctrl = OUT / f"sil_control_core{suffix}.o"
+    c_pd = OUT / f"sil_leg_pd{suffix}.o"
+    c_yaw = OUT / f"sil_yaw_pi{suffix}.o"
+    for input_file, output_file in (
+        (rs06_source / "control" / "controller" / "balancing_core.c", c_ctrl),
+        (rs06_source / "control" / "controller" / "balancing_leg_pd.c", c_pd),
+        (rs06_source / "control" / "controller" / "balancing_yaw_pi.c", c_yaw),
+    ):
+        subprocess.run(
+            ["gcc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
+             "-I", str(F446_APP / "Inc"), "-c", str(input_file), *flags,
+             "-o", str(output_file)],
+            check=True, cwd=ROOT, timeout=30,
+        )
+    print(f"[test_f446_sil_control_cycle{suffix}] コンパイル", flush=True)
+    subprocess.run(
+        rs06_service_common + sources + flags +
+        [str(codec), str(c_math), str(c_attitude), str(c_ctrl),
+         str(c_pd), str(c_yaw), "-lm", "-o", str(path)],
+        check=True, cwd=ROOT, timeout=30,
+    )
+    subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
+
 print("[CubeIDE C++設定回帰試験] 実行", flush=True)
 subprocess.run(
     [
