@@ -327,3 +327,19 @@ flowchart LR
 </pre>
 
 脚はCAD未検証の数学fixtureのみであるため、ControlSnapshotの有無は実機の駆動許可を意味しません。古い姿勢・各軸時刻は500 Hzのコピー時刻で更新しません。
+
+## 固定脚長の500 Hz SIL制御経路（実機駆動なし）
+
+<pre class="mermaid">
+flowchart TB
+    OBS["IMU / CAN1脚4軸 / CAN2車輪2軸"] --> FIX["StateEstimator：1周期のControlSnapshot"]
+    FIX --> SEQ["RobotSequence：ARM/FAULTと駆動要求"]
+    FIX --> CTRL["BalanceControl：LQR・脚長Roll PD・VMC"]
+    SEQ -.->|"仮想BALANCING時のみ計算結果を採用"| CTRL
+    CTRL --> YAW["車輪倒立優先・Yaw PI残余配分"]
+    YAW --> MATH["fixtureOnly：関節4軸＋車輪2軸の数学トルク"]
+    FIX -->|"未成立"| FAULT["観測不成立 → SILの停止・FAULT"]
+    SEQ -->|"FAULT / DISARM"| FAULT
+</pre>
+
+このSILは `tests/support/SilControlCycle.hpp` に限る。実機Application/CAN送信には接続せず、数値fixtureから計算したトルクを実モータへ送らない。500 Hzは仮想時計の2 ms周期であり、MCU上の周期実測ではない。

@@ -98,3 +98,21 @@ C++オブジェクトの構築後、CubeMX／HALの周辺初期化が完了し�
 | 推定と指令 | 同じ周期の入力と実測の周期間隔を使用する。右脚の推定失敗などをその周期で反映し、旧6軸指令を再送しない。検証済み上限での通常飽和と変換失敗を区別する |
 | PC診断 | 重要・通常イベントのFIFO、最新ステータス、3フレームの部分送信・Tx完了をホストで確認する |
 | 実機 | ARMの通信遅延、期限設定、可動域・符号・トルク／電流上限、制御周期、物理非常停止を実測・照合する |
+
+## C++17 BalanceControlと500 HzのSIL経路（実機未接続）
+
+`BalanceControl` は旧C11の純粋な数学演算 `b_lqr_compute` → `b_leg_pd_compute` → `b_leg_virtual_to_joint_torque`、および `b_yaw_pi_step` と `b_wheel_allocate` を順序付きで呼ぶ。6状態は `ControlSnapshot` から作り、左右脚の仮想トルクはLQRの両脚合計を左右へ等分し、脚別PD支持力とヤコビアンで4関節軸トルクへ変換する。車輪倒立トルクを優先して残った容量だけをYaw PIへ渡す。**飽和診断にはYaw PIによる事前制限と最後の車輪配分の両方を含める。**
+
+公開 `BalanceReference` は位置基準 [m]、速度基準 [m/s]、Yaw角速度基準 [rad/s] を**上流が明示**する。位置目標の自動生成規則、操作者の変化率制限を先回りして実装しない。固定脚長目標は `initialize()` 時点の現在左右脚長から取得し、`reset()` でYaw積分と初期脚長目標を破棄する。未検証ゲイン・数値異常があれば `std::nullopt` を返し、古い指令を流用しない。
+
+`BalanceControlOutput` はモータ側指令ではなく**6軸の機構側の数学トルク**である。現在の `fixtureOnly` は常にtrueで、本番の `MotorCommand`、`MotorService`、`CanPort`、`Application::controlTick()` へは接続していない。
+
+`tests/support/SilControlCycle.hpp` はホスト専用の仮想500 Hz周期実行器で、次の順番を試す。
+
+1. 入力を1周期で固定し、`StateEstimator::update()` を呼ぶ。
+2. ARM直前の脚長参照と今周期の観測・周期異常を準備する。
+3. 既にBALANCING中なら制御の数学候補を計算し、数値演算失敗を状態機械へ同周期に報告する。
+4. `RobotSequence::update()` は**一周期に一回**。FAULT/DISARMなら数値候補を破棄し、非BALANCING時のYaw履歴をクリアする。
+5. BALANCINGを維持したときだけ `fixtureOnly` の計算候補をホスト試験へ返す。ハードウェアへの送信APIは存在しない。
+
+SIL内で4軸のARM応答・検証済みの機構/ゲインを模擬するためのtrueは、**機体や実CANが検証されたという意味ではない**。そのような値を実機のARM許可へ使わないこと。詳細は [SIL制御周期検証](../verification/f446-sil-control-cycle-host.md) に記録する。
