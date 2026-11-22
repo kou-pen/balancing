@@ -177,6 +177,7 @@
 | [f446-wheel-odometry-host.md](../verification/f446-wheel-odometry-host.md) | C620左右車輪の折返し・位置・速度換算と時刻のホスト試験 |
 | [f446-state-estimator-host.md](../verification/f446-state-estimator-host.md) | IMU姿勢・RS06 4軸・C620 2軸の同一周期数学スナップショット |
 | [f446-sil-control-cycle-host.md](../verification/f446-sil-control-cycle-host.md) | 倒立優先・脚VMCと500HzのSIL周期・故障注入をホスト検証 |
+| [f446-motor-command-host.md](../verification/f446-motor-command-host.md) | RS06トルク・C620電流の6軸変換、個別飽和、同周期FAULTの数値検証 |
 | [f446-source-layout.md](../verification/f446-source-layout.md) | 旧ソース配置の統合とCubeIDEビルド手順 |
 | [index.md](../verification/index.md) | 試験記録の案内、判定の意味、実機未検証の範囲 |
 | [issue10-observation-host.md](../verification/issue10-observation-host.md) | センサ、操作入力、IMUのホスト回帰 |
@@ -317,6 +318,7 @@
 |---|---|
 | <a href="balancing__core_8h_source.html">balancing_core.h</a> | 旧C11状態機械と倒立制御演算の型・API |
 | <a href="BalanceControl_8hpp_source.html">BalanceControl.hpp</a> | LQR・LegPD/RollPD・VMC・Yaw PIの数値合成API |
+| <a href="MotorCommand_8hpp_source.html">MotorCommand.hpp</a> | RS06・C620の6軸独立換算設定と数学プレビューAPI |
 | <a href="balancing__leg__pd_8h_source.html">balancing_leg_pd.h</a> | 脚長・Roll PDの入出力と設定 |
 | <a href="balancing__yaw__pi_8h_source.html">balancing_yaw_pi.h</a> | Yaw角速度PIの入出力と状態 |
 */
@@ -442,6 +444,7 @@
 |---|---|
 | <a href="balancing__core_8c_source.html">balancing_core.c</a> | 旧C11の運転モードや制御演算 |
 | <a href="BalanceControl_8cpp_source.html">BalanceControl.cpp</a> | C11数値演算の呼出順と機構側6軸トルクの計算 |
+| <a href="MotorCommand_8cpp_source.html">MotorCommand.cpp</a> | モータ軸トルク/電流換算、最終軸別飽和と原子的な不採用 |
 | <a href="balancing__leg__pd_8c_source.html">balancing_leg_pd.c</a> | 脚長とRollのPD演算、出力制限 |
 | <a href="balancing__yaw__pi_8c_source.html">balancing_yaw_pi.c</a> | Yaw角速度PI、積分飽和防止と車輪出力配分 |
 */

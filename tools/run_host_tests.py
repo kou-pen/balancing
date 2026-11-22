@@ -437,6 +437,7 @@ for suffix, flags in [
     path = OUT / f"test_f446_sil_control_cycle{suffix}"
     sources = [
         str(rs06_source / "control" / "controller" / "BalanceControl.cpp"),
+        str(rs06_source / "control" / "controller" / "MotorCommand.cpp"),
         str(rs06_source / "control" / "estimator" / "StateEstimator.cpp"),
         str(rs06_source / "control" / "estimator" / "LegKinematics.cpp"),
         str(rs06_source / "control" / "estimator" / "WheelOdometry.cpp"),
@@ -466,6 +467,22 @@ for suffix, flags in [
          str(c_pd), str(c_yaw), "-lm", "-o", str(path)],
         check=True, cwd=ROOT, timeout=30,
     )
+    subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
+
+
+# Mathematical MotorCommand preview only (cannot emit CAN/MotorTargets).
+for suffix, flags in [
+    ("", []),
+    ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"]),
+]:
+    path = OUT / f"test_f446_motor_command{suffix}"
+    sources = [
+        str(rs06_source / "control" / "controller" / "MotorCommand.cpp"),
+        str(ROOT / "tests" / "test_f446_motor_command.cpp"),
+    ]
+    print(f"[test_f446_motor_command{suffix}] コンパイル", flush=True)
+    subprocess.run(["g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic", "-I", str(F446_APP / "Inc")] + sources + flags +
+                   ["-o", str(path)], check=True, cwd=ROOT, timeout=30)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
 print("[CubeIDE C++設定回帰試験] 実行", flush=True)

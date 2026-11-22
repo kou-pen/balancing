@@ -2,6 +2,7 @@
 
 #include "balancing/app/RobotSequence.hpp"
 #include "balancing/control/controller/BalanceControl.hpp"
+#include "balancing/control/controller/MotorCommand.hpp"
 #include "balancing/control/estimator/StateEstimator.hpp"
 
 #include <chrono>
@@ -28,6 +29,7 @@ struct TickResult {
     std::optional<ControlSnapshot> estimate{};
     std::optional<StateEstimateError> estimateError{};
     std::optional<BalanceControlOutput> mathematicalTorques{};
+    std::optional<MotorCommandPreview> motorCommandPreview{};
     FaultFlags observedFaults{FaultFlags::None};
 };
 
@@ -39,8 +41,9 @@ struct TickResult {
 class SilControlCycle final {
 public:
     SilControlCycle(StateEstimator& estimator, RobotSequence& sequence,
-                    BalanceControl& control) noexcept
-        : estimator_{estimator}, sequence_{sequence}, control_{control} {}
+                    BalanceControl& control, MotorCommand& converter) noexcept
+        : estimator_{estimator}, sequence_{sequence}, control_{control},
+          converter_{converter} {}
 
     /** @brief 観測固定→推定→安全状態遷移→条件付き数学制御を1回実行する。
      *  @param[in] tick この周期でコピーされた入力と操作イベント。
@@ -97,6 +100,7 @@ public:
         const bool currentEstimate = outcome.estimate.has_value();
         sequenceInput.interlocks.imuReady &= currentEstimate;
         sequenceInput.interlocks.motorsReady &= currentEstimate;
+        sequenceInput.interlocks.driveLimitsVerified &= converter_.hasVerifiedConfiguration();
 
         const RobotState before = sequence_.state();
         if (before == RobotState::Disarmed && tick.operations.arm && currentEstimate) {
@@ -109,9 +113,19 @@ public:
         // 状態機械を更新する前に計算候補を作り、更新後に許可があれば返す。
         // それ以外ではYaw積分や制御出力を進めない。
         std::optional<BalanceControlOutput> candidate{};
+        std::optional<MotorCommandPreview> converted{};
         if (before == RobotState::Balancing && currentEstimate) {
             candidate = control_.compute(*outcome.estimate, tick.target);
-            if (!candidate) {
+            if (candidate) {
+                const auto preview = converter_.evaluate(*candidate);
+                if (preview.status == CommandStatus::Ready ||
+                    preview.status == CommandStatus::Saturated) {
+                    converted = preview;
+                }
+            }
+            // 変換器の未検証設定・不正入力も、送信前の同周期にFAULTとして扱う。
+            // ただし数学fixtureの成功は実機の駆動を許可しない。
+            if (!candidate || !converted) {
                 sequenceInput.observedFaults =
                     sequenceInput.observedFaults | FaultFlags::ExternalFault;
             }
@@ -122,6 +136,7 @@ public:
         if (outcome.sequence.desiredMotorState == DesiredMotorState::DriveAllowed) {
             // あくまで数学トルク。fixtureOnlyが偽になる変換器は存在しない。
             outcome.mathematicalTorques = candidate;
+            outcome.motorCommandPreview = converted;
         } else if (outcome.sequence.state == RobotState::Disarmed ||
                    outcome.sequence.state == RobotState::Fault) {
             control_.reset();
@@ -133,6 +148,7 @@ private:
     StateEstimator& estimator_;
     RobotSequence& sequence_;
     BalanceControl& control_;
+    MotorCommand& converter_;
     std::optional<std::uint64_t> previousUs_{};
 };
 
