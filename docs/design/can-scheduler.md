@@ -24,7 +24,7 @@ F446で実行する500 Hz制御ティックを基準に、CAN1のRS06×4へ250 H
 
 ### CAN1 3メールボックスで4台を扱う
 
-```mermaid
+<pre class="mermaid">
 sequenceDiagram
     participant T as 制御ティック
     participant S as C11 Scheduler
@@ -44,7 +44,7 @@ sequenceDiagram
     H-->>S: accepted(axis3, mailbox0)
     I->>S: completed(mailbox0)
     Note over S,H: 4 ms境界で未受付の古い要求は破棄
-```
+</pre>
 
 - **送信要求：** `b_sched_next()` は対象と世代を提示するだけ。HAL BUSYなら `b_sched_accepted()` を呼ばない。
 - **受付：** `b_sched_accepted()` は0〜2の実メールボックス占有を記録する。**完了時刻は更新しない**。
