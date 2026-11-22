@@ -436,6 +436,7 @@ for suffix, flags in [
 ]:
     path = OUT / f"test_f446_sil_control_cycle{suffix}"
     sources = [
+        str(rs06_source / "app" / "ControlCycle.cpp"),
         str(rs06_source / "control" / "controller" / "BalanceControl.cpp"),
         str(rs06_source / "control" / "controller" / "MotorCommand.cpp"),
         str(rs06_source / "control" / "estimator" / "StateEstimator.cpp"),
