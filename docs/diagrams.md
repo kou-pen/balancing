@@ -358,3 +358,20 @@ flowchart LR
 </pre>
 
 プレビュー結果の `fixtureOnly=true` は固定。CAN/HALへ送る端子はなく、`Application::controlTick()` と実モータの出力は依然として未接続。実機校正と安全審査後の別の実装判断が必要。
+
+## CAN1 Type1とCAN2共通0x200のSILフレーム計画
+
+<pre class="mermaid">
+flowchart TB
+    SEQ["RobotSequence：周期の駆動要求"] --> PLAN["MotorFramePlan：状態別符号化（SIL）"]
+    CMD["MotorCommand：6軸換算・最終制限"] --> PLAN
+    PLAN -->|"Balancing + DriveAllowed"| RS["CAN1 Type1 ×4（250Hzの対象）"]
+    PLAN -->|"Balancing + DriveAllowed"| C["CAN2 0x200 ×1（500Hzの対象）"]
+    PLAN -->|"DISARM/ARMING/FAULT"| Z["CAN2 0x200ゼロ電流のみ"]
+    SEQ --> STOP["MotorCanLink：Type4停止は専用枠で管理"]
+    STOP -.->|"停止優先"| SCH["CanTxScheduler：旧未受付の周期指令を破棄"]
+    RS -.->|"ホスト模擬に限る"| SCH
+    C -.->|"ホスト模擬に限る"| SCH
+</pre>
+
+MotorFramePlanは実機CANへ接続されていない。CANメッセージ形式の一致は機体安全性・トルク限界・実送信成功の証明ではない。
