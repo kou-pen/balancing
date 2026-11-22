@@ -211,6 +211,7 @@ add_test(NAME balancing_f446_state_estimator_tests COMMAND balancing_f446_state_
 # Test only: no CAN/HAL actuator output is linked into the executable.
 add_executable(balancing_f446_sil_control_cycle_tests
     tests/test_f446_sil_control_cycle.cpp
+    ${F446_APP}/Src/balancing/control/controller/MotorCommand.cpp
     ${F446_APP}/Src/balancing/control/controller/BalanceControl.cpp
     ${F446_APP}/Src/balancing/control/estimator/StateEstimator.cpp
     ${F446_APP}/Src/balancing/control/estimator/LegKinematics.cpp
@@ -220,3 +221,13 @@ add_executable(balancing_f446_sil_control_cycle_tests
 target_link_libraries(balancing_f446_sil_control_cycle_tests PRIVATE balancing_core m)
 target_compile_options(balancing_f446_sil_control_cycle_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_sil_control_cycle_tests COMMAND balancing_f446_sil_control_cycle_tests)
+
+# Six-axis SIL-only conversion from mechanism-side torque to RS06 Nm / C620 A.
+# Hardware readiness and CAN frame construction are intentionally absent.
+add_executable(balancing_f446_motor_command_tests
+    tests/test_f446_motor_command.cpp
+    ${F446_APP}/Src/balancing/control/controller/MotorCommand.cpp
+)
+target_include_directories(balancing_f446_motor_command_tests PRIVATE ${F446_APP}/Inc)
+target_compile_options(balancing_f446_motor_command_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME balancing_f446_motor_command_tests COMMAND balancing_f446_motor_command_tests)

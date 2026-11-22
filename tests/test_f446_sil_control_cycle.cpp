@@ -1,5 +1,6 @@
 #include "balancing/app/RobotSequence.hpp"
 #include "balancing/control/controller/BalanceControl.hpp"
+#include "balancing/control/controller/MotorCommand.hpp"
 #include "balancing/control/estimator/StateEstimator.hpp"
 #include "support/SilControlCycle.hpp"
 
@@ -41,6 +42,19 @@ BalanceControlConfig controlFixture()
     c.yawPi = {3.0f, 4.0f, 2.0f, true};
     c.wheelTorqueLimitNm = {5.0f, 5.0f};
     return c;
+}
+
+MotorCommandConfig motorFixture()
+{
+    // モータ/車輪の換算比と6軸上限はホスト内の人工値。実機定数ではない。
+    MotorCommandConfig config{};
+    for (auto& axis : config.rs06) {
+        axis = {1.5f, 1.0f, 4.0f, true};
+    }
+    for (auto& axis : config.c620) {
+        axis = {0.4f, 1.0f, 4.0f, true};
+    }
+    return config;
 }
 
 StateEstimatorInput observation(std::uint64_t atUs)
@@ -201,7 +215,8 @@ void testEndToEnd500HzSilRunner()
     StateEstimator estimator{estimatorFixture()};
     BalanceControl control{controlFixture()};
     RobotSequence sequence{{2000000, true}}; // 2sはSILだけの期限。実機値ではない。
-    sil::SilControlCycle cycle{estimator, sequence, control};
+    MotorCommand converter{motorFixture()};
+    sil::SilControlCycle cycle{estimator, sequence, control, converter};
     sil::TickInput tick{};
     tick.interlocks = simulatedInterlocks().interlocks;
     tick.operations.arm = true;
@@ -226,6 +241,14 @@ void testEndToEnd500HzSilRunner()
         assert(result.sequence.state == RobotState::Balancing);
         assert(result.estimate && result.estimate->elapsed == 2000us);
         assert(result.mathematicalTorques && result.mathematicalTorques->fixtureOnly);
+        // 実数学制御の値をモータ軸[Nm]・車輪電流[A]まで変換する。
+        // どれもfixtureOnly=trueで、CAN送信可能なフレームにはならない。
+        assert(result.motorCommandPreview && result.motorCommandPreview->fixtureOnly);
+        const auto command = *result.motorCommandPreview;
+        assert(command.status == CommandStatus::Ready ||
+               command.status == CommandStatus::Saturated);
+        assert(std::isfinite(command.rs06[0].limitedMotorTorqueNm));
+        assert(std::isfinite(command.c620[0].limitedCurrentA));
     }
 
     // 3周期分（6ms）の欠落でControlTimingをラッチし、その周期の数値出力を捨てる。
@@ -234,6 +257,7 @@ void testEndToEnd500HzSilRunner()
     assert(result.sequence.state == RobotState::Fault);
     assert(result.sequence.desiredMotorState == DesiredMotorState::StopAll);
     assert(!result.mathematicalTorques);
+    assert(!result.motorCommandPreview);
     assert(sequence.currentFault()->primaryCause == FaultFlags::ControlTiming);
 
     // 故障原因が解消しても自動復帰しない。
@@ -248,7 +272,8 @@ void testSilSensorFaultAndClockRegression()
     StateEstimator estimator{estimatorFixture()};
     BalanceControl control{controlFixture()};
     RobotSequence sequence{{2000000, true}};
-    sil::SilControlCycle cycle{estimator, sequence, control};
+    MotorCommand converter{motorFixture()};
+    sil::SilControlCycle cycle{estimator, sequence, control, converter};
     sil::TickInput tick{};
     tick.interlocks = simulatedInterlocks().interlocks;
     tick.operations.arm = true;
@@ -269,12 +294,14 @@ void testSilSensorFaultAndClockRegression()
     assert(result.sequence.state == RobotState::Fault);
     assert(!result.estimate && result.estimateError);
     assert(!result.mathematicalTorques);
+    assert(!result.motorCommandPreview);
     assert(sequence.currentFault()->primaryCause == FaultFlags::InterlockLost);
 
     StateEstimator secondEstimator{estimatorFixture()};
     BalanceControl secondControl{controlFixture()};
     RobotSequence secondSequence{{2000000, true}};
-    sil::SilControlCycle second{secondEstimator, secondSequence, secondControl};
+    MotorCommand secondConverter{motorFixture()};
+    sil::SilControlCycle second{secondEstimator, secondSequence, secondControl, secondConverter};
     tick = {};
     tick.interlocks = simulatedInterlocks().interlocks;
     tick.observations = observation(4000);
@@ -286,6 +313,58 @@ void testSilSensorFaultAndClockRegression()
     assert(secondSequence.currentFault()->primaryCause == FaultFlags::ClockRegression);
 }
 
+void testMotorConversionFailureTriggersSameCycleFault()
+{
+    // 係数自体は有限だが変換先floatの範囲を超える人工値を注入する。
+    // 数学ControlOutputが成功しても、この周期の機構指令候補は捨てる。
+    auto conversion = motorFixture();
+    conversion.c620[0].wheelTorqueNmPerAmp =
+        std::numeric_limits<float>::denorm_min();
+    MotorCommand converter{conversion};
+    assert(converter.hasVerifiedConfiguration());
+    StateEstimator estimator{estimatorFixture()};
+    BalanceControl balance{controlFixture()};
+    RobotSequence sequence{{2000000, true}};
+    sil::SilControlCycle cycle{estimator, sequence, balance, converter};
+    sil::TickInput tick{};
+    tick.interlocks = simulatedInterlocks().interlocks;
+    tick.operations.arm = true;
+    tick.observations = observation(2000);
+    auto result = cycle.step(tick);
+    assert(result.sequence.state == RobotState::Arming);
+    tick.operations.arm = false;
+    tick.armFeedback.session = result.sequence.armSession;
+    tick.armFeedback.axes.fill(Rs06ArmStatus::Confirmed);
+    tick.observations = observation(4000);
+    result = cycle.step(tick);
+    assert(result.sequence.state == RobotState::Balancing);
+    tick.observations = observation(6000);
+    result = cycle.step(tick);
+    assert(result.sequence.state == RobotState::Fault);
+    assert(result.sequence.desiredMotorState == DesiredMotorState::StopAll);
+    assert(!result.mathematicalTorques && !result.motorCommandPreview);
+    assert(sequence.currentFault()->primaryCause == FaultFlags::ExternalFault);
+}
+
+void testUnverifiedMotorConfigPreventsArm()
+{
+    auto conversion = motorFixture();
+    conversion.c620[1].verified = false;
+    MotorCommand converter{conversion};
+    StateEstimator estimator{estimatorFixture()};
+    BalanceControl balance{controlFixture()};
+    RobotSequence sequence{{2000000, true}};
+    sil::SilControlCycle cycle{estimator, sequence, balance, converter};
+    sil::TickInput tick{};
+    tick.interlocks = simulatedInterlocks().interlocks;
+    tick.operations.arm = true;
+    tick.observations = observation(2000);
+    const auto result = cycle.step(tick);
+    assert(result.sequence.state == RobotState::Disarmed);
+    assert(result.sequence.desiredMotorState == DesiredMotorState::StopAll);
+    assert(!result.motorCommandPreview);
+}
+
 } // namespace
 
 int main()
@@ -295,5 +374,7 @@ int main()
     testEstimatorFailurePreventsControl();
     testEndToEnd500HzSilRunner();
     testSilSensorFaultAndClockRegression();
+    testMotorConversionFailureTriggersSameCycleFault();
+    testUnverifiedMotorConfigPreventsArm();
     std::puts("PASS: SIL 500 Hz estimator→sequence→math-only control, failure/stop");
 }
