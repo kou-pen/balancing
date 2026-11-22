@@ -309,3 +309,21 @@ flowchart TB
 </pre>
 
 位置の積算は一つのC620受信につき一度だけです。20 msの鮮度判定は `MotorService` に残し、旧C11と新C++17の期限境界差分は [ホスト検証記録](verification/f446-wheel-odometry-host.md) に明記します。実CAN2と実機駆動は未検証です。
+
+## IMUと6軸の同一周期StateEstimator
+
+<pre class="mermaid">
+flowchart LR
+    IMU["BNO055姿勢フィルタ：新規IMU時刻"] --> EST["StateEstimator：同一周期で評価"]
+    CAN1["CAN1 RS06：脚4軸・個別受信時刻"] --> M["MotorService：6軸コピー"]
+    CAN2["CAN2 C620：左右車輪・個別受信時刻"] --> M
+    M --> LEG["LegKinematics：左右脚・解析J"]
+    M --> WHEEL["WheelOdometry：左右位置・速度"]
+    LEG --> EST
+    WHEEL --> EST
+    EST --> OUT{"全入力が成立したか"}
+    OUT -->|Yes| SNAP["ControlSnapshot：Body Chassis Leg Wheel"]
+    OUT -->|No| ERR["StateEstimateError：制御入力不成立"]
+</pre>
+
+脚はCAD未検証の数学fixtureのみであるため、ControlSnapshotの有無は実機の駆動許可を意味しません。古い姿勢・各軸時刻は500 Hzのコピー時刻で更新しません。
