@@ -343,3 +343,18 @@ flowchart TB
 </pre>
 
 このSILは `tests/support/SilControlCycle.hpp` に限る。実機Application/CAN送信には接続せず、数値fixtureから計算したトルクを実モータへ送らない。500 Hzは仮想時計の2 ms周期であり、MCU上の周期実測ではない。
+
+## 6軸MotorCommandの換算プレビュー（SILのみ）
+
+<pre class="mermaid">
+flowchart LR
+    S["StateEstimator：状態と時刻"] --> B["BalanceControl：LQR / VMC / Yaw PI"]
+    B --> M["MotorCommand：起動時固定の軸別設定"]
+    M --> RS["RS06 4軸：機構Nm → モータNm"]
+    M --> C["C620 2軸：車輪Nm → 電流A"]
+    RS --> P["MotorCommandPreview：軸別要求・適用値・飽和"]
+    C --> P
+    M -->|"未検証・変換失敗"| F["数学値の棄却→SIL同周期FAULT"]
+</pre>
+
+プレビュー結果の `fixtureOnly=true` は固定。CAN/HALへ送る端子はなく、`Application::controlTick()` と実モータの出力は依然として未接続。実機校正と安全審査後の別の実装判断が必要。

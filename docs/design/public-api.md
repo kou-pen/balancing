@@ -116,3 +116,15 @@ C++オブジェクトの構築後、CubeMX／HALの周辺初期化が完了し�
 5. BALANCINGを維持したときだけ `fixtureOnly` の計算候補をホスト試験へ返す。ハードウェアへの送信APIは存在しない。
 
 SIL内で4軸のARM応答・検証済みの機構/ゲインを模擬するためのtrueは、**機体や実CANが検証されたという意味ではない**。そのような値を実機のARM許可へ使わないこと。詳細は [SIL制御周期検証](../verification/f446-sil-control-cycle-host.md) に記録する。
+
+## MotorCommandのC++17換算とSILだけの最終制限
+
+`MotorCommand::evaluate(BalanceControlOutput)` はRS06の機構軸トルク4軸[N·m]からモータ軸トルク[N·m]、C620の車輪トルク2軸[N·m]から電流[A]へ換算する。変換と最終制限は、このクラスが一度だけ担当する。起動時固定の `MotorCommandConfig` には、4軸それぞれの `Rs06TorqueConversion`（モータ/機構軸の回転比、符号、モータ側Nm上限、検証状態）と、2軸それぞれの `C620CurrentConversion`（車輪Nm/Aの実効係数、電流符号、A上限、検証状態）を保持する。機構側の計算に用いたヤコビアンと、モータ側の減速・効率の換算は別の責務であり、減速比を二重適用しない。
+
+`CommandStatus` は `Ready` / `Saturated` / `UnverifiedConfiguration` / `InvalidInput` / `ConversionFailed`。通常の上限超過は軸別に制限して要求値・制限値・飽和の情報を返し、飽和だけでFAULTとしない。未検証の設定、符号不明、非有限値、floatの表現範囲外は全軸を原子的に不採用とし、部分的な非ゼロ値を返さない。上流の `BalanceControlOutput.wheelSaturated` を `upstreamWheelSaturated` に分けて保存するため、最終軸飽和との混同を避ける。
+
+**現在はSILプレビュー専用。** `BalanceControlOutput.fixtureOnly` がtrueである数学結果しか取り込まず、返す `MotorCommandPreview.fixtureOnly` も常にtrue。`MotorTargets` やCANフレームへの変換API、MotorServiceへの実際の非ゼロ指令経路は実装していない。テスト用の `verified=true` やCANプロトコル表現範囲（RS06 ±36Nm、C620 ±20A）は実機安全限界の検証を意味しない。
+
+テスト専用 `SilControlCycle` は `MotorCommand::hasVerifiedConfiguration()` がfalseならARMを拒否する。BALANCING中の非有限値や換算失敗は同周期に `RobotSequence` へ `ExternalFault` を伝え、コマンド候補を一切公開しない。成功時でも数学値としてのみ利用する。
+
+[MotorCommand 6軸換算のホスト検証](../verification/f446-motor-command-host.md)
