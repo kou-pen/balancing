@@ -374,6 +374,23 @@ for test, extra_sources in [
                        check=True, cwd=ROOT, timeout=30)
         subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
+
+# C++17 wheel odometry: C11 C620 decode -> MotorService -> wheel positions.
+# Link the same C11 codec object as the RS06 host test rather than compiling C as C++.
+for suffix, flags in [
+    ("", []),
+    ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"]),
+]:
+    path = OUT / f"test_f446_wheel_odometry{suffix}"
+    source = ROOT / "tests" / "test_f446_wheel_odometry.cpp"
+    wheel_source = rs06_source / "control" / "estimator" / "WheelOdometry.cpp"
+    codec = OUT / f"motor_service_rs06_codec{suffix}.o"
+    print(f"[test_f446_wheel_odometry{suffix}] コンパイル", flush=True)
+    subprocess.run(rs06_service_common + [str(wheel_source)] + flags +
+                   [str(source), str(codec), "-lm", "-o", str(path)],
+                   check=True, cwd=ROOT, timeout=30)
+    subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
+
 print("[CubeIDE C++設定回帰試験] 実行", flush=True)
 subprocess.run(
     [

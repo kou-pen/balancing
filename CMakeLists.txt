@@ -182,3 +182,14 @@ target_include_directories(balancing_f446_can_event_poll_tests PRIVATE
 target_link_libraries(balancing_f446_can_event_poll_tests PRIVATE balancing_core m)
 target_compile_options(balancing_f446_can_event_poll_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_can_event_poll_tests COMMAND balancing_f446_can_event_poll_tests)
+
+# C11 C620 decoder -> MotorService snapshot -> C++17 wheel displacement/velocity.
+# Mathematical fixture only; it does not authorize the real motor outputs.
+add_executable(balancing_f446_wheel_odometry_tests
+    tests/test_f446_wheel_odometry.cpp
+    ${F446_APP}/Src/balancing/control/estimator/WheelOdometry.cpp
+    ${BALANCING_RS06_SERVICE_SOURCES}
+)
+target_link_libraries(balancing_f446_wheel_odometry_tests PRIVATE balancing_core m)
+target_compile_options(balancing_f446_wheel_odometry_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME balancing_f446_wheel_odometry_tests COMMAND balancing_f446_wheel_odometry_tests)
