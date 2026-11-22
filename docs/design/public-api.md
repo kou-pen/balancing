@@ -128,3 +128,11 @@ SIL内で4軸のARM応答・検証済みの機構/ゲインを模擬するため
 テスト専用 `SilControlCycle` は `MotorCommand::hasVerifiedConfiguration()` がfalseならARMを拒否する。BALANCING中の非有限値や換算失敗は同周期に `RobotSequence` へ `ExternalFault` を伝え、コマンド候補を一切公開しない。成功時でも数学値としてのみ利用する。
 
 [MotorCommand 6軸換算のホスト検証](../verification/f446-motor-command-host.md)
+
+## C++17の6軸CANフレーム計画（SILのみ）
+
+`MotorFramePlan::compose()` は、`MotorCommandPreview` と `RobotSequenceResult` を受け、既存C11コーデックによりRS06 Type 1を4軸分、C620共通 `0x200` を1件符号化する。通常駆動時以外はRS06 Type 1を生成せず、C620ゼロ電流フレームだけを生成する。RS06 Type 4停止とType 3有効化は既存 `MotorCanLink` が一元管理し、停止キューを二重化しない。
+
+この処理の生成物は常に `fixtureOnly=true` の数学プレビューであり、F446の実機起動経路にもCAN送信関数にも接続しない。RS06 250Hz/C620 500Hzの周期・送信期限・停止優先は既存 `CanTxScheduler` が所有するため、符号化側で再実装しない。実機のメールボックスに既に受付済みのトルク指令はソフトウェアから取り消せないので、停止の遅延については実機で別途検証する。
+
+[CANフレーム計画・2バス停止優先のホスト検証](../verification/f446-motor-frame-plan-host.md)

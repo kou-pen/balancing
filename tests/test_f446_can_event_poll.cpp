@@ -4,10 +4,13 @@
 #include "balancing/communication/can/CanPort.hpp"
 #include "balancing/communication/can/CanRouter.hpp"
 #include "balancing/communication/can/CanTxScheduler.hpp"
+#include "balancing/communication/can/MotorFramePlan.hpp"
+#include "balancing/control/controller/MotorCommand.hpp"
 
 #ifdef NDEBUG
 #undef NDEBUG
 #endif
+#include <algorithm>
 #include <cassert>
 #include <cstdio>
 
@@ -1020,6 +1023,93 @@ void testMotorCanLinkCan1BusOffRecoveryAndRxLoss()
     assert(f.motors.takeObservedFaults(6) == FaultFlags::None);
 }
 
+
+void testMotorFramePlanCan1Can2StopPriority()
+{
+    // 6軸の数値fixtureを既存コーデックで実フレーム形式に変換し、
+    // 同じスケジューラへ投入する。HALはスタブで実CAN送信は行わない。
+    MotorCommandConfig calibration{};
+    for (auto& axis : calibration.rs06) {
+        axis = {2.0f, 1.0f, 3.0f, true};
+    }
+    for (auto& axis : calibration.c620) {
+        axis = {0.4f, 1.0f, 3.0f, true};
+    }
+    MotorCommand motor{calibration};
+    BalanceControlOutput torques{};
+    torques.jointTorqueNm = {2.0f, 2.0f, 2.0f, 2.0f};
+    torques.wheelTorqueNm = {0.4f, -0.4f};
+    MotorFramePlan planner{{11, 12, 13, 14}};
+    const auto converted = motor.evaluate(torques);
+    const RobotSequenceResult driving{RobotState::Balancing, DesiredMotorState::DriveAllowed, 3};
+    const auto planned = planner.compose(driving, converted);
+    assert(planned.status == MotorFramePreview::Status::Ready);
+
+    auto frame = [](const BMotorCanFrame& c) {
+        CanFrame copy{c.id, {}, c.dlc, c.extended};
+        std::copy_n(c.data, copy.data.size(), copy.data.begin());
+        return copy;
+    };
+
+    Fixture can1, can2;
+    Recorder sink;
+    CanTxScheduler tx1{can1.port}, tx2{can2.port};
+    CanRouter router{sink, &tx1, &tx2};
+    PeriodicTxBatch rsRequests{};
+    rsRequests.generation = 1;
+    rsRequests.expiresAtUs = 2000;
+    for (std::size_t axis = 0; axis < 4; ++axis) {
+        rsRequests.requests[axis] =
+            PeriodicTxRequest{frame(planned.can1Type1[axis]), {axis + 1u, 77}};
+    }
+    PeriodicTxBatch c620Requests{};
+    c620Requests.generation = 1;
+    c620Requests.expiresAtUs = 2000;
+    c620Requests.requests[0] = PeriodicTxRequest{frame(planned.can2Current), {1, 88}};
+    assert(tx1.replacePeriodic(rsRequests, 1000) == PeriodicBatchResult::Queued);
+    assert(tx2.replacePeriodic(c620Requests, 1000) == PeriodicBatchResult::Queued);
+    assert(tx1.service(1000).result == ScheduledTxResult::Accepted);
+    assert((can1.registers.sTxMailBox[0].TIR & CAN_TI0R_IDE) != 0);
+    can1.occupy(0);
+    assert(tx2.service(1000).result == ScheduledTxResult::Accepted);
+    assert((can2.registers.sTxMailBox[0].TIR & CAN_TI0R_IDE) == 0);
+    assert(can2.registers.sTxMailBox[0].TDHR == 0); // 未搭載ID3/4=ゼロ
+    can2.occupy(0);
+
+    // 今周期の停止要求が入ったら未受付の残り3軸は消え、
+    // Type4が次の空き枠で通常Type1より先に受付される。
+    BMotorCanFrame stop{};
+    assert(b_rs06_control_frame(11, 0x5a, false, &stop));
+    assert(tx1.enqueueStop(0, frame(stop), {20, 99}) == StopEnqueueResult::Queued);
+    const auto acceptedStop = tx1.service(1001);
+    assert(acceptedStop.result == ScheduledTxResult::Accepted);
+    assert(((can1.registers.sTxMailBox[1].TIR >> 27u) & 0x1fu) == 4u);
+    can1.occupy(1);
+
+    can1.complete(0, CAN_TSR_TXOK0, 1002);
+    pollCanEvents(&can1.port, &can2.port, router);
+    assert(tx1.service(1002).result == ScheduledTxResult::Busy);
+    can1.complete(1, CAN_TSR_TXOK0, 1003);
+    pollCanEvents(&can1.port, &can2.port, router);
+    assert(tx1.service(1004).result == ScheduledTxResult::Idle);
+    // 停止枠が解放されても旧世代の残りType1は復活しない。
+    assert((can1.registers.sTxMailBox[2].TIR & CAN_TI0R_TXRQ) == 0);
+
+    // CAN2も次世代のゼロ電流へ切り替え、前世代の非ゼロを再投入しない。
+    const auto disarmed = planner.compose(
+        {RobotState::Fault, DesiredMotorState::StopAll, 3}, converted);
+    assert(disarmed.status == MotorFramePreview::Status::ZeroCurrentOnly);
+    c620Requests.generation = 2;
+    c620Requests.expiresAtUs = 3000;
+    c620Requests.requests[0] = PeriodicTxRequest{frame(disarmed.can2Current), {2, 88}};
+    assert(tx2.replacePeriodic(c620Requests, 1004) == PeriodicBatchResult::Queued);
+    can2.complete(0, CAN_TSR_TXOK0, 1005);
+    pollCanEvents(&can1.port, &can2.port, router);
+    assert(tx2.service(1006).result == ScheduledTxResult::Accepted);
+    assert(can2.registers.sTxMailBox[0].TDLR == 0u);
+    assert(can2.registers.sTxMailBox[0].TDHR == 0u);
+}
+
 } // namespace
 
 int main()
@@ -1045,5 +1135,6 @@ int main()
     testMotorCanLinkDisarmDropsUnacceptedEnableAndWaitsForSameAxis();
     testMotorCanLinkRetryAndFeedbackIgnoreForeignEvents();
     testMotorCanLinkCan1BusOffRecoveryAndRxLoss();
+    testMotorFramePlanCan1Can2StopPriority();
     std::puts("PASS: F446 CAN dispatch, TX scheduling, six-axis feedback and RS06 arm/stop");
 }

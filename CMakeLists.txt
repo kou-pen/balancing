@@ -170,6 +170,8 @@ add_test(NAME balancing_f446_can1_runtime_tests COMMAND balancing_f446_can1_runt
 # A shared main-loop poll with separate bxCAN IRQ sources.
 add_executable(balancing_f446_can_event_poll_tests
     tests/test_f446_can_event_poll.cpp
+    ${F446_APP}/Src/balancing/communication/can/MotorFramePlan.cpp
+    ${F446_APP}/Src/balancing/control/controller/MotorCommand.cpp
     ${BALANCING_CAN_DISPATCH_SOURCES}
     ${BALANCING_RS06_SERVICE_SOURCES}
     ${F446_APP}/Src/balancing/app/MotorCanLink.cpp
@@ -231,3 +233,14 @@ add_executable(balancing_f446_motor_command_tests
 target_include_directories(balancing_f446_motor_command_tests PRIVATE ${F446_APP}/Inc)
 target_compile_options(balancing_f446_motor_command_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_motor_command_tests COMMAND balancing_f446_motor_command_tests)
+
+# Reuse the C11 RS06/C620 codecs to build a five-frame output plan without
+# connecting any of the resulting byte arrays to the F446 runtime.
+add_executable(balancing_f446_motor_frame_plan_tests
+    tests/test_f446_motor_frame_plan.cpp
+    ${F446_APP}/Src/balancing/communication/can/MotorFramePlan.cpp
+    ${F446_APP}/Src/balancing/control/controller/MotorCommand.cpp
+)
+target_link_libraries(balancing_f446_motor_frame_plan_tests PRIVATE balancing_core m)
+target_compile_options(balancing_f446_motor_frame_plan_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME balancing_f446_motor_frame_plan_tests COMMAND balancing_f446_motor_frame_plan_tests)

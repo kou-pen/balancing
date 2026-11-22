@@ -178,6 +178,7 @@
 | [f446-state-estimator-host.md](../verification/f446-state-estimator-host.md) | IMU姿勢・RS06 4軸・C620 2軸の同一周期数学スナップショット |
 | [f446-sil-control-cycle-host.md](../verification/f446-sil-control-cycle-host.md) | 倒立優先・脚VMCと500HzのSIL周期・故障注入をホスト検証 |
 | [f446-motor-command-host.md](../verification/f446-motor-command-host.md) | RS06トルク・C620電流の6軸変換、個別飽和、同周期FAULTの数値検証 |
+| [f446-motor-frame-plan-host.md](../verification/f446-motor-frame-plan-host.md) | 6軸CAN符号化、停止優先・周期世代の模擬2バス検証 |
 | [f446-source-layout.md](../verification/f446-source-layout.md) | 旧ソース配置の統合とCubeIDEビルド手順 |
 | [index.md](../verification/index.md) | 試験記録の案内、判定の意味、実機未検証の範囲 |
 | [issue10-observation-host.md](../verification/issue10-observation-host.md) | センサ、操作入力、IMUのホスト回帰 |
@@ -296,6 +297,7 @@
 | <a href="CanPort_8hpp_source.html">CanPort.hpp</a> | 1バスの送受信、IRQ、メールボックスを扱うAPI |
 | <a href="CanRouter_8hpp_source.html">CanRouter.hpp</a> | CANイベントの発生元バス・種別を使う配送API |
 | <a href="CanTxScheduler_8hpp_source.html">CanTxScheduler.hpp</a> | 対象別の停止要求、通常FIFO、周期送信、受付と終端の照合API |
+| <a href="MotorFramePlan_8hpp_source.html">MotorFramePlan.hpp</a> | SIL専用Type1×4＋C620共通0x200の符号化計画 |
 | <a href="CanTypes_8hpp_source.html">CanTypes.hpp</a> | フレーム、トークン、送信結果、IRQイベントの共通型 |
 */
 
@@ -423,6 +425,7 @@
 | <a href="CanPort_8cpp_source.html">CanPort.cpp</a> | bxCANレジスタ操作、送受信、IRQイベント回収 |
 | <a href="CanRouter_8cpp_source.html">CanRouter.cpp</a> | 受信、送信終端、バス状態を上位へ振り分ける処理 |
 | <a href="CanTxScheduler_8cpp_source.html">CanTxScheduler.cpp</a> | 停止送信の優先順位と再試行、通常FIFO、周期指令の期限と終端照合 |
+| <a href="MotorFramePlan_8cpp_source.html">MotorFramePlan.cpp</a> | 状態別の通常トルク抑止とC11コーデックによる5フレーム生成 |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Src_balancing_control control/

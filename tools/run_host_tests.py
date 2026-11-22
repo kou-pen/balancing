@@ -357,7 +357,7 @@ can_dispatch_common = [
 ]
 for test, extra_sources in [
     ("test_f446_can1_runtime", [str(rs06_source / "device" / "f446_can1_runtime.cpp")]),
-    ("test_f446_can_event_poll", rs06_service_sources + [str(rs06_source / "app" / "MotorCanLink.cpp")]),
+    ("test_f446_can_event_poll", rs06_service_sources + [str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "communication" / "can" / "MotorFramePlan.cpp"), str(rs06_source / "control" / "controller" / "MotorCommand.cpp")]),
 ]:
     for suffix, flags in [
         ("", []),
@@ -483,6 +483,27 @@ for suffix, flags in [
     print(f"[test_f446_motor_command{suffix}] コンパイル", flush=True)
     subprocess.run(["g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic", "-I", str(F446_APP / "Inc")] + sources + flags +
                    ["-o", str(path)], check=True, cwd=ROOT, timeout=30)
+    subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
+
+
+# SIL-only CAN frame plan. The actual STM32 CAN send path is intentionally absent.
+for suffix, flags in [
+    ("", []),
+    ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"]),
+]:
+    path = OUT / f"test_f446_motor_frame_plan{suffix}"
+    sources = [
+        str(rs06_source / "communication" / "can" / "MotorFramePlan.cpp"),
+        str(rs06_source / "control" / "controller" / "MotorCommand.cpp"),
+        str(ROOT / "tests" / "test_f446_motor_frame_plan.cpp"),
+    ]
+    codec = OUT / f"motor_service_rs06_codec{suffix}.o"
+    print(f"[test_f446_motor_frame_plan{suffix}] コンパイル", flush=True)
+    subprocess.run(
+        ["g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
+         "-I", str(F446_APP / "Inc")] + sources + flags +
+        [str(codec), "-lm", "-o", str(path)], check=True, cwd=ROOT, timeout=30,
+    )
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
 print("[CubeIDE C++設定回帰試験] 実行", flush=True)
