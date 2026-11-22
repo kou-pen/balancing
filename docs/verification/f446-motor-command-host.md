@@ -1,3 +1,5 @@
+> **現在の配置:** この文書は当時のSIL試験記録です。周期実行器は後続の `ControlCycle` 本体へ移りました。[移行後の検証](f446-control-cycle-core-host.md) を参照してください。
+
 # F446 MotorCommand 6軸変換・飽和のSIL検証
 
 **仕様ID:** CTRL-LQR-001 / PROTO-RS06-001 / PROTO-C620-001  

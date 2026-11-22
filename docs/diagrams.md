@@ -342,7 +342,7 @@ flowchart TB
     SEQ -->|"FAULT / DISARM"| FAULT
 </pre>
 
-このSILは `tests/support/SilControlCycle.hpp` に限る。実機Application/CAN送信には接続せず、数値fixtureから計算したトルクを実モータへ送らない。500 Hzは仮想時計の2 ms周期であり、MCU上の周期実測ではない。
+この経路は `App/ControlCycle` に本体化し、実測時刻を外部入力とする。実機Application/CAN送信には接続せず、数値fixtureから計算したトルクを実モータへ送らない。500 Hzは仮想時計の2 ms周期であり、MCU上の周期実測ではない。
 
 ## 6軸MotorCommandの換算プレビュー（SILのみ）
 
@@ -375,3 +375,20 @@ flowchart TB
 </pre>
 
 MotorFramePlanは実機CANへ接続されていない。CANメッセージ形式の一致は機体安全性・トルク限界・実送信成功の証明ではない。
+
+## ControlCycle本体の処理順と実機未接続の境界
+
+<pre class="mermaid">
+flowchart TB
+    CLOCK["上位の実測単調時刻・経過時間"] --> INPUT["ControlTickInput：IMUとCAN6軸の固定観測"]
+    INPUT --> EST["StateEstimator：現在周期の成立/欠損"]
+    EST --> SEQ["RobotSequence：ARM/FAULTを1回決定"]
+    EST --> CTRL["BalanceControl：成立時のみ数学トルク"]
+    CTRL --> CMD["MotorCommand：最終軸別数学換算"]
+    SEQ -->|"StopAll"| STOP["トルク候補破棄、Yaw履歴reset"]
+    CMD --> PREVIEW["ControlTickResult：fixtureOnlyプレビュー"]
+    SEQ -.->|"DriveAllowedの場合のみ"| PREVIEW
+    PREVIEW -.-> LIMIT["Application::controlTickは現時点で未接続"]
+</pre>
+
+Core/Driversの生成部分や実CAN送信は変更しない。SILで運転可能な人工値は実機の校正/物理安全許可に昇格しない。

@@ -1,3 +1,5 @@
+> **現在の配置:** この文書は当時のSIL試験記録です。周期実行器は後続の `ControlCycle` 本体へ移りました。[移行後の検証](f446-control-cycle-core-host.md) を参照してください。
+
 # F446 C++17 BalanceControl・500 Hz SIL周期結合の検証
 
 **対象:** CTRL-LQR-001、CTRL-EST-001、BEHAV-001、Issue #9/#10/#11/#27。  

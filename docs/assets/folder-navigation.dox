@@ -179,6 +179,7 @@
 | [f446-sil-control-cycle-host.md](../verification/f446-sil-control-cycle-host.md) | 倒立優先・脚VMCと500HzのSIL周期・故障注入をホスト検証 |
 | [f446-motor-command-host.md](../verification/f446-motor-command-host.md) | RS06トルク・C620電流の6軸変換、個別飽和、同周期FAULTの数値検証 |
 | [f446-motor-frame-plan-host.md](../verification/f446-motor-frame-plan-host.md) | 6軸CAN符号化、停止優先・周期世代の模擬2バス検証 |
+| [f446-control-cycle-core-host.md](../verification/f446-control-cycle-core-host.md) | ControlCycleをテスト専用から本体Appに移し、初回時刻・停止・故障処理を検証 |
 | [f446-source-layout.md](../verification/f446-source-layout.md) | 旧ソース配置の統合とCubeIDEビルド手順 |
 | [index.md](../verification/index.md) | 試験記録の案内、判定の意味、実機未検証の範囲 |
 | [issue10-observation-host.md](../verification/issue10-observation-host.md) | センサ、操作入力、IMUのホスト回帰 |
@@ -269,6 +270,7 @@
 | フォルダ・ファイル | 内容 |
 |---|---|
 | <a href="CanEventPoll_8hpp_source.html">CanEventPoll.hpp</a> | CAN1・CAN2からイベントを回収するAPI |
+| <a href="ControlCycle_8hpp_source.html">ControlCycle.hpp</a> | 時刻付き観測・状態機械・数学制御を1周期で処理する契約 |
 | <a href="MotorService_8hpp_source.html">MotorService.hpp</a> | RS06のARM・停止と、脚・車輪6軸の周期観測をまとめるAPI |
 | <a href="MotorCanLink_8hpp_source.html">MotorCanLink.hpp</a> | CAN1・CAN2の機器報告の配送、RS06の送信・終端接続 |
 | <a href="RobotSequence_8hpp_source.html">RobotSequence.hpp</a> | 運転状態、FAULT、要求と結果の公開型 |
@@ -396,6 +398,7 @@
 | フォルダ・ファイル | 内容 |
 |---|---|
 | <a href="CanEventPoll_8cpp_source.html">CanEventPoll.cpp</a> | 2バスのイベントを交互に上限付きで回収 |
+| <a href="ControlCycle_8cpp_source.html">ControlCycle.cpp</a> | 1周期の観測→ARM/FAULT→数学制御・指令変換の実行順 |
 | <a href="MotorService_8cpp_source.html">MotorService.cpp</a> | 6軸の観測取得、報告の軸選択、RS06のARM・停止要求 |
 | <a href="MotorCanLink_8cpp_source.html">MotorCanLink.cpp</a> | 両バスの軸別受信と、CAN1の有効化・停止の受付・終端を配送 |
 | <a href="RobotSequence_8cpp_source.html">RobotSequence.cpp</a> | 運転状態の遷移、ARMINGの期限、FAULT記録 |
