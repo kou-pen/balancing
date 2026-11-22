@@ -391,6 +391,43 @@ for suffix, flags in [
                    check=True, cwd=ROOT, timeout=30)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
+
+# C++17 StateEstimator combines the previously tested C11 IMU and leg fixture
+# with all 6 independent CAN axis timestamps. Both sanitizer variants are tested.
+for suffix, flags in [
+    ("", []),
+    ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"]),
+]:
+    path = OUT / f"test_f446_state_estimator{suffix}"
+    sources = [
+        str(rs06_source / "control" / "estimator" / "StateEstimator.cpp"),
+        str(rs06_source / "control" / "estimator" / "LegKinematics.cpp"),
+        str(rs06_source / "control" / "estimator" / "WheelOdometry.cpp"),
+        str(ROOT / "tests" / "test_f446_state_estimator.cpp"),
+    ]
+    codec = OUT / f"motor_service_rs06_codec{suffix}.o"
+    # Use the same C11 math and attitude implementations already in the repo;
+    # compile C11 with gcc instead of attempting to compile C as C++17.
+    c_math = OUT / f"estimator_c_math{suffix}.o"
+    c_attitude = OUT / f"estimator_c_attitude{suffix}.o"
+    for input_file, output_file in (
+        (rs06_source / "control" / "estimator" / "balancing_leg_kinematics.c", c_math),
+        (rs06_source / "control" / "filter" / "balancing_attitude_filter.c", c_attitude),
+    ):
+        subprocess.run(
+            ["gcc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
+             "-I", str(F446_APP / "Inc"), "-c", str(input_file),
+             *flags, "-o", str(output_file)],
+            check=True, cwd=ROOT, timeout=30,
+        )
+    print(f"[test_f446_state_estimator{suffix}] コンパイル", flush=True)
+    subprocess.run(
+        rs06_service_common + sources + flags +
+        [str(codec), str(c_math), str(c_attitude), "-lm", "-o", str(path)],
+        check=True, cwd=ROOT, timeout=30,
+    )
+    subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
+
 print("[CubeIDE C++設定回帰試験] 実行", flush=True)
 subprocess.run(
     [

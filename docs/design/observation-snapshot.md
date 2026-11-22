@@ -51,3 +51,13 @@ M3508のC620エンコーダはロータ1回転あたり8192カウントです。
 古い/未来時刻、8192以上の生カウント、半回転ちょうどの差分は棄却し、以前の位置・時刻を保持します。新しいCAN報告の換算に失敗した場合、その古い位置を `fresh=true` として公開しません。鮮度期限を `WheelOdometry` では再判定せず、`MotorService` の `fresh` を使います。
 
 **既知の仕様境界差分:** C11の `b_check_freshness()` は20 msちょうどを有効とする一方、C++17の `C620Motor::feedback()` は20 msちょうどを期限切れにします。今回はどちらの式も変更せず、統合SILでの整合判定を残します。実行結果と未検証範囲は [C++17車輪オドメトリのホスト検証](../verification/f446-wheel-odometry-host.md) に記録します。
+
+## 同一周期のC++17 StateEstimator
+
+500 Hzの制御周期開始時にIMUの姿勢推定出力と6軸 `MotorService::feedback(nowUs)` を固定し、`StateEstimator::update()` が `ControlSnapshot` か失敗理由を返します。RS06は左右各脚2軸のモータ角を外部伝達比・原点で機構角へ変換し、既存の閉リンク数学fixtureで脚長・仮想角・解析ヤコビアンへ写像します。C620は `WheelOdometry` の左右変位・周速度に写像し、その平均を車体前後位置・速度とします。姿勢フィルタはIMUの測定時刻を保持し、500 Hzで新規観測時刻を捏造しません。
+
+`StateEstimator` は元の各軸・IMU測定時刻と実測周期間隔を返します。片脚が未受信・非到達・特異であれば、一部の脚だけ使える `ControlSnapshot` は返しません。ただしIMU欠損中も車輪が新規受信していれば位置は積算しておき、復旧周期に正しい原点の継続を扱います。
+
+**安全境界:** 旧C11 `b_leg_fixture_forward` の幾何は実機の六節リンクCADと未照合です。新しい `ControlSnapshot.fixtureOnly` は常に `true` であり、数学上の推定成功は実機のARM/トルク許可ではありません。実機CAD・原点・軸方向・姿勢取付方向の確定と、HAL/I2C/CAN/実時間確認は後続です。
+
+[StateEstimatorの実装とホスト検証](../verification/f446-state-estimator-host.md)

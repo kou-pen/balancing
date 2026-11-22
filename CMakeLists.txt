@@ -193,3 +193,16 @@ add_executable(balancing_f446_wheel_odometry_tests
 target_link_libraries(balancing_f446_wheel_odometry_tests PRIVATE balancing_core m)
 target_compile_options(balancing_f446_wheel_odometry_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_wheel_odometry_tests COMMAND balancing_f446_wheel_odometry_tests)
+
+# A single 500Hz mathematical snapshot from C11 IMU filtering + C++17 six-axis data.
+# Real fixture geometry and actuator permission are intentionally absent.
+add_executable(balancing_f446_state_estimator_tests
+    tests/test_f446_state_estimator.cpp
+    ${F446_APP}/Src/balancing/control/estimator/StateEstimator.cpp
+    ${F446_APP}/Src/balancing/control/estimator/LegKinematics.cpp
+    ${F446_APP}/Src/balancing/control/estimator/WheelOdometry.cpp
+    ${BALANCING_RS06_SERVICE_SOURCES}
+)
+target_link_libraries(balancing_f446_state_estimator_tests PRIVATE balancing_core m)
+target_compile_options(balancing_f446_state_estimator_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME balancing_f446_state_estimator_tests COMMAND balancing_f446_state_estimator_tests)

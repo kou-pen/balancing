@@ -11,6 +11,7 @@
 | F446 CAN1の起動と割込み | [CAN1の起動・割込みの検証](f446-can1-runtime-host.md) | フィルタ、TX／RX0／SCE、DWT時計、受信観測 |
 | F446 CANイベント回収・配送 | [2バスの回収と配送](f446-can-event-dispatch-host.md) | 1バス最大19件、RS06・C620の受信振り分け、バスごとのTX終端照合、周期フレームの置換・期限、通常イベントFIFO |
 | C620車輪のC++17位置・速度換算 | [車輪オドメトリのホスト検証](f446-wheel-odometry-host.md) | CAN2生報告から左右の相対位置・周速度への変換、二重積算の防止、異常時刻・曖昧半回転・鮮度の境界 |
+| IMU・6軸のC++17状態スナップショット | [StateEstimatorのホスト検証](f446-state-estimator-host.md) | 姿勢・左右脚数学fixture・左右車輪の同一周期結合、不成立時の出力禁止 |
 | F446 CAN1の送受信と軸別トークン | [CAN1ポートとRS06の接続検証](f446-can1-rs06-port-host.md) | メールボックス再利用、受信あふれ、バスオフ、4軸ARMの結合 |
 | RS06 4軸の有効化と停止 | [MotorServiceの模擬CAN検証](motor-service-rs06-host.md) | Type 3完了と新規応答の照合、4軸別のType 4再試行、バスオフ・期限の故障注入 |
 | F446の11ソース構成 | [Issue #9脚長・Rollホスト検証](issue9-leg-pd-host.md) | Debug/Releaseで新しい脚長PDソースを含むARMクロスビルドPASS（実機未実施） |
