@@ -1,6 +1,6 @@
 #include "balancing/app/CanEventPoll.hpp"
 #include "balancing/app/MotorService.hpp"
-#include "balancing/app/Rs06CanLink.hpp"
+#include "balancing/app/MotorCanLink.hpp"
 #include "balancing/communication/can/CanPort.hpp"
 #include "balancing/communication/can/CanRouter.hpp"
 #include "balancing/communication/can/CanTxScheduler.hpp"
@@ -28,12 +28,13 @@ struct Fixture {
     CAN_HandleTypeDef handle{&registers, HAL_CAN_STATE_LISTENING};
     CanPort port{handle};
 
-    void pushRx(std::uint32_t id, std::uint64_t atUs, bool extended = false, std::uint32_t dlc = 1)
+    void pushRx(std::uint32_t id, std::uint64_t atUs, bool extended = false, std::uint32_t dlc = 1,
+                std::uint32_t dataLow = 0x45u, std::uint32_t dataHigh = 0)
     {
         auto& fifo = registers.RF0R;
         assert(fifo.count < 3u);
         const auto rawId = extended ? (id << 3u) | CAN_RI0R_IDE : id << 21u;
-        registers.sFIFOMailBox[fifo.count++] = {rawId, dlc, 0x45u, 0};
+        registers.sFIFOMailBox[fifo.count++] = {rawId, dlc, dataLow, dataHigh};
         port.captureInterrupt(atUs);
     }
 
@@ -739,19 +740,20 @@ void testStopWaitSurvivesNotReadyAndBusOff()
     assert(tx.trySubmit({}, {3, 31}, 50002) == CanTxSubmitResult::Busy);
 }
 
-struct Rs06LinkFixture {
+struct MotorLinkFixture {
     // 番号・時刻ともホスト試験専用。対象番号とモータIDが別であることも確認する。
     static constexpr std::uint8_t hostId = 0xa6;
     Fixture can1, can2;
     MotorService motors{{{11, 12, 13, 14}, hostId}};
     RobotSequence sequence{{1000, true}};
     CanTxScheduler tx1{can1.port}, tx2{can2.port};
-    Rs06CanLink link{motors, tx1};
+    MotorCanLink link{motors, tx1};
     CanRouter router{link, &tx1, &tx2};
 
-    static constexpr std::uint32_t reportId(std::uint8_t motorId, std::uint32_t mode) noexcept
+    static constexpr std::uint32_t reportId(std::uint8_t motorId, std::uint32_t mode,
+                                             std::uint32_t type = 2u) noexcept
     {
-        return (2u << 24u) | (mode << 22u) | (std::uint32_t{motorId} << 8u) | hostId;
+        return (type << 24u) | (mode << 22u) | (std::uint32_t{motorId} << 8u) | hostId;
     }
 
     void poll()
@@ -817,9 +819,74 @@ struct Rs06LinkFixture {
     }
 };
 
-void testRs06CanLinkArmRequiresNewCan1ReportsAfterTransmission()
+void testMotorCanLinkCollectsSixAxesForOneCycle()
 {
-    Rs06LinkFixture f;
+    MotorLinkFixture f;
+    const auto empty = f.motors.feedback(0);
+    for (const auto& axis : empty.rs06) {
+        assert(!axis.latest && !axis.fresh);
+    }
+    for (const auto& axis : empty.c620) {
+        assert(!axis.latest && !axis.fresh);
+    }
+
+    // 受信時刻をずらして、回収時刻で全軸を上書きしていないことも確認する。
+    constexpr std::uint64_t receivedAt = 1000;
+    constexpr std::uint64_t cycleAt = 2000;
+    for (std::size_t i = 0; i < empty.rs06.size(); ++i) {
+        const auto motorId = static_cast<std::uint8_t>(11u + i);
+        const auto id = f.reportId(motorId, 2, i == 0 ? 2u : 24u);
+        // 角度・速度・トルクは量子化範囲の端、温度は25 °C。
+        f.can1.pushRx(id, receivedAt + i, true, 8, 0xffff0000u, 0xfa000000u);
+    }
+    for (std::size_t i = 0; i < empty.c620.size(); ++i) {
+        // ロータ角4096/4097、-100 rpm、電流123、42 °C。送信レジスタ上は下位バイトが先頭。
+        const auto low = 0x9cff0010u | (static_cast<std::uint32_t>(i) << 8u);
+        f.can2.pushRx(0x201u + static_cast<std::uint32_t>(i), receivedAt + i, false, 8, low, 0x002a7b00u);
+    }
+    f.poll();
+    const auto snapshot = f.motors.feedback(cycleAt);
+    assert(snapshot.sampledAtUs == cycleAt);
+    for (std::size_t i = 0; i < snapshot.rs06.size(); ++i) {
+        const auto& axis = snapshot.rs06[i];
+        assert(axis.fresh && axis.latest && axis.latest->receivedAtUs == receivedAt + i);
+        const auto& report = axis.latest->report;
+        assert(report.motorId == 11u + i && report.hostId == MotorLinkFixture::hostId);
+        assert(report.report == (i == 0 ? Rs06Report::Status : Rs06Report::Periodic));
+        assert(report.angleRad == -12.566370614359172f && report.velocityRadPerSec == 50.0f);
+        assert(report.torqueNm == -36.0f && report.temperatureC == 25.0f);
+    }
+    for (std::size_t i = 0; i < snapshot.c620.size(); ++i) {
+        const auto& axis = snapshot.c620[i];
+        assert(axis.fresh && axis.latest && axis.latest->receivedAtUs == receivedAt + i);
+        const auto& report = axis.latest->report;
+        assert(report.motor_id == 1u + i && report.encoder_raw == 4096u + i);
+        assert(report.rpm == -100 && report.current_raw == 123 && report.temperature_c == 42);
+    }
+
+    // バス違い・宛先違い・復号不能な報告は、過去の値や鮮度を更新しない。
+    f.can1.pushRx(0x201, 19000, false, 8);
+    f.can2.pushRx(f.reportId(11, 2), 19000, true, 8);
+    f.can1.pushRx(f.reportId(11, 2) ^ 1u, 19001, true, 8);
+    f.can1.pushRx(f.reportId(11, 3), 19002, true, 8);
+    f.can2.pushRx(0x201, 19002, false, 8, 0x00000020u);  // ロータ角8192は範囲外。
+    f.can2.pushRx(0x203, 19003, false, 8);
+    f.poll();
+    assert(f.motors.feedback(receivedAt + 19999).c620[0].fresh);
+    const auto wheelDeadline = f.motors.feedback(receivedAt + 20000);
+    assert(!wheelDeadline.c620[0].fresh && wheelDeadline.c620[1].fresh);
+    assert(wheelDeadline.c620[0].latest->receivedAtUs == receivedAt);
+    assert(f.motors.feedback(receivedAt + 29999).rs06[0].fresh);
+    const auto legDeadline = f.motors.feedback(receivedAt + 30000);
+    assert(!legDeadline.rs06[0].fresh && legDeadline.rs06[1].fresh);
+    assert(legDeadline.rs06[0].latest->receivedAtUs == receivedAt);
+    assert(!f.motors.rs06Status(legDeadline.sampledAtUs)[0].feedbackFresh);
+    assert(snapshot.c620[0].fresh && snapshot.rs06[0].fresh);
+}
+
+void testMotorCanLinkArmRequiresNewCan1ReportsAfterTransmission()
+{
+    MotorLinkFixture f;
     f.completeBootStops();
     assert(f.beginCycle(10, OperatorEvents{true}) == RobotState::Arming);
     for (unsigned box = 0; box < 3u; ++box) {
@@ -843,9 +910,9 @@ void testRs06CanLinkArmRequiresNewCan1ReportsAfterTransmission()
     assert(f.beginCycle(16) == RobotState::Balancing);
 }
 
-void testRs06CanLinkDisarmDropsUnacceptedEnableAndWaitsForSameAxis()
+void testMotorCanLinkDisarmDropsUnacceptedEnableAndWaitsForSameAxis()
 {
-    Rs06LinkFixture f;
+    MotorLinkFixture f;
     f.completeBootStops();
     // Type 3を1軸だけ受付し、残る候補がFIFOに残らない条件を作る。
     f.can1.registers.TSR.bits = CAN_TSR_TME0;
@@ -879,9 +946,9 @@ void testRs06CanLinkDisarmDropsUnacceptedEnableAndWaitsForSameAxis()
     assert(f.service(15).result == ScheduledTxResult::Idle);
 }
 
-void testRs06CanLinkRetryAndFeedbackIgnoreForeignEvents()
+void testMotorCanLinkRetryAndFeedbackIgnoreForeignEvents()
 {
-    Rs06LinkFixture f;
+    MotorLinkFixture f;
     // 発行元の種別が違えば、CAN1で同じ軸番号・シリアルを持つ送信も別物になる。
     const TxToken foreign{1, 11};
     assert(f.tx1.trySubmit({}, foreign, 0) == CanTxSubmitResult::Accepted);
@@ -924,9 +991,9 @@ void testRs06CanLinkRetryAndFeedbackIgnoreForeignEvents()
     assert(f.motors.rs06Status(7)[0].disableConfirmed);
 }
 
-void testRs06CanLinkCan1BusOffRecoveryAndRxLoss()
+void testMotorCanLinkCan1BusOffRecoveryAndRxLoss()
 {
-    Rs06LinkFixture f;
+    MotorLinkFixture f;
     assert(f.beginCycle(1) == RobotState::Disarmed);
     f.can2.registers.ESR = CAN_ESR_BOFF;
     f.can2.registers.RF0R.flags = CAN_RF0R_FOVR0;
@@ -973,9 +1040,10 @@ int main()
     testFourStopsHavePriorityWhileTheNormalFifoIsFull();
     testFailedStopsRequireNewTokensAndAreIndependentBetweenBuses();
     testStopWaitSurvivesNotReadyAndBusOff();
-    testRs06CanLinkArmRequiresNewCan1ReportsAfterTransmission();
-    testRs06CanLinkDisarmDropsUnacceptedEnableAndWaitsForSameAxis();
-    testRs06CanLinkRetryAndFeedbackIgnoreForeignEvents();
-    testRs06CanLinkCan1BusOffRecoveryAndRxLoss();
-    std::puts("PASS: F446 CAN dispatch, TX scheduling and RS06 arm/stop link");
+    testMotorCanLinkCollectsSixAxesForOneCycle();
+    testMotorCanLinkArmRequiresNewCan1ReportsAfterTransmission();
+    testMotorCanLinkDisarmDropsUnacceptedEnableAndWaitsForSameAxis();
+    testMotorCanLinkRetryAndFeedbackIgnoreForeignEvents();
+    testMotorCanLinkCan1BusOffRecoveryAndRxLoss();
+    std::puts("PASS: F446 CAN dispatch, TX scheduling, six-axis feedback and RS06 arm/stop");
 }

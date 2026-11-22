@@ -319,6 +319,7 @@ rs06_service_sources = [
     str(rs06_source / "app" / "RobotSequence.cpp"),
     str(rs06_source / "app" / "MotorService.cpp"),
     str(rs06_source / "device" / "Rs06Motor.cpp"),
+    str(rs06_source / "device" / "C620Motor.cpp"),
     str(rs06_source / "communication" / "Rs06Codec.cpp"),
 ]
 rs06_service_common = [
@@ -356,7 +357,7 @@ can_dispatch_common = [
 ]
 for test, extra_sources in [
     ("test_f446_can1_runtime", [str(rs06_source / "device" / "f446_can1_runtime.cpp")]),
-    ("test_f446_can_event_poll", rs06_service_sources + [str(rs06_source / "app" / "Rs06CanLink.cpp")]),
+    ("test_f446_can_event_poll", rs06_service_sources + [str(rs06_source / "app" / "MotorCanLink.cpp")]),
 ]:
     for suffix, flags in [
         ("", []),

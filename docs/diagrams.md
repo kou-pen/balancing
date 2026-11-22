@@ -23,7 +23,7 @@ F446の設計上の呼び出し順と通信の流れを示します。現行C11�
 
 <pre class="mermaid">
 flowchart TB
-    IO["IMU・モータ・操作・電源"] --> APP["Application：周期入力を固定"]
+    IO["IMU・操作・電源"] --> APP["Application：周期入力を固定"]
     APP --> EST["StateEstimator"]
     EST --> KIN["LegKinematics：左右各脚"]
     KIN -->|脚の解| EST
@@ -37,8 +37,11 @@ flowchart TB
     CMD -.->|変換異常| SEQ
     SEQ -->|DesiredMotorState・ARMセッション番号| OUT
     OUT --> MS["MotorService"]
-    MS --> RS["CAN1：RS06 4軸"]
-    MS --> WHEEL["CAN2：C620 2軸"]
+    MS -->|指令| RS["CAN1：RS06 4軸"]
+    MS -->|指令| WHEEL["CAN2：C620 2軸"]
+    RS -->|状態報告| MS
+    WHEEL -->|車輪報告| MS
+    MS -->|MotorFeedbackSnapshot| APP
 </pre>
 
 `ControlSnapshot` は機体・車体・脚・車輪の変換済み物理状態を持つ。駆動が許可された周期だけトルクを計算する。通常の指令飽和は `MotorCommand` が記録し、停止を要する異常は送信前に `RobotSequence` へ伝える。

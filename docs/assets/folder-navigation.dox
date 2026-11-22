@@ -264,8 +264,8 @@
 | フォルダ・ファイル | 内容 |
 |---|---|
 | <a href="CanEventPoll_8hpp_source.html">CanEventPoll.hpp</a> | CAN1・CAN2からイベントを回収するAPI |
-| <a href="MotorService_8hpp_source.html">MotorService.hpp</a> | RS06 4軸のARM・停止・状態取得をまとめるAPI |
-| <a href="Rs06CanLink_8hpp_source.html">Rs06CanLink.hpp</a> | RS06とCAN1送信調停の接続、受付・終端と異常通知のAPI |
+| <a href="MotorService_8hpp_source.html">MotorService.hpp</a> | RS06のARM・停止と、脚・車輪6軸の周期観測をまとめるAPI |
+| <a href="MotorCanLink_8hpp_source.html">MotorCanLink.hpp</a> | CAN1・CAN2の機器報告の配送、RS06の送信・終端接続 |
 | <a href="RobotSequence_8hpp_source.html">RobotSequence.hpp</a> | 運転状態、FAULT、要求と結果の公開型 |
 | <a href="balancing__motor__bench_8h_source.html">balancing_motor_bench.h</a> | 単軸試運転の状態・入出力・周期実行の宣言 |
 | <a href="balancing__operator__input_8h_source.html">balancing_operator_input.h</a> | 操作元と指令値、受信・更新APIの宣言 |
@@ -352,6 +352,7 @@
 
 | フォルダ・ファイル | 内容 |
 |---|---|
+| <a href="C620Motor_8hpp_source.html">C620Motor.hpp</a> | C620 1軸の受信値・鮮度取得のAPI |
 | <a href="Rs06Motor_8hpp_source.html">Rs06Motor.hpp</a> | RS06 1軸の有効化、停止、状態報告のAPI |
 | <a href="balancing__f446__motor__bench__port_8h_source.html">balancing_f446_motor_bench_port.h</a> | F446の試運転ポートを操作するC API |
 */
@@ -384,8 +385,8 @@
 | フォルダ・ファイル | 内容 |
 |---|---|
 | <a href="CanEventPoll_8cpp_source.html">CanEventPoll.cpp</a> | 2バスのイベントを交互に上限付きで回収 |
-| <a href="MotorService_8cpp_source.html">MotorService.cpp</a> | RS06 4軸へARM・停止要求を配り、結果を集約 |
-| <a href="Rs06CanLink_8cpp_source.html">Rs06CanLink.cpp</a> | Type 3・4の投入と停止枠の受付、CAN1から該当軸への結果配送 |
+| <a href="MotorService_8cpp_source.html">MotorService.cpp</a> | 6軸の観測取得、報告の軸選択、RS06のARM・停止要求 |
+| <a href="MotorCanLink_8cpp_source.html">MotorCanLink.cpp</a> | 両バスの軸別受信と、CAN1の有効化・停止の受付・終端を配送 |
 | <a href="RobotSequence_8cpp_source.html">RobotSequence.cpp</a> | 運転状態の遷移、ARMINGの期限、FAULT記録 |
 | <a href="application_8cpp_source.html">application.cpp</a> | F446のC++側初期化、タイマ通知、メインループ処理 |
 | <a href="balancing__motor__bench_8c_source.html">balancing_motor_bench.c</a> | 単軸試運転のコマンド、状態遷移、停止条件 |
@@ -462,6 +463,7 @@
 
 | フォルダ・ファイル | 内容 |
 |---|---|
+| <a href="C620Motor_8cpp_source.html">C620Motor.cpp</a> | C620 1軸の最新報告と受信時刻からの鮮度判定 |
 | <a href="Rs06Motor_8cpp_source.html">Rs06Motor.cpp</a> | RS06 1軸の有効化・停止フレームと応答の照合 |
 | <a href="balancing__f446__motor__bench__port_8c_source.html">balancing_f446_motor_bench_port.c</a> | F446 HALと単軸試運転の送受信・周期を接続 |
 | <a href="f446__can1__runtime_8cpp_source.html">f446_can1_runtime.cpp</a> | CAN1起動、受信フィルタ、IRQ、DWT時計、監視値の集計 |

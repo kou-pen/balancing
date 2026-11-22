@@ -17,6 +17,10 @@ struct Rs06StateReport {
     Rs06Report report;
     Rs06Mode mode;
     std::uint8_t faultBits;
+    float angleRad;
+    float velocityRadPerSec;
+    float torqueNm;
+    float temperatureC;
 };
 
 class Rs06Codec final {
