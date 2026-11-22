@@ -174,6 +174,7 @@
 | [f446-can1-runtime-host.md](../verification/f446-can1-runtime-host.md) | CAN1の起動、受信フィルタ、割り込み、DWT時計のホスト検証 |
 | [f446-crossbuild-20261109.md](../verification/f446-crossbuild-20261109.md) | 2026年11月9日時点のF446ヘッドレスクロスビルド |
 | [f446-module-layout.md](../verification/f446-module-layout.md) | F446自作C11／C++の機能別配置と移動後の検証 |
+| [f446-wheel-odometry-host.md](../verification/f446-wheel-odometry-host.md) | C620左右車輪の折返し・位置・速度換算と時刻のホスト試験 |
 | [f446-source-layout.md](../verification/f446-source-layout.md) | 旧ソース配置の統合とCubeIDEビルド手順 |
 | [index.md](../verification/index.md) | 試験記録の案内、判定の意味、実機未検証の範囲 |
 | [issue10-observation-host.md](../verification/issue10-observation-host.md) | センサ、操作入力、IMUのホスト回帰 |
@@ -325,6 +326,7 @@
 |---|---|
 | <a href="balancing__leg__kinematics_8h_source.html">balancing_leg_kinematics.h</a> | 六節リンクの関節角、脚長、ヤコビアンの型とAPI |
 | <a href="balancing__observation_8h_source.html">balancing_observation.h</a> | センサ観測の格納、更新、スナップショットの宣言 |
+| <a href="WheelOdometry_8hpp_source.html">WheelOdometry.hpp</a> | C620左右の位置・速度換算と原点リセットの公開契約 |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_control_filter filter/
@@ -446,6 +448,7 @@
 |---|---|
 | <a href="balancing__leg__kinematics_8c_source.html">balancing_leg_kinematics.c</a> | 閉リンクの幾何計算、脚長、ヤコビアン |
 | <a href="balancing__observation_8c_source.html">balancing_observation.c</a> | センサ値の取り込み、車輪角の折返し、観測コピー |
+| <a href="WheelOdometry_8cpp_source.html">WheelOdometry.cpp</a> | C620ロータ角の折返し、重複報告の除外、車輪位置・速度換算 |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Src_balancing_control_filter filter/

@@ -296,3 +296,16 @@ flowchart TB
 図はMermaid記法で編集できる。Doxygen 1.9.8ではMermaid記法の自動描画に対応していないため、`pre class="mermaid"`を用い、生成されたHTML上で**VM内のMermaid.js**により図に変換する。インターネット接続は不要。紙媒体向けのSVG・PNG書き出しは別途実施する。
 
 文書中の未確定事項は図でも確定事項として表現しない。変更時には対応する仕様書と図を同じ作業内で更新する。
+
+## CAN2車輪観測から相対位置・速度へのC++17変換
+
+<pre class="mermaid">
+flowchart TB
+    CAN["CAN2：C620左右報告"] --> LINK["MotorCanLink：CANイベント配送"]
+    LINK --> SERVICE["MotorService：C620生値・受信時刻・鮮度"]
+    SERVICE --> ODOM["WheelOdometry：新しい受信時刻のみ積算"]
+    ODOM --> EST["車輪観測：位置 m・周速度 m/s"]
+    SERVICE -.->|"freshを再利用"| EST
+</pre>
+
+位置の積算は一つのC620受信につき一度だけです。20 msの鮮度判定は `MotorService` に残し、旧C11と新C++17の期限境界差分は [ホスト検証記録](verification/f446-wheel-odometry-host.md) に明記します。実CAN2と実機駆動は未検証です。
