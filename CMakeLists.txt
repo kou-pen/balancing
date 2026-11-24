@@ -213,6 +213,7 @@ add_test(NAME balancing_f446_state_estimator_tests COMMAND balancing_f446_state_
 # Test only: no CAN/HAL actuator output is linked into the executable.
 add_executable(balancing_f446_sil_control_cycle_tests
     tests/test_f446_sil_control_cycle.cpp
+    ${F446_APP}/Src/balancing/app/ControlCycle.cpp
     ${F446_APP}/Src/balancing/control/controller/MotorCommand.cpp
     ${F446_APP}/Src/balancing/control/controller/BalanceControl.cpp
     ${F446_APP}/Src/balancing/control/estimator/StateEstimator.cpp

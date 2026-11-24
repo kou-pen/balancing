@@ -107,7 +107,7 @@ C++オブジェクトの構築後、CubeMX／HALの周辺初期化が完了し�
 
 `BalanceControlOutput` はモータ側指令ではなく**6軸の機構側の数学トルク**である。現在の `fixtureOnly` は常にtrueで、本番の `MotorCommand`、`MotorService`、`CanPort`、`Application::controlTick()` へは接続していない。
 
-`tests/support/SilControlCycle.hpp` はホスト専用の仮想500 Hz周期実行器で、次の順番を試す。
+`ControlCycle` はApp本体内のHAL非依存な周期実行器で、次の順番を試す。
 
 1. 入力を1周期で固定し、`StateEstimator::update()` を呼ぶ。
 2. ARM直前の脚長参照と今周期の観測・周期異常を準備する。
@@ -125,7 +125,7 @@ SIL内で4軸のARM応答・検証済みの機構/ゲインを模擬するため
 
 **現在はSILプレビュー専用。** `BalanceControlOutput.fixtureOnly` がtrueである数学結果しか取り込まず、返す `MotorCommandPreview.fixtureOnly` も常にtrue。`MotorTargets` やCANフレームへの変換API、MotorServiceへの実際の非ゼロ指令経路は実装していない。テスト用の `verified=true` やCANプロトコル表現範囲（RS06 ±36Nm、C620 ±20A）は実機安全限界の検証を意味しない。
 
-テスト専用 `SilControlCycle` は `MotorCommand::hasVerifiedConfiguration()` がfalseならARMを拒否する。BALANCING中の非有限値や換算失敗は同周期に `RobotSequence` へ `ExternalFault` を伝え、コマンド候補を一切公開しない。成功時でも数学値としてのみ利用する。
+App本体の `ControlCycle` は `MotorCommand::hasVerifiedConfiguration()` がfalseならARMを拒否する。BALANCING中の非有限値や換算失敗は同周期に `RobotSequence` へ `ExternalFault` を伝え、コマンド候補を一切公開しない。成功時でも数学値としてのみ利用する。
 
 [MotorCommand 6軸換算のホスト検証](../verification/f446-motor-command-host.md)
 
@@ -136,3 +136,9 @@ SIL内で4軸のARM応答・検証済みの機構/ゲインを模擬するため
 この処理の生成物は常に `fixtureOnly=true` の数学プレビューであり、F446の実機起動経路にもCAN送信関数にも接続しない。RS06 250Hz/C620 500Hzの周期・送信期限・停止優先は既存 `CanTxScheduler` が所有するため、符号化側で再実装しない。実機のメールボックスに既に受付済みのトルク指令はソフトウェアから取り消せないので、停止の遅延については実機で別途検証する。
 
 [CANフレーム計画・2バス停止優先のホスト検証](../verification/f446-motor-frame-plan-host.md)
+
+## ControlCycleを本体Appへ移す（実機非ゼロ駆動なし）
+
+`ControlCycle::step(ControlTickInput)` は、元の`tests/support/SilControlCycle.hpp`の数学経路をApp層へ移し、`StateEstimator` → `RobotSequence` → `BalanceControl` → `MotorCommand`を一周期にまとめる。初回の実測`firstElapsed`が必要であり、未取得時に2msを捏造しない。以降は観測スナップショットの共通`sampledAtUs`から実測時間差を得る。6msの更新空白をFAULTとするのはBALANCING中のみ。非常停止・DISARMがすでに分かる周期は数学トルクの候補を計算しない。
+
+本体化は**実行経路の公開クラスと処理順の確定**であり、現時点の`Application::controlTick()`からは呼ばない。実I2C/ CAN2、単調時刻供給、実機の幾何・ゲイン/限界が未検証のため、数学上の`fixtureOnly`はモータ送信へ接続しない。詳細は [ControlCycle本体化の検証](../verification/f446-control-cycle-core-host.md)。
