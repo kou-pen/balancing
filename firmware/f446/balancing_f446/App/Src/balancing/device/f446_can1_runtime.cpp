@@ -67,6 +67,10 @@ public:
         balancing::CanRouter router{*this, &tx_};
         // CAN1の観測経路を主ループの共通回収に通す。CAN2の起動・接続は別工程。
         balancing::pollCanEvents(&port, nullptr, router);
+        // RX時刻と同じ時計を回収後に読む。回収中のIRQで取得した時刻が
+        // 評価時刻より未来にならないよう、回収前の時刻では代用しない。
+        snapshot.sampled_at_us = sampleClock();
+        snapshot.sampled = true;
     }
 
     balancing::CanPort port;

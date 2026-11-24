@@ -2,6 +2,7 @@
 #define BALANCING_F446_CAN1_BRIDGE_H
 
 #include "stm32f4xx_hal.h"
+#include "balancing/device/Can1Observation.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -9,14 +10,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-typedef struct {
-    uint32_t rx_frames;
-    uint32_t rx_loss_events;
-    uint32_t bus_off_events;
-    uint64_t last_rx_us;
-    bool bus_off;
-} BF446Can1Snapshot;
 
 /**
  * @brief CAN1のRS06受信フィルタ、イベント取得時計、割込みを起動する。
@@ -41,15 +34,6 @@ bool balancing_f446_can1_capture_irq(void);
  * @spec{BOARD-F446-001}
  */
 void balancing_f446_can1_service(void);
-
-/**
- * @brief メイン側で最後に集計した受信・バス状態を取得する。
- * @param[out] snapshot 出力先。last_rx_usは起動後の取得時刻 [us]。
- * @return 起動済みかつ出力先が有効ならtrue。
- * @pre 割込みから呼び出さない。カウンタの型幅を超えると周回する。
- * @spec{BOARD-F446-001}
- */
-bool balancing_f446_can1_snapshot(BF446Can1Snapshot* snapshot);
 
 #ifdef __cplusplus
 }
