@@ -392,3 +392,18 @@ flowchart TB
 </pre>
 
 Core/Driversの生成部分や実CAN送信は変更しない。SILで運転可能な人工値は実機の校正/物理安全許可に昇格しない。
+
+## CAN1受信時計を使うApplication周期診断
+
+<pre class="mermaid">
+flowchart LR
+    ISR["TIM7 ISR：実行要求"] --> MAIN["main：要求を消費"]
+    MAIN --> RX["CAN1イベント回収"]
+    DWT["既存DWT単調時計"] --> RX
+    RX --> OBS["回収後の評価時刻付き監視コピー"]
+    DWT --> OBS
+    OBS --> APP["Application：周期差分・時刻診断"]
+    APP --> DIAG["読み取り専用TimingSnapshot"]
+</pre>
+
+実機ControlCycle・CAN2・IMUとモータ送信にはまだ接続しない。
