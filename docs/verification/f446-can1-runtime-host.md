@@ -1,3 +1,5 @@
+> **現在の実装:** CAN1/2の共通受信ランタイムへ移行済み。[後続の検証記録](f446-dual-can-runtime-host.md) を参照。以下は当時の検証記録。
+
 # F446 CAN1の起動・割込みの検証
 
 基準は [PR #33](https://github.com/kou-pen/balancing/pull/33) のCAN1ポートです。CubeMXが設定するCAN1のクロック、ビットレート、NVICを使用します。要求は [BOARD-F446-001](../specs/boards/f446_control.md) と [PROTO-RS06-001](../specs/protocols/rs06_can1.md) を参照します。

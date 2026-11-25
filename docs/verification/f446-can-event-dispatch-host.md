@@ -1,3 +1,5 @@
+> **現在の実装:** CAN1/2の共通受信ランタイムへ移行済み。[後続の検証記録](f446-dual-can-runtime-host.md) を参照。以下は当時の検証記録。
+
 # F446 CANイベント回収・配送の検証
 
 [共通CANポート](f446-can1-rs06-port-host.md) のイベントをメインループで回収し、CAN1/CAN2を識別したまま配送します。契約は [BOARD-F446-001](../specs/boards/f446_control.md) と [公開API設計](../design/public-api.md) を参照してください。
@@ -18,7 +20,7 @@ sequenceDiagram
     end
 </pre>
 
-F446の現在の起動経路では `balancing_f446_can1_service()` がCAN1だけを渡し、500 Hzのメイン処理で [既存のCAN1監視結果](f446-can1-runtime-host.md) を更新します。CAN2はホスト試験で同じ回収処理に接続します。
+当時のF446起動経路では `balancing_f446_can1_service()` がCAN1だけを渡し、500 Hzのメイン処理で [既存のCAN1監視結果](f446-can1-runtime-host.md) を更新します。CAN2はホスト試験で同じ回収処理に接続します。
 
 ## 回収順と境界
 
