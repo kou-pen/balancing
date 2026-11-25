@@ -48,3 +48,5 @@
 制御コア・CAN通信・送信要求モデル、運動学fixture、脚長PD/Roll PDの**ホスト試験**、F446の**11ソースCubeIDE Debug/Release管理ビルド**は2026-11-11にPASSしました。一方、実機書込み、CAN実通信、トルク出力、実時間性能、独立非常停止、実機での倒立は未検証です。
 
 次の試験を計画するときは [実機検証TODO](../todo/verification.md) の受入条件を参照し、作業上の最新状態はGitHub Issue/PRで確認します。
+
+- [CANランタイムの6軸観測接続](f446-runtime-motor-observation-host.md)

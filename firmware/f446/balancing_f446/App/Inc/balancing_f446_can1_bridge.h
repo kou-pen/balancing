@@ -46,6 +46,16 @@ void balancing_f446_can_service(void);
 
 #ifdef __cplusplus
 }
+
+#include "balancing/device/MotorObservation.hpp"
+
+namespace balancing {
+/** @brief 検証済み観測設定を固定して両CANを起動する。送信は開始しない。
+ *  @spec{BOARD-F446-001}
+ */
+bool startCanObservation(CAN_HandleTypeDef* can1, CAN_HandleTypeDef* can2,
+                         const MotorObservationConfig& config) noexcept;
+}
 #endif
 
 #endif /* BALANCING_F446_CAN1_BRIDGE_H */

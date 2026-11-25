@@ -132,6 +132,16 @@ public:
      */
     FaultFlags takeObservedFaults(std::uint64_t nowUs) noexcept;
 
+    /** @brief 受信専用段階の実故障を消費する。未設定軸は故障でなく観測未成立。
+     *  @spec{BOARD-F446-001}
+     */
+    FaultFlags takeObservationFaults(std::uint64_t nowUs) noexcept;
+
+    /** @brief RS06の構築時ID検査結果。物理配線の証明ではない。
+     *  @spec{PROTO-RS06-001}
+     */
+    bool hasRs06Configuration() const noexcept { return configured_; }
+
 private:
     Rs06Motor* findMotor(std::uint8_t id) noexcept;
 

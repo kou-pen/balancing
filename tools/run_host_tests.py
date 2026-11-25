@@ -356,7 +356,7 @@ can_dispatch_common = [
     str(rs06_source / "app" / "CanEventPoll.cpp"),
 ]
 for test, extra_sources in [
-    ("test_f446_can1_runtime", [str(rs06_source / "device" / "f446_can1_runtime.cpp"), str(rs06_source / "app" / "application.cpp")]),
+    ("test_f446_can1_runtime", rs06_service_sources + [str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "device" / "f446_can1_runtime.cpp"), str(rs06_source / "app" / "application.cpp")]),
     ("test_f446_can_event_poll", rs06_service_sources + [str(rs06_source / "control" / "estimator" / "WheelOdometry.cpp"), str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "communication" / "can" / "MotorFramePlan.cpp"), str(rs06_source / "control" / "controller" / "MotorCommand.cpp")]),
 ]:
     for suffix, flags in [
@@ -366,7 +366,7 @@ for test, extra_sources in [
         path = OUT / f"{test}{suffix}"
         source = ROOT / "tests" / f"{test}.cpp"
         link_libraries = []
-        if test == "test_f446_can_event_poll":
+        if test in ("test_f446_can_event_poll", "test_f446_can1_runtime"):
             link_libraries = [str(OUT / f"motor_service_rs06_codec{suffix}.o"), "-lm"]
         print(f"[{test}{suffix}] コンパイル", flush=True)
         subprocess.run(can_dispatch_common + extra_sources + flags +
@@ -375,6 +375,7 @@ for test, extra_sources in [
         subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
         if test == "test_f446_can1_runtime":
             subprocess.run([str(path), "--rollback-failure"], check=True, cwd=ROOT, timeout=30)
+            subprocess.run([str(path), "--motor-observation"], check=True, cwd=ROOT, timeout=30)
 
 
 # C++17 wheel odometry: C11 C620 decode -> MotorService -> wheel positions.

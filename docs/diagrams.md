@@ -442,3 +442,18 @@ flowchart LR
 </pre>
 
 通信鮮度と位置連続性は別。原点再設定と推定器のresetは上位の明示操作で同期する。実CANランタイムへの配送は未接続。
+
+
+## CANランタイムから6軸観測へ
+
+<pre class="mermaid">
+flowchart LR
+    CAN["CAN1/2 CanPort"] --> R["CanRouter"]
+    R --> L["MotorCanLink"]
+    L --> M["MotorService"]
+    M --> S["MotorObservationSnapshot"]
+    R --> D["既存受信監視"]
+    S --> APP["Application（後続）"]
+</pre>
+
+観測のみ。送信経路は未接続。

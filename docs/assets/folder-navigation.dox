@@ -372,6 +372,7 @@
 | <a href="Rs06Motor_8hpp_source.html">Rs06Motor.hpp</a> | RS06 1軸の有効化、停止、状態報告のAPI |
 | <a href="Can1Observation_8h_source.html">Can1Observation.h</a> | HAL非依存のCAN1受信監視コピーと採取時刻 |
 | <a href="Can2Observation_8h_source.html">Can2Observation.h</a> | CAN2の受信・左右分類・バス異常・共通評価時刻 |
+| <a href="MotorObservation_8hpp_source.html">MotorObservation.hpp</a> | 6軸周期観測と回収番号・故障保持 |
 | <a href="balancing__f446__motor__bench__port_8h_source.html">balancing_f446_motor_bench_port.h</a> | F446の試運転ポートを操作するC API |
 */
 
