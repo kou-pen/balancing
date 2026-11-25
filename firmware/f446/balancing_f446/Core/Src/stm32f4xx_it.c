@@ -278,6 +278,11 @@ void TIM7_IRQHandler(void)
 void CAN2_TX_IRQHandler(void)
 {
   /* USER CODE BEGIN CAN2_TX_IRQn 0 */
+  /* CAN2の受信・終端フラグを二重消費しない。 */
+  if (balancing_f446_can2_capture_irq())
+  {
+    return;
+  }
 
   /* USER CODE END CAN2_TX_IRQn 0 */
   HAL_CAN_IRQHandler(&hcan2);
@@ -292,6 +297,11 @@ void CAN2_TX_IRQHandler(void)
 void CAN2_RX0_IRQHandler(void)
 {
   /* USER CODE BEGIN CAN2_RX0_IRQn 0 */
+  /* CAN2の受信・終端フラグを二重消費しない。 */
+  if (balancing_f446_can2_capture_irq())
+  {
+    return;
+  }
 
   /* USER CODE END CAN2_RX0_IRQn 0 */
   HAL_CAN_IRQHandler(&hcan2);
@@ -306,6 +316,11 @@ void CAN2_RX0_IRQHandler(void)
 void CAN2_SCE_IRQHandler(void)
 {
   /* USER CODE BEGIN CAN2_SCE_IRQn 0 */
+  /* CAN2の受信・終端フラグを二重消費しない。 */
+  if (balancing_f446_can2_capture_irq())
+  {
+    return;
+  }
 
   /* USER CODE END CAN2_SCE_IRQn 0 */
   HAL_CAN_IRQHandler(&hcan2);

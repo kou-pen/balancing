@@ -111,9 +111,9 @@ int main(void)
   MX_USB_OTG_HS_HCD_Init();
   /* USER CODE BEGIN 2 */
   balancing_app_init();
-  /* CAN1を開始してRS06の状態報告とバス異常を観測する。
+  /* CAN1/2を開始してRS06/C620の受信とバス異常を観測する。
    * 駆動設定の照合と状態機械の接続は後続のため、指令は送信しない。 */
-  if (!balancing_f446_can1_start(&hcan1))
+  if (!balancing_f446_can_start(&hcan1, &hcan2))
   {
     Error_Handler();
   }
@@ -138,7 +138,7 @@ int main(void)
     __set_PRIMASK(primask);
     if (do_control != 0u)
     {
-      balancing_f446_can1_service();
+      balancing_f446_can_service();
       balancing_app_control_tick();
     }
     balancing_app_poll();

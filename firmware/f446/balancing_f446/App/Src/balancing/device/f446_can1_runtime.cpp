@@ -16,7 +16,7 @@ constexpr std::uint32_t notifications = CAN_IT_TX_MAILBOX_EMPTY | CAN_IT_RX_FIFO
 constexpr std::uint32_t microsecondsPerSecond = 1000000u;
 constexpr std::uint32_t extendedDataMask = (0x1fu << 27u) | CAN_RI0R_IDE | CAN_RI0R_RTR;
 
-bool installFilters(CAN_HandleTypeDef& handle)
+bool installCan1Filters(CAN_HandleTypeDef& handle)
 {
     CAN_FilterTypeDef filter{};
     filter.FilterMode = CAN_FILTERMODE_IDMASK;
@@ -40,10 +40,35 @@ bool installFilters(CAN_HandleTypeDef& handle)
     return true;
 }
 
-class Can1Runtime final : private balancing::CanEventSink {
+bool installCan2Filters(CAN_HandleTypeDef& handle)
+{
+    CAN_FilterTypeDef filter{};
+    filter.FilterMode = CAN_FILTERMODE_IDMASK;
+    filter.FilterScale = CAN_FILTERSCALE_32BIT;
+    filter.FilterFIFOAssignment = CAN_FILTER_FIFO0;
+    filter.FilterActivation = ENABLE;
+    // bxCANのバンク分割は共有。CAN1のbank0/1とは重ならない。
+    filter.SlaveStartFilterBank = 14u;
+    filter.FilterBank = 14u;
+    filter.FilterMaskIdHigh = 0xffe0u;
+    filter.FilterMaskIdLow = CAN_RI0R_IDE | CAN_RI0R_RTR;
+    for (const auto id : {0x201u, 0x202u}) {
+        // 標準11bit IDは上位11bit。拡張・リモートフレームも排除する。
+        filter.FilterIdHigh = id << 5u;
+        filter.FilterIdLow = 0u;
+        if (HAL_CAN_ConfigFilter(&handle, &filter) != HAL_OK) {
+            return false;
+        }
+        ++filter.FilterBank;
+    }
+    return true;
+}
+
+class CanRuntime final : private balancing::CanEventSink {
 public:
-    Can1Runtime(CAN_HandleTypeDef& handle, std::uint32_t cyclesPerUs) noexcept
-        : port{handle}, handle{handle}, cyclesPerUs_{cyclesPerUs}, lastCycle_{DWT->CYCCNT}
+    CanRuntime(CAN_HandleTypeDef& can1, CAN_HandleTypeDef& can2, std::uint32_t cyclesPerUs) noexcept
+        : port1{can1}, port2{can2}, handle1{can1}, handle2{can2},
+          cyclesPerUs_{cyclesPerUs}, lastCycle_{DWT->CYCCNT}
     {
     }
 
@@ -64,26 +89,40 @@ public:
     void service() noexcept
     {
         sampleClock();
-        balancing::CanRouter router{*this, &tx_};
-        // CAN1の観測経路を主ループの共通回収に通す。CAN2の起動・接続は別工程。
-        balancing::pollCanEvents(&port, nullptr, router);
+        balancing::CanRouter router{*this, &tx1_, &tx2_};
+        // 片側の受信集中でも両バスを交互に回収し、有限回で戻る。
+        balancing::pollCanEvents(&port1, &port2, router);
         // RX時刻と同じ時計を回収後に読む。回収中のIRQで取得した時刻が
         // 評価時刻より未来にならないよう、回収前の時刻では代用しない。
-        snapshot.sampled_at_us = sampleClock();
-        snapshot.sampled = true;
+        const auto now = sampleClock();
+        snapshot1.sampled_at_us = snapshot2.sampled_at_us = now;
+        snapshot1.sampled = snapshot2.sampled = true;
     }
 
-    balancing::CanPort port;
-    CAN_HandleTypeDef& handle;
-    BF446Can1Snapshot snapshot{};
+    balancing::CanPort port1;
+    balancing::CanPort port2;
+    CAN_HandleTypeDef& handle1;
+    CAN_HandleTypeDef& handle2;
+    BF446Can1Snapshot snapshot1{};
+    BF446Can2Snapshot snapshot2{};
 
 private:
-    void onCanReceive(balancing::CanBus, balancing::CanRxTarget, const balancing::CanFrame&,
+    void onCanReceive(balancing::CanBus bus, balancing::CanRxTarget target, const balancing::CanFrame&,
                       std::uint64_t atUs) noexcept override
     {
         // 監視値はポートが回収した受信の集計。機器の鮮度や正常応答の判定には使わない。
-        ++snapshot.rx_frames;
-        snapshot.last_rx_us = atUs;
+        if (bus == balancing::CanBus::Can1) {
+            ++snapshot1.rx_frames;
+            snapshot1.last_rx_us = atUs;
+        } else {
+            ++snapshot2.rx_frames;
+            snapshot2.last_rx_us = atUs;
+            if (target == balancing::CanRxTarget::C620LeftFeedback) {
+                ++snapshot2.left_frames;
+            } else if (target == balancing::CanRxTarget::C620RightFeedback) {
+                ++snapshot2.right_frames;
+            }
+        }
     }
 
     void onCanTransmit(balancing::CanBus, balancing::TxToken, balancing::CanTxOutcome,
@@ -92,7 +131,18 @@ private:
         // 現在の監視プロファイルには送信要求元がない。機器サービスの結果通知は別途接続する。
     }
 
-    void onCanPortStatus(balancing::CanBus, balancing::CanEventKind kind, std::uint64_t) noexcept override
+    void onCanPortStatus(balancing::CanBus bus, balancing::CanEventKind kind, std::uint64_t) noexcept override
+    {
+        // 集計はバスごと。片側の欠落や復旧をもう片側へ伝播させない。
+        if (bus == balancing::CanBus::Can1) {
+            updateStatus(snapshot1, kind);
+        } else {
+            updateStatus(snapshot2, kind);
+        }
+    }
+
+    template<class Snapshot>
+    static void updateStatus(Snapshot& snapshot, balancing::CanEventKind kind) noexcept
     {
         switch (kind) {
         case balancing::CanEventKind::RxLost:
@@ -110,43 +160,77 @@ private:
         }
     }
 
-    balancing::CanTxScheduler tx_{port};
+    balancing::CanTxScheduler tx1_{port1};
+    balancing::CanTxScheduler tx2_{port2};
     std::uint32_t cyclesPerUs_;
     std::uint32_t lastCycle_;
     std::uint64_t accumulated_{0};
 };
 
-std::optional<Can1Runtime> runtime;
+std::optional<CanRuntime> runtime;
+
+// 通知有効化中のIRQからは構築済みポートを見せるが、両バス起動が完了するまで
+// 主ループへの観測公開はしない。失敗後の不明なHAL状態からの再起動は拒否する。
+bool started = false;
+bool rollbackFailed = false;
 
 } // namespace
 
-extern "C" bool balancing_f446_can1_start(CAN_HandleTypeDef* handle)
+extern "C" bool balancing_f446_can_start(CAN_HandleTypeDef* can1, CAN_HandleTypeDef* can2)
 {
-    if (runtime) {
-        return &runtime->handle == handle;
+    if (started) {
+        return &runtime->handle1 == can1 && &runtime->handle2 == can2;
     }
-    if (handle == nullptr || handle->Instance != CAN1 ||
-        HAL_CAN_GetState(handle) != HAL_CAN_STATE_READY ||
+    if (rollbackFailed || runtime || can1 == nullptr || can2 == nullptr ||
+        can1->Instance != CAN1 || can2->Instance != CAN2 ||
+        HAL_CAN_GetState(can1) != HAL_CAN_STATE_READY ||
+        HAL_CAN_GetState(can2) != HAL_CAN_STATE_READY ||
         SystemCoreClock == 0u || SystemCoreClock % microsecondsPerSecond != 0u ||
         (DWT->CTRL & DWT_CTRL_NOCYCCNT_Msk) != 0u) {
         return false;
     }
-
     CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
     DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
     if ((DWT->CTRL & DWT_CTRL_CYCCNTENA_Msk) == 0u ||
-        !installFilters(*handle) || HAL_CAN_Start(handle) != HAL_OK) {
+        !installCan1Filters(*can1) || !installCan2Filters(*can2)) {
         return false;
     }
-
-    // 通知を有効にする前に固定領域を構築する。ISRは主ループの集計に踏み込まない。
-    runtime.emplace(*handle, SystemCoreClock / microsecondsPerSecond);
-    if (HAL_CAN_ActivateNotification(handle, notifications) != HAL_OK) {
-        __HAL_CAN_DISABLE_IT(handle, notifications);
-        HAL_CAN_Stop(handle);
+    // HAL_CAN_Start失敗時もHALがLISTENINGへ移行済みの場合がある。
+    // READYに戻っていなければ停止を試み、復帰不能なら再起動を禁止する。
+    auto stopIfNeeded = [](CAN_HandleTypeDef* handle) {
+        if (HAL_CAN_GetState(handle) != HAL_CAN_STATE_READY &&
+            HAL_CAN_Stop(handle) != HAL_OK) {
+            rollbackFailed = true;
+        }
+    };
+    if (HAL_CAN_Start(can1) != HAL_OK) {
+        stopIfNeeded(can1);
+        return false;
+    }
+    if (HAL_CAN_Start(can2) != HAL_OK) {
+        stopIfNeeded(can2);
+        stopIfNeeded(can1);
+        return false;
+    }
+    // NVICはCubeMXが先に有効化するため、構築途中のポートをIRQに見せない。
+    const auto constructionMask = __get_PRIMASK();
+    __disable_irq();
+    runtime.emplace(*can1, *can2, SystemCoreClock / microsecondsPerSecond);
+    __set_PRIMASK(constructionMask);
+    if (HAL_CAN_ActivateNotification(can1, notifications) != HAL_OK ||
+        HAL_CAN_ActivateNotification(can2, notifications) != HAL_OK) {
+        // IRQからoptionalを参照できないよう、通知停止と破棄を同じ排他区間で行う。
+        const auto mask = __get_PRIMASK();
+        __disable_irq();
+        __HAL_CAN_DISABLE_IT(can1, notifications);
+        __HAL_CAN_DISABLE_IT(can2, notifications);
         runtime.reset();
+        __set_PRIMASK(mask);
+        stopIfNeeded(can2);
+        stopIfNeeded(can1);
         return false;
     }
+    started = true;
     return true;
 }
 
@@ -155,22 +239,40 @@ extern "C" bool balancing_f446_can1_capture_irq(void)
     if (!runtime) {
         return false;
     }
-    runtime->port.captureInterrupt(runtime->sampleClock());
+    runtime->port1.captureInterrupt(runtime->sampleClock());
     return true;
 }
 
-extern "C" void balancing_f446_can1_service(void)
+extern "C" bool balancing_f446_can2_capture_irq(void)
 {
-    if (runtime) {
+    if (!runtime) {
+        return false;
+    }
+    runtime->port2.captureInterrupt(runtime->sampleClock());
+    return true;
+}
+
+extern "C" void balancing_f446_can_service(void)
+{
+    if (started) {
         runtime->service();
     }
 }
 
 extern "C" bool balancing_f446_can1_snapshot(BF446Can1Snapshot* snapshot)
 {
-    if (!runtime || snapshot == nullptr) {
+    if (!started || snapshot == nullptr) {
         return false;
     }
-    *snapshot = runtime->snapshot;
+    *snapshot = runtime->snapshot1;
+    return true;
+}
+
+extern "C" bool balancing_f446_can2_snapshot(BF446Can2Snapshot* snapshot)
+{
+    if (!started || snapshot == nullptr) {
+        return false;
+    }
+    *snapshot = runtime->snapshot2;
     return true;
 }
