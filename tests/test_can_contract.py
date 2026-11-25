@@ -64,17 +64,33 @@ class CanContractTests(unittest.TestCase):
         errors = self.changed(CAN_SUMMARY, "0x202", "0x205")
         self.assertTrue(any("summary missing" in err for err in errors))
 
-    def test_power_guessed_id(self) -> None:
-        errors = self.changed(
-            POWER_SPEC,
-            "| **未確定** | **未確定** | **未確定** |",
-            "| **未確定** | **0x305** | **8** |",
-        )
-        self.assertTrue(any("F303" in err for err in errors))
+    def test_power_id_drift(self) -> None:
+        errors = self.changed(POWER_SPEC, "0x0840BC03", "0x0840BC04")
+        self.assertTrue(any("v1 ID fields" in err for err in errors))
 
-    def test_remote_guessed_id(self) -> None:
-        errors = self.changed(REMOTE_SPEC, "| **未確定** | **未確定** |", "| **0x305** | **8** |")
-        self.assertTrue(any("remote CAN" in err for err in errors))
+    def test_remote_dlc_drift(self) -> None:
+        errors = self.changed(REMOTE_SPEC, "float32×2 / 8", "float32×2 / 7")
+        self.assertTrue(any("spec/golden" in err for err in errors))
+
+    def test_v1_reserved_prefix(self) -> None:
+        errors = self.changed(REMOTE_SPEC, "0x0880C401", "0x1C00C401")
+        self.assertTrue(any("DJI reserved" in err for err in errors))
+
+    def test_v1_reserved_numeric(self) -> None:
+        errors = self.changed(POWER_SPEC, "0x0840BC03", "0x00000700")
+        self.assertTrue(any("DJI reserved" in err for err in errors))
+
+    def test_v1_duplicate(self) -> None:
+        errors = self.changed(REMOTE_SPEC, "0x0880C402", "0x0880C401")
+        self.assertTrue(any("duplicate" in err for err in errors))
+
+    def test_v1_direction(self) -> None:
+        errors = self.changed(REMOTE_SPEC, "Pi→F446", "F303→F446")
+        self.assertTrue(any("direction mismatch" in err for err in errors))
+
+    def test_v1_power_period(self) -> None:
+        errors = self.changed(POWER_SPEC, "| 100 ms |", "| 200 ms |")
+        self.assertTrue(any("POWER_STATUS period" in err for err in errors))
 
     def test_codec_command_id_drift(self) -> None:
         errors = self.changed(CODEC, "parsed.id = 0x200u;", "parsed.id = 0x205u;")
