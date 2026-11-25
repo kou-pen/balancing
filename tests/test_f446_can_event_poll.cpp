@@ -1,4 +1,5 @@
 #include "balancing/app/CanEventPoll.hpp"
+#include "balancing/app/PowerBoardService.hpp"
 #include "balancing/app/DiagnosticsService.hpp"
 #include "balancing/app/ControlCycle.hpp"
 #include "balancing/control/filter/ImuAttitudeSource.hpp"
@@ -314,6 +315,50 @@ void testRoutingFromBothPortQueues()
     assert(sink.entries[0].target == CanRxTarget::Rs06Status);
     assert(sink.entries[1].target == CanRxTarget::C620LeftFeedback);
     assert(sink.entries[2].target == CanRxTarget::C620RightFeedback);
+}
+
+// 本番のRouterとCanPortを利用するが、実機の配送先・フィルタは変更しない。
+void testPowerStatusThroughCanQueue()
+{
+    class PowerSink final : public CanEventSink {
+    public:
+        PowerBoardService power;
+        std::uint64_t nowUs{};
+        void onCanReceive(CanBus bus, CanRxTarget target, const CanFrame& frame,
+                          std::uint64_t atUs) noexcept override
+        {
+            assert(primask == 0u);
+            (void)power.acceptCanStatus(bus, target, frame, atUs, nowUs);
+        }
+        void onCanTransmit(CanBus, TxToken, CanTxOutcome, std::uint64_t) noexcept override {}
+        void onCanPortStatus(CanBus, CanEventKind, std::uint64_t) noexcept override {}
+    } sink;
+    Fixture can1, can2;
+    CanRouter router{sink};
+    // 仕様表の独立した固定IDとバイト列を使う。CAN1の同IDは採用しない。
+    // 電源ON=02、flags=80、faultBits=1234、sequence=00AB、予約=0000。
+    can1.pushRx(0x0840bc03u,100,true,8,0x34128002u,0x0000ab00u);
+    sink.nowUs=110;
+    pollCanEvents(&can1.port,&can2.port,router);
+    assert(!sink.power.snapshot(110).latest);
+    can2.pushRx(0x0840bc03u,120,true,8,0x34128002u,0x0000ab00u);
+    sink.nowUs=130;
+    pollCanEvents(&can1.port,&can2.port,router);
+    const auto report=sink.power.snapshot(130);
+    assert(report.ready && report.latest->receivedAtUs==120 && report.latest->wire);
+    assert(report.latest->wire->flags==0x80 && report.latest->wire->faultBits==0x1234);
+    assert(report.latest->wire->sequence==0xab);
+    // RouterでPowerStatusと分類されても、予約違反はCodecで拒否する。
+    can2.pushRx(0x0840bc03u,140,true,8,0x00000003u,0x01000000u);
+    sink.nowUs=150;
+    pollCanEvents(&can1.port,&can2.port,router);
+    assert(sink.power.snapshot(150).latest->receivedAtUs==120);
+    assert(sink.power.snapshot(500119).ready && !sink.power.snapshot(500120).fresh);
+    // POWER_RESULTに含む状態は最新のPOWER_STATUSを置き換えない。
+    can2.pushRx(0x08408404u,160,true,8,0x01000100u,0x00000200u);
+    sink.nowUs=170;
+    pollCanEvents(&can1.port,&can2.port,router);
+    assert(sink.power.snapshot(170).latest->receivedAtUs==120);
 }
 
 void testTerminalOnlyReleasesTheOriginatingBus()
@@ -1502,6 +1547,7 @@ int main()
     testRoutingUsesBusIdentifierFormatAndDlc();
     testCan2ProtocolReceiveDirections();
     testRoutingFromBothPortQueues();
+    testPowerStatusThroughCanQueue();
     testTerminalOnlyReleasesTheOriginatingBus();
     testSchedulerIgnoresUnacceptedAndStaleEvents();
     testNonSendTerminalEventsReleaseTheEntry();

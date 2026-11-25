@@ -114,6 +114,10 @@ app_math_cpp = [str(app_source / name) for name in (
     "app/ControlCycle.cpp", "app/PowerBoardService.cpp", "app/RemoteControlService.cpp", "app/DiagnosticsService.cpp", "app/StatusIndicator.cpp", "control/controller/MotorCommand.cpp",
     "control/controller/BalanceControl.cpp", "control/estimator/StateEstimator.cpp",
     "control/estimator/LegKinematics.cpp", "control/estimator/WheelOdometry.cpp")]
+power_codec_sources = [str(app_source / ("communication/can/" + name)) for name in
+                       ("PowerBoardCodec.cpp", "ProtocolPayload.cpp")]
+power_id_source = str(app_source / "communication/can/ProtocolId.cpp")
+app_math_cpp += power_codec_sources
 app_math_objects = {}
 for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"])]:
     app_math_objects[suffix] = []
@@ -138,7 +142,7 @@ cpp_common = [
     str(F446_APP / "Src" / "balancing" / "app" / "application.cpp"),
     str(ROOT / "tests" / "test_cpp_app.cpp"),
     str(app_source / "app" / "RobotSequence.cpp"),
-    *app_math_cpp,
+    *app_math_cpp, power_id_source,
 ]
 for label, flags in [
     ("C++アプリ通常ビルド", []),
@@ -552,7 +556,8 @@ for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-saniti
     path = OUT / f"test_f446_power_board_service{suffix}"
     subprocess.run(["g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
         "-I", str(F446_APP / "Inc"), str(app_source / "app/PowerBoardService.cpp"),
-        str(app_source / "app/RobotSequence.cpp"), str(ROOT / "tests/test_f446_power_board_service.cpp"),
+        str(app_source / "app/RobotSequence.cpp"), *power_codec_sources, power_id_source,
+        str(ROOT / "tests/test_f446_power_board_service.cpp"),
         *flags, "-o", str(path)], check=True, cwd=ROOT, timeout=30)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
