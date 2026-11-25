@@ -275,7 +275,7 @@
 | <a href="CanEventPoll_8hpp_source.html">CanEventPoll.hpp</a> | CAN1・CAN2からイベントを回収するAPI |
 | <a href="ControlCycle_8hpp_source.html">ControlCycle.hpp</a> | 時刻付き観測・状態機械・数学制御を1周期で処理する契約 |
 | <a href="ApplicationObservation_8hpp_source.html">ApplicationObservation.hpp</a> | 非駆動周期の入力・状態・診断コピー |
-| <a href="PowerBoardService_8hpp_source.html">PowerBoardService.hpp</a> | 電源の論理状態・500ms期限・故障保持 |
+| <a href="PowerBoardService_8hpp_source.html">PowerBoardService.hpp</a> | 電源報告の受信API・生メタデータ・500ms期限・故障保持 |
 | <a href="RemoteControlService_8hpp_source.html">RemoteControlService.hpp</a> | 復号済み操作・切替・復帰管理 |
 | <a href="DiagnosticsService_8hpp_source.html">DiagnosticsService.hpp</a> | 診断イベント・固定領域・送信進捗 |
 | <a href="StatusIndicator_8hpp_source.html">StatusIndicator.hpp</a> | 状態別の論理表示パターン |
@@ -426,7 +426,7 @@
 | <a href="MotorCanLink_8cpp_source.html">MotorCanLink.cpp</a> | 既存軸別受信とCAN1の有効化・停止の配送、自作CAN2を除外 |
 | <a href="RobotSequence_8cpp_source.html">RobotSequence.cpp</a> | 運転状態の遷移、ARMINGの期限、FAULT記録 |
 | <a href="application_8cpp_source.html">application.cpp</a> | F446のC++側初期化、6軸・IMU観測の固定、非駆動ControlCycle |
-| <a href="PowerBoardService_8cpp_source.html">PowerBoardService.cpp</a> | 復号済み報告の受理と電源鮮度評価 |
+| <a href="PowerBoardService_8cpp_source.html">PowerBoardService.cpp</a> | CAN2電源状態の復号接続・受理と鮮度評価 |
 | <a href="RemoteControlService_8cpp_source.html">RemoteControlService.cpp</a> | C11操作数学とC++状態の接続 |
 | <a href="DiagnosticsService_8cpp_source.html">DiagnosticsService.cpp</a> | 重要通常FIFO、3部分の終端照合 |
 | <a href="StatusIndicator_8cpp_source.html">StatusIndicator.cpp</a> | FAULT優先と時刻差による点滅・鳴動 |
