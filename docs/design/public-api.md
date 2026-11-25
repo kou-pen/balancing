@@ -167,3 +167,7 @@ ApplicationはMotorObservationSnapshotとImuAttitudeを同じ周期時刻で固�
 ## F303電源通信コーデック（実機未接続）
 
 `PowerBoardCodec` は電源状態、投入・遮断要求、処理結果、共通非常停止の形式を検証し、`CanFrame` と論理データを相互変換する。未決定の状態フラグ・故障ビットは生値のまま。鮮度、要求実行、操作許可は別責務。 [検証記録](../verification/f446-power-board-codec-host.md)。
+
+## Raspberry Pi操作通信コーデック（実機未接続）
+
+`RemoteControlCodec` は運動指令、操作要求、操作結果と `CanFrame` を相互変換する。有限値と固定形式を検査し、操作元指定はSELECT_SOURCEのみ許す。物理上限・操作元の権限・受信鮮度・状態遷移は別責務。 [検証記録](../verification/f446-remote-control-codec-host.md)。

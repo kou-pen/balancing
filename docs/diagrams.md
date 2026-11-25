@@ -510,7 +510,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     P["PowerBoardCodec"] --> I["ProtocolId：ID・DLC検査"]
-    R["操作Codec（予定）"] --> I
+    R["RemoteControlCodec"] --> I
     D["診断Codec（予定）"] --> I
     P --> B["ProtocolPayload：Big endian変換"]
     R --> B
@@ -519,4 +519,4 @@ flowchart TD
     B --> F
 ```
 
-共通処理と電源Codecは実装済み。操作・診断CodecとCAN2送受信への接続は未実施。
+共通処理・電源・操作Codecは実装済み。診断CodecとCAN2送受信への接続は未実施。
