@@ -182,6 +182,7 @@
 | [f446-control-cycle-core-host.md](../verification/f446-control-cycle-core-host.md) | ControlCycleをテスト専用から本体Appに移し、初回時刻・停止・故障処理を検証 |
 | [f446-application-timing-host.md](../verification/f446-application-timing-host.md) | CAN1とApplicationの共通DWT時刻・周期診断 |
 | [f446-dual-can-runtime-host.md](../verification/f446-dual-can-runtime-host.md) | CAN1/2共通時計・受信監視・起動失敗の検証 |
+| [f446-c620-continuity-host.md](../verification/f446-c620-continuity-host.md) | C620受信順累積・連続性喪失・原点世代の検証 |
 | [f446-source-layout.md](../verification/f446-source-layout.md) | 旧ソース配置の統合とCubeIDEビルド手順 |
 | [index.md](../verification/index.md) | 試験記録の案内、判定の意味、実機未検証の範囲 |
 | [issue10-observation-host.md](../verification/issue10-observation-host.md) | センサ、操作入力、IMUのホスト回帰 |
@@ -367,7 +368,7 @@
 
 | フォルダ・ファイル | 内容 |
 |---|---|
-| <a href="C620Motor_8hpp_source.html">C620Motor.hpp</a> | C620 1軸の受信値・鮮度取得のAPI |
+| <a href="C620Motor_8hpp_source.html">C620Motor.hpp</a> | C620 1軸の受信順累積・連続性・鮮度のAPI |
 | <a href="Rs06Motor_8hpp_source.html">Rs06Motor.hpp</a> | RS06 1軸の有効化、停止、状態報告のAPI |
 | <a href="Can1Observation_8h_source.html">Can1Observation.h</a> | HAL非依存のCAN1受信監視コピーと採取時刻 |
 | <a href="Can2Observation_8h_source.html">Can2Observation.h</a> | CAN2の受信・左右分類・バス異常・共通評価時刻 |
@@ -467,7 +468,7 @@
 |---|---|
 | <a href="balancing__leg__kinematics_8c_source.html">balancing_leg_kinematics.c</a> | 閉リンクの幾何計算、脚長、ヤコビアン |
 | <a href="balancing__observation_8c_source.html">balancing_observation.c</a> | センサ値の取り込み、車輪角の折返し、観測コピー |
-| <a href="WheelOdometry_8cpp_source.html">WheelOdometry.cpp</a> | C620ロータ角の折返し、重複報告の除外、車輪位置・速度換算 |
+| <a href="WheelOdometry_8cpp_source.html">WheelOdometry.cpp</a> | C620累積カウント・RPMの物理換算、受理番号と世代の照合 |
 | <a href="LegKinematics_8cpp_source.html">LegKinematics.cpp</a> | C11閉リンク数値演算をC++17に接続し脚長とJを求める |
 | <a href="StateEstimator_8cpp_source.html">StateEstimator.cpp</a> | 6軸とIMUを同期評価し制御状態かエラーを返す |
 */
@@ -487,7 +488,7 @@
 
 | フォルダ・ファイル | 内容 |
 |---|---|
-| <a href="C620Motor_8cpp_source.html">C620Motor.cpp</a> | C620 1軸の最新報告と受信時刻からの鮮度判定 |
+| <a href="C620Motor_8cpp_source.html">C620Motor.cpp</a> | C620 1軸の受信順折返し、連続性喪失、通信鮮度 |
 | <a href="Rs06Motor_8cpp_source.html">Rs06Motor.cpp</a> | RS06 1軸の有効化・停止フレームと応答の照合 |
 | <a href="balancing__f446__motor__bench__port_8c_source.html">balancing_f446_motor_bench_port.c</a> | F446 HALと単軸試運転の送受信・周期を接続 |
 | <a href="f446__can1__runtime_8cpp_source.html">f446_can1_runtime.cpp</a> | CAN1/2起動、共有フィルタ、IRQ、共通DWT時計、独立した監視集計 |

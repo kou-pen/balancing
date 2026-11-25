@@ -111,7 +111,8 @@ public:
     std::variant<ControlSnapshot, StateEstimateError>
     update(const StateEstimatorInput& input, std::chrono::microseconds elapsed) noexcept;
 
-    /** @brief 観測原点の再設定時に車輪の積算基準を消す。
+    /** @brief MotorServiceの明示原点再設定と同期して次世代を待つ。
+     *  @pre DISARMED、旧RXキュー排除、MotorService::resetWheelReference()成功済み。
      *  @note 通常のARM/DISARMでは呼ばない。IMU姿勢フィルタ自体のresetは上流担当。
      *  @spec{CTRL-EST-001}
      */
