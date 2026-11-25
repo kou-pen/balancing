@@ -15,6 +15,7 @@ namespace balancing {
 // 起動時固定の非駆動プロファイル。CAD・校正・ゲイン・上限・ARM期限の
 // 未検証値を人工fixtureで埋めない。所有者の寿命はControlCycleより長い。
 struct ObservationCycle {
+    PowerBoardService power{};
     StateEstimator estimator{StateEstimatorConfig{}};
     RobotSequence sequence{ArmTimeoutConfig{}};
     BalanceControl controller{BalanceControlConfig{}};
@@ -59,6 +60,7 @@ public:
         ++timing_.control_ticks;
         observation_.motors.reset();
         observation_.imu = {};
+        observation_.power = {};
         observation_.cycle.reset();
         timing_.sample_valid = false;
         timing_.elapsed_valid = false;
@@ -96,7 +98,9 @@ public:
         observation_.imu = imuAttitude(nowUs);
         ControlTickInput input{};
         input.observations = {observation_.imu, motors->motors};
-        input.observedFaults = motors->observedFaults;
+        observation_.power = control_->power.snapshot(nowUs);
+        input.interlocks.powerReady = observation_.power.ready;
+        input.observedFaults = motors->observedFaults | control_->power.takeObservedFaults(nowUs);
         // 電源・PS5・機構・校正・ゲイン・限界が未検証なので、既定の
         // interlocks=false / mechanism=Unverified / operator空を維持。
         // 初回・取得不能直後はfirstElapsed=0で推定を拒否する。
