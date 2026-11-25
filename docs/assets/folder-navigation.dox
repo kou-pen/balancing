@@ -350,6 +350,7 @@
 | フォルダ・ファイル | 内容 |
 |---|---|
 | <a href="balancing__attitude__filter_8h_source.html">balancing_attitude_filter.h</a> | 加速度とジャイロを使う姿勢フィルタの型とAPI |
+| <a href="ImuAttitudeSource_8hpp_source.html">ImuAttitudeSource.hpp</a> | 新規IMU測定と姿勢フィルタ |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_core core/
@@ -373,6 +374,9 @@
 | <a href="Can1Observation_8h_source.html">Can1Observation.h</a> | HAL非依存のCAN1受信監視コピーと採取時刻 |
 | <a href="Can2Observation_8h_source.html">Can2Observation.h</a> | CAN2の受信・左右分類・バス異常・共通評価時刻 |
 | <a href="MotorObservation_8hpp_source.html">MotorObservation.hpp</a> | 6軸周期観測と回収番号・故障保持 |
+| <a href="I2cPort_8hpp_source.html">I2cPort.hpp</a> | 非同期I2C転送の契約 |
+| <a href="Bno055_8hpp_source.html">Bno055.hpp</a> | ACCGYRO取得とDRDY・時間窓 |
+| <a href="ImuObservation_8hpp_source.html">ImuObservation.hpp</a> | 姿勢の周期読取API |
 | <a href="balancing__f446__motor__bench__port_8h_source.html">balancing_f446_motor_bench_port.h</a> | F446の試運転ポートを操作するC API |
 */
 

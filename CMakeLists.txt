@@ -252,3 +252,17 @@ add_executable(balancing_f446_motor_frame_plan_tests
 target_link_libraries(balancing_f446_motor_frame_plan_tests PRIVATE balancing_core m)
 target_compile_options(balancing_f446_motor_frame_plan_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_motor_frame_plan_tests COMMAND balancing_f446_motor_frame_plan_tests)
+
+set(BALANCING_IMU_SOURCES
+    ${F446_APP}/Src/balancing/device/I2cPort.cpp
+    ${F446_APP}/Src/balancing/device/Bno055.cpp
+    ${F446_APP}/Src/balancing/device/f446_imu_runtime.cpp
+    ${F446_APP}/Src/balancing/control/filter/ImuAttitudeSource.cpp
+)
+add_executable(balancing_f446_imu_runtime_tests
+    tests/test_f446_imu_runtime.cpp
+    ${BALANCING_IMU_SOURCES})
+target_include_directories(balancing_f446_imu_runtime_tests PRIVATE tests/stubs_can1)
+target_link_libraries(balancing_f446_imu_runtime_tests PRIVATE balancing_core m)
+target_compile_options(balancing_f446_imu_runtime_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME balancing_f446_imu_runtime_tests COMMAND balancing_f446_imu_runtime_tests)

@@ -457,3 +457,17 @@ flowchart LR
 </pre>
 
 観測のみ。送信経路は未接続。
+
+
+## BNO055入力
+
+<pre class="mermaid">
+flowchart LR
+    IRQ["I2C1 IRQ：完了通知"] --> P["I2cPort"]
+    P --> B["Bno055：設定・DRDY・SI値"]
+    B --> F["ImuAttitudeSource：静止校正・相補フィルタ"]
+    F --> A["ImuAttitude：元時刻・50ms鮮度"]
+    A --> APP["Application（後続）"]
+</pre>
+
+未検証の取得条件・静止証明では姿勢無効。

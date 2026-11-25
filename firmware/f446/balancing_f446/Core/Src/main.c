@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "../../App/Inc/balancing_app_bridge.h"
 #include "../../App/Inc/balancing_f446_can1_bridge.h"
+#include "../../App/Inc/balancing_f446_imu_bridge.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -117,6 +118,8 @@ int main(void)
   {
     Error_Handler();
   }
+  /* 未検証IMU設定では観測未成立のままCAN監視を継続する。 */
+  (void)balancing_f446_imu_start(&hi2c1);
   if (HAL_TIM_Base_Start_IT(&htim7) != HAL_OK)
   {
     Error_Handler();
@@ -141,6 +144,7 @@ int main(void)
       balancing_f446_can_service();
       balancing_app_control_tick();
     }
+    balancing_f446_imu_poll();
     balancing_app_poll();
   }
   /* USER CODE END 3 */
