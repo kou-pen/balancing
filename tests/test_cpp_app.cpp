@@ -32,6 +32,8 @@ balancing::ImuAttitude balancing::imuAttitude(std::uint64_t nowUs) noexcept
     return {nowUs,0,0,0,0,0,false,false};
 }
 
+void balancing::serviceCan2ApplicationTx() noexcept {}
+
 int main()
 {
     BF446AppTimingSnapshot timing{};

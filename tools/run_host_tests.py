@@ -117,7 +117,10 @@ app_math_cpp = [str(app_source / name) for name in (
 power_codec_sources = [str(app_source / ("communication/can/" + name)) for name in
                        ("PowerBoardCodec.cpp", "ProtocolPayload.cpp")]
 power_id_source = str(app_source / "communication/can/ProtocolId.cpp")
-app_math_cpp += power_codec_sources
+remote_codec_source = str(app_source / "communication/can/RemoteControlCodec.cpp")
+app_math_cpp += power_codec_sources + [remote_codec_source,
+    str(app_source / "communication/can/DiagnosticsCodec.cpp"),
+    str(app_source / "app/Can2ServiceLink.cpp")]
 app_math_objects = {}
 for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"])]:
     app_math_objects[suffix] = []
@@ -379,6 +382,7 @@ can_dispatch_common = [
     str(rs06_source / "communication" / "can" / "ProtocolId.cpp"),
     str(rs06_source / "communication" / "can" / "CanTxScheduler.cpp"),
     str(rs06_source / "app" / "CanEventPoll.cpp"),
+    str(rs06_source / "app" / "Can2ServiceLinkTx.cpp"),
 ]
 for test, extra_sources in [
     ("test_f446_can1_runtime", rs06_service_sources + app_math_cpp + [str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "device" / "f446_can1_runtime.cpp"), str(rs06_source / "communication" / "can" / "Can2FilterPlan.cpp"), str(rs06_source / "app" / "application.cpp")]),
@@ -406,6 +410,7 @@ for test, extra_sources in [
         if test == "test_f446_can1_runtime":
             subprocess.run([str(path), "--rollback-failure"], check=True, cwd=ROOT, timeout=30)
             subprocess.run([str(path), "--motor-observation"], check=True, cwd=ROOT, timeout=30)
+            subprocess.run([str(path), "--can2-services"], check=True, cwd=ROOT, timeout=30)
 
 
 # C++17 wheel odometry: C11 C620 decode -> MotorService -> wheel positions.
@@ -565,7 +570,8 @@ for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-saniti
     path = OUT / f"test_f446_remote_control_service{suffix}"
     subprocess.run(["g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
         "-I", str(F446_APP / "Inc"), str(app_source / "app/RemoteControlService.cpp"),
-        str(ROOT / "tests/test_f446_remote_control_service.cpp"), *app_math_objects[suffix],
+        str(ROOT / "tests/test_f446_remote_control_service.cpp"), remote_codec_source,
+        str(app_source / "communication/can/ProtocolPayload.cpp"), power_id_source, *app_math_objects[suffix],
         *flags, "-lm", "-o", str(path)], check=True, cwd=ROOT, timeout=30)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 

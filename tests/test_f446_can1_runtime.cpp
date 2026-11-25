@@ -32,6 +32,7 @@ int filterFailsBank=-1;
 int startFailsBus = -1;
 bool startTimeout{};
 int irqEnableFailsBus = -1;
+bool expectSelfDefinedCan2{};
 
 void pushReceive(unsigned motor = 11, unsigned host = 0x5a)
 {
@@ -160,7 +161,8 @@ HAL_StatusTypeDef HAL_CAN_Start(CAN_HandleTypeDef* handle)
 {
     assert(handle->State == HAL_CAN_STATE_READY && enabledNotifications[busIndex(handle)] == 0u);
     assert(installedFilters[14].FilterActivation == ENABLE);
-    for (unsigned i=15;i<28;++i) assert(installedFilters[i].FilterActivation == DISABLE);
+    for (unsigned i=15;i<28;++i)
+        assert(installedFilters[i].FilterActivation == (expectSelfDefinedCan2 && i<=20 ? ENABLE : DISABLE));
     ++startCount;
     if (static_cast<int>(busIndex(handle)) == startFailsBus) {
         if (startTimeout) handle->State = HAL_CAN_STATE_ERROR;
@@ -236,6 +238,100 @@ int main(int argc, char** argv)
         assert(!balancing_f446_can_start(&handle, &handle2));
         assert(startCount == attempts);
         std::puts("PASS: failed CAN2 rollback is latched");
+        return 0;
+    }
+
+    if (argc == 2 && std::strcmp(argv[1], "--can2-services") == 0) {
+        using namespace balancing;
+        using namespace balancing::protocol;
+        // 全値はホストfixture。未設定のまま自作フィルタだけを開くことはできない。
+        assert(!startCanObservation(&handle,&handle2,{},true));
+        assert(!applicationCan2Link());
+        std::array<DiagnosticSlot,4> important{};
+        Can2ObservationProfile profile{};
+        profile.communication={200000,100000,20000,20,1000,4,0xCA2u,false};
+        profile.operatorConfig={100000,20000,2.0f,3.0f,0.01f,0.01f,1.0f,1.0f,true};
+        profile.faultSlots=important.data();
+        profile.faultCapacity=important.size();
+        assert(initializeCan2Observation(profile));
+        expectSelfDefinedCan2=true;
+        assert(startCanObservation(&handle,&handle2,{},true));
+        assert(!startCanObservation(&handle,&handle2,{},false));
+        const auto expected=makeCan2FilterPlan(true);
+        for (unsigned i=0;i<expected.count;++i) {
+            const auto& f=installedFilters[14+i];
+            assert(((f.FilterIdHigh<<16u)|f.FilterIdLow)==expected.entries[i].first);
+            assert(((f.FilterMaskIdHigh<<16u)|f.FilterMaskIdLow)==expected.entries[i].second);
+        }
+        const auto rx=[&](std::uint32_t id,unsigned dlc,std::uint32_t low=0,std::uint32_t high=0) {
+            DWT->CYCCNT+=168u*100u;
+            can2.sFIFOMailBox[0]={(id<<3u)|CAN_RI0R_IDE,dlc,low,high};
+            can2.RF0R.count=1;
+            assert(balancing_f446_can2_capture_irq());
+        };
+        const auto tick=[&] {
+            DWT->CYCCNT+=168u*2000u;
+            balancing_f446_can_service();
+            balancing_app_control_tick();
+            assert(applicationObservation()->timing.sample_valid);
+        };
+        const auto send=[&](std::uint32_t expectedId) {
+            balancing_app_poll();
+            // 診断/応答でモータ用の全メールボックスを占有しない。
+            assert((can2.sTxMailBox[0].TIR&CAN_TI0R_TXRQ)!=0u);
+            assert((can2.sTxMailBox[0].TIR>>3u)==expectedId);
+            assert((can2.sTxMailBox[1].TIR&CAN_TI0R_TXRQ)==0u);
+            assert((can2.sTxMailBox[2].TIR&CAN_TI0R_TXRQ)==0u);
+            const auto low=can2.sTxMailBox[0].TDLR, high=can2.sTxMailBox[0].TDHR;
+            can2.TSR.bits&=~CAN_TSR_TME0;
+            can2.sTxMailBox[0].TIR&=~CAN_TI0R_TXRQ;
+            can2.TSR.bits|=CAN_TSR_TME0|CAN_TSR_RQCP0|CAN_TSR_TXOK0;
+            DWT->CYCCNT+=168u;
+            assert(balancing_f446_can2_capture_irq());
+            tick();
+            return std::array<std::uint32_t,2>{low,high};
+        };
+        // 独立した固定IDとワイヤ値で、IRQからApplicationまで実配線以外を確認。
+        rx(0x0840bc03,8,0x34128002,0x00000100);
+        tick();
+        auto obs=applicationObservation();
+        assert(obs->power.ready && obs->power.latest->receivedAtUs==100);
+        assert(obs->power.latest->wire->faultBits==0x1234);
+        // USB選択中のPi ARMはUnauthorized。選択変更後も未検証パラメータでARM不可。
+        rx(0x0880c402,2,0x0100);
+        tick();
+        auto response=send(0x08804c06);
+        assert(response[0]==0x02000100 && (response[1]&0xffu)==5);
+        rx(0x0880c405,3,0x00010200);
+        tick();
+        response=send(0x08804c06);
+        assert(response[0]==0x05000200 && (response[1]&0xffu)==0);
+        assert(applicationObservation()->operatorTarget->source==B_OPERATOR_CAN_REMOTE);
+        rx(0x0880c402,2,0x0300);
+        tick();
+        response=send(0x08804c06);
+        assert(response[0]==0x02000300 && (response[1]&0xffu)==3);
+        // 同じ周期でARMとE-STOPが来てもFAULTが先。応答満杯と無関係。
+        rx(0x0880c402,2,0x0400);
+        rx(0x0004fc01,0);
+        tick();
+        obs=applicationObservation();
+        assert(obs->cycle->sequence.state==RobotState::Fault);
+        assert(obs->fault && obs->fault->primaryCause==FaultFlags::EmergencyStop);
+        assert(obs->diagnostics.importantPending==1 && !obs->cycle->motorCommandPreview);
+        // 実ApplicationのFaultRecordを3フレームへ配送し、終端まで保持。
+        const auto first=send(0x04c04c20);
+        const auto second=send(0x04c04c21);
+        const auto third=send(0x04c04c22);
+        assert((first[0]&0xffffu)==(second[0]&0xffffu));
+        assert((second[0]&0xffffu)==(third[0]&0xffffu));
+        assert(applicationObservation()->diagnostics.importantPending==0);
+        for (const auto& mailbox:can1.sTxMailBox) assert(!(mailbox.TIR&CAN_TI0R_TXRQ));
+        // 解除権限は非駆動profileでは未接続。再ARMもしない。
+        rx(0x0880c404,2,0x0500);
+        tick();
+        assert(applicationObservation()->cycle->sequence.state==RobotState::Fault);
+        std::puts("PASS: CAN2 opt-in filters, IRQ, application cycle, remote response and three fault frames");
         return 0;
     }
 
