@@ -128,6 +128,7 @@ void MotorService::setCan2BusOff(bool busOff) noexcept
 {
     can2BusOff_ = busOff;
     if (busOff) {
+        pendingFaults_ = pendingFaults_ | FaultFlags::BusOff;
         reportCan2RxLost();
     }
 }
@@ -179,14 +180,17 @@ Rs06ArmFeedback MotorService::rs06ArmFeedback(std::uint64_t nowUs) const noexcep
 
 FaultFlags MotorService::takeObservedFaults(std::uint64_t nowUs) noexcept
 {
+    const auto flags = takeObservationFaults(nowUs);
+    return configured_ ? flags : flags | FaultFlags::ExternalFault;
+}
+
+FaultFlags MotorService::takeObservationFaults(std::uint64_t nowUs) noexcept
+{
     // 1周期の間に正常フレームや復旧通知が来ても、発生した異常を渡す。
     auto flags = pendingFaults_;
     pendingFaults_ = FaultFlags::None;
-    if (can1BusOff_) {
+    if (can1BusOff_ || can2BusOff_) {
         flags = flags | FaultFlags::BusOff;
-    }
-    if (!configured_) {
-        flags = flags | FaultFlags::ExternalFault;
     }
     for (const auto& status : rs06Status(nowUs)) {
         if (status.motorFault) {

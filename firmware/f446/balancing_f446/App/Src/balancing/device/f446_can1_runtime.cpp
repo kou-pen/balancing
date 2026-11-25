@@ -1,6 +1,7 @@
 #include "balancing_f446_can1_bridge.h"
 
 #include "balancing/app/CanEventPoll.hpp"
+#include "balancing/app/MotorCanLink.hpp"
 #include "balancing/communication/can/CanPort.hpp"
 #include "balancing/communication/can/CanRouter.hpp"
 #include "balancing/communication/can/CanTxScheduler.hpp"
@@ -66,8 +67,12 @@ bool installCan2Filters(CAN_HandleTypeDef& handle)
 
 class CanRuntime final : private balancing::CanEventSink {
 public:
-    CanRuntime(CAN_HandleTypeDef& can1, CAN_HandleTypeDef& can2, std::uint32_t cyclesPerUs) noexcept
+    CanRuntime(CAN_HandleTypeDef& can1, CAN_HandleTypeDef& can2, std::uint32_t cyclesPerUs,
+               const balancing::MotorObservationConfig& config) noexcept
         : port1{can1}, port2{can2}, handle1{can1}, handle2{can2},
+          motors_{config.rs06MappingVerified ? config.rs06 : balancing::Rs06BusConfig{},
+                  config.wheelContinuity},
+          link_{motors_, tx1_}, mappingVerified_{config.rs06MappingVerified && motors_.hasRs06Configuration()},
           cyclesPerUs_{cyclesPerUs}, lastCycle_{DWT->CYCCNT}
     {
     }
@@ -97,8 +102,22 @@ public:
         const auto now = sampleClock();
         snapshot1.sampled_at_us = snapshot2.sampled_at_us = now;
         snapshot1.sampled = snapshot2.sampled = true;
+        // 同じ評価時刻で全軸を固定。監視を読んだだけでは故障を消さない。
+        pendingFaults_ = pendingFaults_ | motors_.takeObservationFaults(now);
+        observation = balancing::MotorObservationSnapshot{
+            motors_.feedback(now), ++observationGeneration_, snapshot1.bus_off, snapshot2.bus_off,
+            pendingFaults_, mappingVerified_};
     }
 
+    bool acknowledge(std::uint64_t generation) noexcept
+    {
+        if (!observation || observation->generation != generation) return false;
+        pendingFaults_ = balancing::FaultFlags::None;
+        // コピーは次回回収まで変更しない。
+        return true;
+    }
+
+    std::optional<balancing::MotorObservationSnapshot> observation{};
     balancing::CanPort port1;
     balancing::CanPort port2;
     CAN_HandleTypeDef& handle1;
@@ -107,9 +126,10 @@ public:
     BF446Can2Snapshot snapshot2{};
 
 private:
-    void onCanReceive(balancing::CanBus bus, balancing::CanRxTarget target, const balancing::CanFrame&,
+    void onCanReceive(balancing::CanBus bus, balancing::CanRxTarget target, const balancing::CanFrame& frame,
                       std::uint64_t atUs) noexcept override
     {
+        link_.onCanReceive(bus, target, frame, atUs);
         // 監視値はポートが回収した受信の集計。機器の鮮度や正常応答の判定には使わない。
         if (bus == balancing::CanBus::Can1) {
             ++snapshot1.rx_frames;
@@ -125,14 +145,16 @@ private:
         }
     }
 
-    void onCanTransmit(balancing::CanBus, balancing::TxToken, balancing::CanTxOutcome,
-                       std::uint64_t) noexcept override
+    void onCanTransmit(balancing::CanBus bus, balancing::TxToken token, balancing::CanTxOutcome outcome,
+                       std::uint64_t atUs) noexcept override
     {
-        // 現在の監視プロファイルには送信要求元がない。機器サービスの結果通知は別途接続する。
+        // 受信専用。終端の配送だけで、送信候補は生成しない。
+        link_.onCanTransmit(bus, token, outcome, atUs);
     }
 
-    void onCanPortStatus(balancing::CanBus bus, balancing::CanEventKind kind, std::uint64_t) noexcept override
+    void onCanPortStatus(balancing::CanBus bus, balancing::CanEventKind kind, std::uint64_t atUs) noexcept override
     {
+        link_.onCanPortStatus(bus, kind, atUs);
         // 集計はバスごと。片側の欠落や復旧をもう片側へ伝播させない。
         if (bus == balancing::CanBus::Can1) {
             updateStatus(snapshot1, kind);
@@ -162,6 +184,11 @@ private:
 
     balancing::CanTxScheduler tx1_{port1};
     balancing::CanTxScheduler tx2_{port2};
+    balancing::MotorService motors_;
+    balancing::MotorCanLink link_;
+    bool mappingVerified_;
+    std::uint64_t observationGeneration_{0};
+    balancing::FaultFlags pendingFaults_{balancing::FaultFlags::None};
     std::uint32_t cyclesPerUs_;
     std::uint32_t lastCycle_;
     std::uint64_t accumulated_{0};
@@ -177,6 +204,12 @@ bool rollbackFailed = false;
 } // namespace
 
 extern "C" bool balancing_f446_can_start(CAN_HandleTypeDef* can1, CAN_HandleTypeDef* can2)
+{
+    return balancing::startCanObservation(can1, can2, {});
+}
+
+bool balancing::startCanObservation(CAN_HandleTypeDef* can1, CAN_HandleTypeDef* can2,
+                                    const MotorObservationConfig& config) noexcept
 {
     if (started) {
         return &runtime->handle1 == can1 && &runtime->handle2 == can2;
@@ -215,7 +248,7 @@ extern "C" bool balancing_f446_can_start(CAN_HandleTypeDef* can1, CAN_HandleType
     // NVICはCubeMXが先に有効化するため、構築途中のポートをIRQに見せない。
     const auto constructionMask = __get_PRIMASK();
     __disable_irq();
-    runtime.emplace(*can1, *can2, SystemCoreClock / microsecondsPerSecond);
+    runtime.emplace(*can1, *can2, SystemCoreClock / microsecondsPerSecond, config);
     __set_PRIMASK(constructionMask);
     if (HAL_CAN_ActivateNotification(can1, notifications) != HAL_OK ||
         HAL_CAN_ActivateNotification(can2, notifications) != HAL_OK) {
@@ -275,4 +308,20 @@ extern "C" bool balancing_f446_can2_snapshot(BF446Can2Snapshot* snapshot)
     }
     *snapshot = runtime->snapshot2;
     return true;
+}
+
+std::optional<balancing::MotorObservationSnapshot> balancing::motorObservation() noexcept
+{
+    return started ? runtime->observation : std::nullopt;
+}
+
+bool balancing::acknowledgeMotorObservation(std::uint64_t generation) noexcept
+{
+    return started && runtime->acknowledge(generation);
+}
+
+std::optional<std::uint64_t> balancing::observationClockUs() noexcept
+{
+    if (!started) return std::nullopt;
+    return runtime->sampleClock();
 }
