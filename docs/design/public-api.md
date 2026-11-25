@@ -159,3 +159,7 @@ App本体の `ControlCycle` は `MotorCommand::hasVerifiedConfiguration()` がfa
 ## Applicationの観測周期統合（非駆動）
 
 ApplicationはMotorObservationSnapshotとImuAttitudeを同じ周期時刻で固定し、ControlCycleへ渡す。既定プロファイルは校正・モデル・駆動限界・電源・機構・操作条件が未検証で、ARM/指令送信に接続しない。ApplicationObservationは周期・6軸・姿勢・状態推定・FAULTの診断コピー。取得不能・時計異常では旧周期結果を返さない。最新回収番号の異常通知消費はFAULT解除とは独立する。[統合検証](../verification/f446-application-observation-cycle-host.md)。
+
+## CAN2 v1共通コーデック（実機未接続）
+
+個別Codecから `protocol::encodeId()/decodeId()` と `findMessage()/matchesProtocolFrame()` を使用する。35件の固定IDとDLCを照合し、DJI予約領域を除外する。 `ProtocolPayload` の整数・float32変換はDLC境界と非有限値を検査し、HALや送信経路に依存しない。形式検査と状態機械の操作許可は別責務。 [検証記録](../verification/f446-protocol-codec-host.md)。

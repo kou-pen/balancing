@@ -62,3 +62,5 @@
 - [診断イベント管理](f446-diagnostics-service-host.md)
 
 - [LED/Buzzer論理表示](f446-status-indicator-host.md)
+
+- [CAN2 v1共通コーデック](f446-protocol-codec-host.md)

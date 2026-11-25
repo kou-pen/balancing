@@ -504,3 +504,19 @@ flowchart TD
 </pre>
 
 実CAN・USB復号、診断配信と物理GPIOは未接続。
+
+## CAN2 v1共通コーデック
+
+```mermaid
+flowchart TD
+    P["電源Codec（予定）"] --> I["ProtocolId：ID・DLC検査"]
+    R["操作Codec（予定）"] --> I
+    D["診断Codec（予定）"] --> I
+    P --> B["ProtocolPayload：Big endian変換"]
+    R --> B
+    D --> B
+    I --> F["CanFrame"]
+    B --> F
+```
+
+共通処理のみ実装済み。個別Codec・CAN2送受信への接続は未実施。
