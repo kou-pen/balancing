@@ -1733,6 +1733,41 @@ void testIntegratedObservationAndFrameScheduling()
     assert(tx2.service(faultAt+2).result==ScheduledTxResult::Idle);
 }
 
+void testAbortPeriodicDoesNotDelayOtherAxisStop()
+{
+    Fixture can1;
+    Recorder sink;
+    CanTxScheduler tx{can1.port};
+    CanRouter router{sink,&tx,nullptr};
+    PeriodicTxBatch batch{1,4000,{}};
+    const CanFrame old{0x111,{},8,false};
+    batch.requests[0]=PeriodicTxRequest{old,{1,90}};
+    batch.requests[1]=PeriodicTxRequest{old,{2,90}};
+    assert(tx.replacePeriodic(batch,100)==PeriodicBatchResult::Queued);
+    assert(tx.service(100).result==ScheduledTxResult::Accepted);
+    can1.occupy(0);
+    // 2軸目は未受付。軸0の旧指令に中止を要求し、軸1の待ちを破棄。
+    tx.invalidatePeriodic();
+    assert(can1.registers.TSR.aborts==CAN_TSR_ABRQ0);
+    const CanFrame stop0{0x112,{},8,false},stop1{0x113,{},8,false};
+    assert(tx.enqueueStop(0,stop0,{3,90})==StopEnqueueResult::Queued);
+    assert(tx.enqueueStop(1,stop1,{4,90})==StopEnqueueResult::Queued);
+    assert(tx.service(101).token==(TxToken{4,90}));
+    can1.occupy(1);
+    assert(tx.service(102).result==ScheduledTxResult::Busy);
+    can1.complete(1,CAN_TSR_TXOK0,103);
+    pollCanEvents(&can1.port,nullptr,router);
+    assert(tx.service(103).result==ScheduledTxResult::Busy);
+    // ABRQを書いた時点で解放しない。旧軸0の終端を受けてから同じ軸の停止。
+    can1.complete(0,0,104);
+    pollCanEvents(&can1.port,nullptr,router);
+    assert(tx.service(104).token==(TxToken{3,90}));
+    can1.occupy(0);
+    can1.complete(0,CAN_TSR_TXOK0,105);
+    pollCanEvents(&can1.port,nullptr,router);
+    assert(tx.service(105).result==ScheduledTxResult::Idle); // 捨てた旧軸1は復活しない
+}
+
 void testDiagnosticPartsWithScheduler()
 {
     // ここでのCAN ID/DLCは模擬転送の容器にすぎず、PC向け通信仕様ではない。
@@ -1796,6 +1831,7 @@ int main()
     testMotorCanLinkCan1BusOffRecoveryAndRxLoss();
     testMotorFramePlanCan1Can2StopPriority();
     testIntegratedObservationAndFrameScheduling();
+    testAbortPeriodicDoesNotDelayOtherAxisStop();
     testDiagnosticPartsWithScheduler();
     std::puts("PASS: F446 CAN dispatch, TX scheduling, six-axis feedback and RS06 arm/stop");
 }

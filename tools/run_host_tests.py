@@ -385,7 +385,7 @@ can_dispatch_common = [
     str(rs06_source / "app" / "Can2ServiceLinkTx.cpp"),
 ]
 for test, extra_sources in [
-    ("test_f446_can1_runtime", rs06_service_sources + app_math_cpp + [str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "device" / "f446_can1_runtime.cpp"), str(rs06_source / "communication" / "can" / "Can2FilterPlan.cpp"), str(rs06_source / "app" / "application.cpp")]),
+    ("test_f446_can1_runtime", rs06_service_sources + app_math_cpp + [str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "device" / "f446_can1_runtime.cpp"), str(rs06_source / "communication" / "can" / "Can2FilterPlan.cpp"), str(rs06_source / "app" / "application.cpp"), str(rs06_source / "app" / "DriveCycle.cpp"), str(rs06_source / "communication" / "can" / "MotorFramePlan.cpp")]),
     ("test_f446_can_event_poll", rs06_service_sources + app_math_cpp + [str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "communication" / "can" / "MotorFramePlan.cpp"), str(rs06_source / "control" / "filter" / "ImuAttitudeSource.cpp")]),
 ]:
     for suffix, flags in [
@@ -404,6 +404,7 @@ for test, extra_sources in [
             link_libraries.append(str(attitude))
         print(f"[{test}{suffix}] コンパイル", flush=True)
         subprocess.run(can_dispatch_common + extra_sources + flags +
+                       (['-DBALANCING_HOST_SIL'] if test == 'test_f446_can1_runtime' else []) +
                        [str(source)] + link_libraries + ["-o", str(path)],
                        check=True, cwd=ROOT, timeout=30)
         subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
@@ -411,6 +412,10 @@ for test, extra_sources in [
             subprocess.run([str(path), "--rollback-failure"], check=True, cwd=ROOT, timeout=30)
             subprocess.run([str(path), "--motor-observation"], check=True, cwd=ROOT, timeout=30)
             subprocess.run([str(path), "--can2-services"], check=True, cwd=ROOT, timeout=30)
+            for mode in ("--drive-sil", "--drive-sil-timeout", "--drive-sil-invalid",
+                         "--drive-sil-stale", "--drive-sil-rs-timeout", "--drive-sil-tx-error", "--drive-sil-estop",
+                         "--drive-sil-invalid-model", "--drive-sil-rx-loss", "--drive-sil-gap"):
+                subprocess.run([str(path), mode], check=True, cwd=ROOT, timeout=30)
 
 
 # C++17 wheel odometry: C11 C620 decode -> MotorService -> wheel positions.

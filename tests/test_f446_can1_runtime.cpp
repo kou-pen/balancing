@@ -9,6 +9,7 @@
 #endif
 
 #include <array>
+#include <cmath>
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
@@ -209,7 +210,9 @@ void __HAL_CAN_DISABLE_IT(CAN_HandleTypeDef* handle, std::uint32_t value)
     enabledNotifications[busIndex(handle)] &= ~value;
 }
 
-balancing::ImuAttitude balancing::imuAttitude(std::uint64_t) noexcept { return {}; }
+namespace { bool silImu=false; }
+balancing::ImuAttitude balancing::imuAttitude(std::uint64_t atUs) noexcept
+{ return silImu ? ImuAttitude{atUs,0.1f,0,0,0,0,true,true}:ImuAttitude{}; }
 
 int main(int argc, char** argv)
 {
@@ -240,6 +243,293 @@ int main(int argc, char** argv)
         std::puts("PASS: failed CAN2 rollback is latched");
         return 0;
     }
+
+#if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
+    if (argc==2 && std::strncmp(argv[1],"--drive-sil",11)==0) {
+        using namespace balancing;
+        using namespace balancing::protocol;
+        const bool timeout=std::strcmp(argv[1],"--drive-sil-timeout")==0;
+        const bool stale=std::strcmp(argv[1],"--drive-sil-stale")==0;
+        const bool rsTimeout=std::strcmp(argv[1],"--drive-sil-rs-timeout")==0;
+        const bool txError=std::strcmp(argv[1],"--drive-sil-tx-error")==0;
+        const bool estop=std::strcmp(argv[1],"--drive-sil-estop")==0;
+        const bool invalid=std::strcmp(argv[1],"--drive-sil-invalid")==0;
+        const bool invalidModel=std::strcmp(argv[1],"--drive-sil-invalid-model")==0;
+        const bool rxLoss=std::strcmp(argv[1],"--drive-sil-rx-loss")==0;
+        const bool gap=std::strcmp(argv[1],"--drive-sil-gap")==0;
+        std::array<DiagnosticSlot,4> faults{};
+        DriveSilProfile p{};
+        // これらは人工fixture。現物のCADやゲイン、送信期限、モータIDではない。
+        p.communication.communication={200000,100000,20000,20,1000,4,0xCA2u,false};
+        p.communication.operatorConfig={10000,2000,2,3,0.01f,0.01f,10,10,true};
+        p.communication.faultSlots=faults.data(); p.communication.faultCapacity=faults.size();
+        for (auto& leg:p.estimator.legs) {
+            leg.motor={{0,0},{0,0},{1,1},1,1,true};
+            leg.fixture={0.2f,0.15f,0.15f,0.25f,0.25f,0.02f,0.01f,-1};
+        }
+        p.estimator.wheels={{{0.1f,10,1,true},{0.1f,10,-1,true}}};
+        p.controller.lqr.verified=true;
+        p.controller.lqr.max_position_error_m=0.2f;
+        p.controller.lqr.gain[B_OUTPUT_WHEEL_TOTAL][B_STATE_PITCH]=2;
+        p.controller.lqr.gain[B_OUTPUT_WHEEL_TOTAL][B_STATE_POSITION]=1;
+        p.controller.lqr.gain[B_OUTPUT_HIP_TOTAL][B_STATE_PITCH]=3;
+        p.controller.legPd={100,10,2,0.5f,4,true};
+        p.controller.yawPi={3,4,2,true};
+        p.controller.wheelTorqueLimitNm={5,5};
+        for (auto& a:p.converter.rs06) a={1.5f,1,4,true};
+        for (auto& a:p.converter.c620) a={0.4f,1,4,true};
+        if (invalid) p.converter.c620[1].verified=false;
+        if (invalidModel) p.controller.lqr.verified=false;
+        p.arm={50000,true}; p.interlocks={true,true,true,true,true,true,MechanismSafety::Safe};
+        p.tx={12000,6000};
+        assert(initializeDriveSil(p));
+        expectSelfDefinedCan2=true;
+        silImu=true;
+        MotorObservationConfig mc{{{11,12,13,14},0x5a},true,{{{4000,true},{4000,true}}}};
+        assert(startCanObservation(&handle,&handle2,mc,true));
+        const auto rx=[&](const CanFrame& f) {
+            std::uint32_t low=0,high=0;
+            for (unsigned i=0;i<4;++i) {
+                low|=std::uint32_t{f.data[i]}<<(8*i);
+                high|=std::uint32_t{f.data[i+4]}<<(8*i);
+            }
+            can2.sFIFOMailBox[0]={(f.id<<3u)|CAN_RI0R_IDE,f.dlc,low,high};
+            can2.RF0R.count=1;
+            assert(balancing_f446_can2_capture_irq());
+        };
+        const auto request=[&](RemoteRequestKind kind,std::uint16_t id,
+                               std::optional<WireInputSource> source=std::nullopt) {
+            rx(*encodeRemoteRequest({kind,id,source}));
+        };
+        const auto feedback=[&](bool running,unsigned wheel=1000) {
+            // Type2角度=-pi/2付近、速度・トルク中心。4軸の新規報告をIRQ経由で供給。
+            for (unsigned id=11;id<=14;++id) {
+                const auto rawId=(2u<<24u)|((running?2u:0u)<<22u)|(id<<8u)|0x5au;
+                can1.sFIFOMailBox[0]={(rawId<<3u)|CAN_RI0R_IDE,8u,0x0080ff6fu,0x2c010080u};
+                can1.RF0R.count=1;
+                assert(balancing_f446_can1_capture_irq());
+            }
+            pushWheel(0x201,8,wheel); assert(balancing_f446_can2_capture_irq());
+            pushWheel(0x202,8,1000); assert(balancing_f446_can2_capture_irq());
+            rx(*encodePowerStatus({WirePowerState::On,0,0,1}));
+        };
+        const auto pre=[&](std::uint64_t at,bool running,unsigned wheel=1000) {
+            DWT->CYCCNT=static_cast<std::uint32_t>((at-20)*168u);
+            feedback(running,wheel);
+        };
+        const auto tick=[&](std::uint64_t at) {
+            DWT->CYCCNT=static_cast<std::uint32_t>(at*168u);
+            balancing_f446_can_service();
+            balancing_app_control_tick();
+            assert(applicationObservation()->driveSil);
+            return *applicationObservation()->driveSil;
+        };
+        struct Counts { unsigned stop{},enable{},torque{},zero{},current{},diagnostic{}; };
+        auto classify=[](CAN_TypeDef& bus,unsigned i,Counts& c) {
+            const auto& m=bus.sTxMailBox[i];
+            if (&bus==CAN1) {
+                const auto type=(m.TIR>>27u)&31u;
+                if (type==4) ++c.stop;
+                else if (type==3) ++c.enable;
+                else { assert(type==1); ++c.torque; }
+            } else if ((m.TIR&CAN_TI0R_IDE)==0) {
+                assert((m.TIR>>21u)==0x200u && m.TDHR==0);
+                if (m.TDLR==0) ++c.zero; else ++c.current;
+            } else ++c.diagnostic;
+        };
+        const auto drain=[&](bool holdWheel=false,bool holdTorque=false) {
+            Counts counts{};
+            // 受付→物理送信完了を区別し、空きができた後の第4軸も回収。
+            for (unsigned round=0;round<8;++round) {
+                bool any=false;
+                for (auto* bus:{CAN1,CAN2}) for (unsigned i=0;i<3;++i) {
+                    auto& m=bus->sTxMailBox[i];
+                    if (!(m.TIR&CAN_TI0R_TXRQ)) continue;
+                    bus->TSR.bits &= ~(CAN_TSR_TME0<<i);
+                    if (holdWheel && bus==CAN2 && !(m.TIR&CAN_TI0R_IDE)) continue;
+                    if (holdTorque && bus==CAN1 && ((m.TIR>>27u)&31u)==1) continue;
+                    classify(*bus,i,counts);
+                    any=true;
+                    m.TIR &= ~CAN_TI0R_TXRQ;
+                    bus->TSR.bits |= (CAN_TSR_TME0<<i)|((CAN_TSR_RQCP0|CAN_TSR_TXOK0)<<(8*i));
+                }
+                if (!any) break;
+                DWT->CYCCNT+=168u;
+                assert(balancing_f446_can1_capture_irq()); assert(balancing_f446_can2_capture_irq());
+                balancing_f446_can_service(); balancing_app_poll();
+            }
+            return counts;
+        };
+        pre(2000,false); request(RemoteRequestKind::SelectSource,1,WireInputSource::CanRemote);
+        auto res=tick(2000); assert(res.control.sequence.state==RobotState::Disarmed);
+        auto c=drain(); assert(c.stop==4 && c.zero==1 && c.torque==0);
+        pre(4000,false); rx(*encodeMotionCommand({0,0}));
+        res=tick(4000); assert(res.control.sequence.state==RobotState::Disarmed); drain();
+        pre(6000,false); rx(*encodeMotionCommand({0,0}));
+        res=tick(6000); assert(applicationObservation()->operatorTarget->operator_ready); drain();
+        pre(8000,false); request(RemoteRequestKind::Arm,2);
+        res=tick(8000);
+        if (invalid || invalidModel) {
+            assert(res.control.sequence.state==RobotState::Disarmed && res.outputInhibited);
+            c=drain(); assert(c.enable==0 && c.torque==0 && c.current==0);
+            std::puts("PASS: invalid six-axis conversion or unverified gain prevents SIL ARM");
+            return 0;
+        }
+        assert(res.control.sequence.state==RobotState::Arming && res.outputInhibited);
+        c=drain(); assert(c.enable==3 && c.zero==1 && c.torque==0);
+        // 先に3軸だけの送信が終わる。第4軸の旧RXで確認を成立させない。
+        pre(10000,true);
+        res=tick(10000); assert(res.control.sequence.state==RobotState::Arming);
+        c=drain(); assert(c.enable==1 && c.zero==1);
+        pre(12000,true);
+        res=tick(12000); assert(res.control.sequence.state==RobotState::Balancing && res.outputInhibited);
+        c=drain(); assert(c.zero==1 && c.torque==0);
+        // 通常運転: 500Hzの車輪電流と250Hzの脚トルク。背景診断も同じschedulerを通る。
+        unsigned rsCount=0, wheelCount=0;
+        float previousRef=0;
+        for (std::uint64_t at=14000;at<=24000;at+=2000) {
+            pre(at,true);
+            rx(*encodeMotionCommand({0.3f,0.1f}));
+            res=tick(at);
+            assert(res.control.sequence.state==RobotState::Balancing && !res.outputInhibited);
+            assert(res.control.appliedReference && res.frames && res.frames->fixtureOnly);
+            assert(res.control.appliedReference->forwardVelocityMps>0);
+            if(at>14000) assert(res.control.appliedReference->positionM>previousRef);
+            previousRef=res.control.appliedReference->positionM;
+            c=drain();
+            assert(c.torque==((at-14000)%4000==0?4u:0u) && c.current==1);
+            rsCount+=c.torque; wheelCount+=c.current;
+        }
+        assert(rsCount==12 && wheelCount==6);
+        if (rxLoss || gap) {
+            if (rxLoss) {
+                pre(26000,true);
+                // 片車輪の壊れた報告で連続性が失われ、部分状態から指令を作らない。
+                pushWheel(0x201,7,1000); assert(balancing_f446_can2_capture_irq());
+                res=tick(26000);
+                assert(res.control.estimateError==StateEstimateError::WheelFeedbackUnavailable);
+            } else {
+                // CANは継続して回収し、制御周期だけを6ms停止させる。
+                for (const auto at:{26000u,28000u}) {
+                    pre(at,true); balancing_f446_can_service();
+                }
+                pre(30000,true); res=tick(30000);
+                assert(res.control.estimate);
+            }
+            assert(res.control.sequence.state==RobotState::Fault && res.outputInhibited);
+            assert(applicationObservation()->fault->primaryCause==
+                (gap?FaultFlags::ControlTiming:FaultFlags::InterlockLost));
+            c=drain(); assert(c.current==0 && c.torque==0 && c.zero==1);
+            std::puts("PASS: RX continuity loss or 6ms control gap stops SIL");
+            return 0;
+        }
+        if (txError || estop) {
+            pre(26000,true);
+            if (estop) rx(*encodeEmergencyStop(NodeId::F303));
+            res=tick(26000);
+            if (txError) {
+                assert(res.control.sequence.state==RobotState::Balancing);
+                // 明示的なTXエラーを新規RXとは独立して注入。
+                for (unsigned i=0;i<3;++i) {
+                    auto& m=can2.sTxMailBox[i];
+                    if (!(m.TIR&CAN_TI0R_TXRQ) || (m.TIR&CAN_TI0R_IDE)) continue;
+                    m.TIR&=~CAN_TI0R_TXRQ;
+                    can2.TSR.bits|=(CAN_TSR_TME0<<i)|((CAN_TSR_RQCP0|CAN_TSR_TERR0)<<(8*i));
+                }
+                DWT->CYCCNT+=168u;
+                assert(balancing_f446_can2_capture_irq());
+                balancing_f446_can_service(); balancing_app_poll();
+                drain();
+                pre(28000,true); res=tick(28000);
+            }
+            assert(res.control.sequence.state==RobotState::Fault && res.outputInhibited);
+            assert(applicationObservation()->fault->primaryCause==
+                (estop?FaultFlags::EmergencyStop:FaultFlags::ExternalFault));
+            c=drain(); assert(c.current==0 && c.torque==0 && c.zero==1);
+            std::puts("PASS: emergency stop or confirmed TX error inhibits normal SIL output");
+            return 0;
+        }
+        if (rsTimeout) {
+            // CAN2は正常完了を続け、RS06だけを滞留させる。
+            for (std::uint64_t at=26000;at<=36000;at+=2000) {
+                pre(at,true); res=tick(at);
+                if (at<36000) assert(res.control.sequence.state==RobotState::Balancing);
+                drain(false,true);
+            }
+            assert(res.control.sequence.state==RobotState::Fault && res.outputInhibited);
+            assert(applicationObservation()->fault->primaryCause==FaultFlags::ExternalFault);
+            assert(can1.TSR.aborts!=0u);
+            std::puts("PASS: independent RS06 TX terminal deadline despite fresh RX");
+            return 0;
+        }
+        if (timeout || stale) {
+            // 新規のRXを維持し、C620の送信終端だけを失わせる。受信鮮度で代用しない。
+            for (std::uint64_t at=26000;at<=32000;at+=2000) {
+                pre(at,true); res=tick(at);
+                if (at<32000) assert(res.control.sequence.state==RobotState::Balancing);
+                drain(true,false);
+                if (stale && at==28000) {
+                    // 26000の旧世代を正常終端させても現在世代の鮮度にはならない。
+                    for (unsigned i=0;i<3;++i) {
+                        auto& m=can2.sTxMailBox[i];
+                        if (!(m.TIR&CAN_TI0R_TXRQ) || (m.TIR&CAN_TI0R_IDE)) continue;
+                        m.TIR&=~CAN_TI0R_TXRQ;
+                        can2.TSR.bits|=(CAN_TSR_TME0<<i)|((CAN_TSR_RQCP0|CAN_TSR_TXOK0)<<(8*i));
+                    }
+                    DWT->CYCCNT+=168u;
+                    assert(balancing_f446_can2_capture_irq());
+                    balancing_f446_can_service(); balancing_app_poll();
+                    drain(true,false);
+                }
+            }
+            assert(res.control.sequence.state==RobotState::Fault && res.outputInhibited);
+            assert(applicationObservation()->fault->primaryCause==FaultFlags::ExternalFault);
+            assert(can2.TSR.aborts!=0u);
+            std::puts("PASS: independent C620 TX terminal deadline despite fresh RX");
+            return 0;
+        }
+        // 中立/通信断で速度が減速して0になり、現在位置基準へ復帰する。
+        for (std::uint64_t at=26000;at<=64000;at+=2000) {
+            pre(at,true,1000+static_cast<unsigned>((at-24000)/2000));
+            res=tick(at); drain();
+        }
+        assert(res.control.appliedReference->forwardVelocityMps==0);
+        assert(res.control.appliedReference->positionM==res.control.estimate->chassis.positionM);
+        assert(applicationObservation()->operatorTarget->waiting_neutral);
+        // 通信復帰でも非中立入力だけでは再開しない。2回の中立報告後だけ再開。
+        pre(66000,true); rx(*encodeMotionCommand({0.3f,0.1f})); res=tick(66000); drain();
+        assert(res.control.appliedReference->forwardVelocityMps==0);
+        for (const auto at:{68000u,70000u}) {
+            pre(at,true); rx(*encodeMotionCommand({0,0})); res=tick(at); drain();
+        }
+        assert(applicationObservation()->operatorTarget->operator_ready);
+        pre(72000,true); rx(*encodeMotionCommand({0.3f,0.1f})); res=tick(72000); drain();
+        assert(res.control.appliedReference->forwardVelocityMps>0);
+        // 旧非ゼロフレームを保持してDISARM。中止要求だけで終端とみなさない。
+        pre(74000,true); res=tick(74000); drain(true,true);
+        pre(76000,true); request(RemoteRequestKind::Disarm,3);
+        res=tick(76000);
+        assert(res.control.sequence.state==RobotState::Disarmed && res.outputInhibited);
+        assert(can1.TSR.aborts!=0u && can2.TSR.aborts!=0u);
+        for (auto* bus:{CAN1,CAN2}) for (unsigned i=0;i<3;++i) {
+            auto& m=bus->sTxMailBox[i];
+            if (!(m.TIR&CAN_TI0R_TXRQ)) continue;
+            if (bus==CAN1) assert(((m.TIR>>27u)&31u)==1u);
+            // 旧周期を中止完了させ、後続のゼロ/停止を解放する。
+            bus->TSR.bits &= ~(CAN_TSR_TME0<<i);
+            m.TIR &= ~CAN_TI0R_TXRQ;
+            bus->TSR.bits|=(CAN_TSR_TME0<<i)|(CAN_TSR_RQCP0<<(8*i));
+        }
+        DWT->CYCCNT+=168u;
+        assert(balancing_f446_can1_capture_irq()); assert(balancing_f446_can2_capture_irq());
+        balancing_f446_can_service(); balancing_app_poll();
+        c=drain(); assert(c.torque==0 && c.current==0 && c.zero==1 && c.stop==4);
+        pre(78000,false); res=tick(78000); c=drain();
+        assert(res.control.sequence.state==RobotState::Disarmed && c.zero==1 && c.torque==0);
+        std::puts("PASS: Application full SIL ARM, 250/500Hz, operation reference, abort/stop");
+        return 0;
+    }
+#endif
 
     if (argc == 2 && std::strcmp(argv[1], "--can2-services") == 0) {
         using namespace balancing;
