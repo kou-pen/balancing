@@ -4,6 +4,7 @@
 #include "balancing/app/PowerBoardService.hpp"
 #include "balancing/app/RemoteControlService.hpp"
 #include "balancing/app/DiagnosticsService.hpp"
+#include "balancing/app/StatusIndicator.hpp"
 #include "balancing/device/MotorObservation.hpp"
 
 namespace balancing {
@@ -20,6 +21,7 @@ struct ApplicationObservation {
     std::optional<ControlTickResult> cycle{};
     std::optional<FaultRecord> fault{};
     DiagnosticSummary diagnostics{};
+    std::optional<IndicatorState> indicator{};
 };
 
 /** @brief 主ループで最後の周期診断を取得。初期化前は空。

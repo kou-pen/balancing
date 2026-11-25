@@ -116,6 +116,7 @@ add_executable(balancing_cpp_app_tests
     ${F446_APP}/Src/balancing/app/PowerBoardService.cpp
     ${F446_APP}/Src/balancing/app/RemoteControlService.cpp
     ${F446_APP}/Src/balancing/app/DiagnosticsService.cpp
+    ${F446_APP}/Src/balancing/app/StatusIndicator.cpp
 )
 target_include_directories(balancing_cpp_app_tests PRIVATE
     ${F446_APP}/Inc
@@ -177,6 +178,7 @@ add_executable(balancing_f446_can1_runtime_tests
     ${F446_APP}/Src/balancing/app/PowerBoardService.cpp
     ${F446_APP}/Src/balancing/app/RemoteControlService.cpp
     ${F446_APP}/Src/balancing/app/DiagnosticsService.cpp
+    ${F446_APP}/Src/balancing/app/StatusIndicator.cpp
     ${BALANCING_CAN_DISPATCH_SOURCES}
     ${F446_APP}/Src/balancing/communication/can/CanPort.cpp
     ${F446_APP}/Src/balancing/device/f446_can1_runtime.cpp
@@ -304,3 +306,9 @@ add_executable(balancing_f446_diagnostics_tests tests/test_f446_diagnostics_serv
 target_include_directories(balancing_f446_diagnostics_tests PRIVATE ${F446_APP}/Inc)
 target_compile_options(balancing_f446_diagnostics_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_diagnostics_tests COMMAND balancing_f446_diagnostics_tests)
+
+add_executable(balancing_f446_status_indicator_tests tests/test_f446_status_indicator.cpp
+    ${F446_APP}/Src/balancing/app/StatusIndicator.cpp)
+target_include_directories(balancing_f446_status_indicator_tests PRIVATE ${F446_APP}/Inc)
+target_compile_options(balancing_f446_status_indicator_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME balancing_f446_status_indicator_tests COMMAND balancing_f446_status_indicator_tests)

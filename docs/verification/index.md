@@ -60,3 +60,5 @@
 - [操作入力C++境界](f446-remote-service-host.md)
 
 - [診断イベント管理](f446-diagnostics-service-host.md)
+
+- [LED/Buzzer論理表示](f446-status-indicator-host.md)

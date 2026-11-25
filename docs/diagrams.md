@@ -488,3 +488,19 @@ flowchart TD
 </pre>
 
 本番の送信・操作・電源・校正接続は未実施。SILの出力を実機送信に転用しない。
+
+
+## 電源・操作・診断・表示の論理統合
+
+<pre class="mermaid">
+flowchart TD
+    P["PowerBoardService：論理電源観測"] --> APP["Application"]
+    R["RemoteControlService：操作目標"] --> APP
+    APP --> C["ControlCycle / RobotSequence"]
+    C --> D["DiagnosticsService：最新状態・独立FIFO"]
+    C --> S["StatusIndicator：論理表示"]
+    D -.通信仕様未確定.-> PC["PC"]
+    S -.GPIO設定未確認.-> L["LED / Buzzer"]
+</pre>
+
+実CAN・USB復号、診断配信と物理GPIOは未接続。
