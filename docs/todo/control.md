@@ -3,6 +3,18 @@
 **更新日：** 2026-11-09  
 **対象：** [状態推定](../specs/control/state_estimation.md)、[LQR／VMC](../specs/control/balance_vmc.md)、[実装ロードマップ](roadmap.md)。
 
+## ホスト実装の到達点（2026-11-26）
+
+| TODO | 検証済み | 残件 |
+|---|---|---|
+| T-CTRL-01〜04 | 六節リンク数学fixture、ヤコビアン、車輪積算・速度換算 | 実CAD、分岐、4軸原点・符号・車輪寸法 |
+| T-CTRL-05 | BNO055非同期取得・姿勢フィルタ・状態推定 | 取付方向・校正・実サンプル時刻 |
+| T-CTRL-06/07 | 線形シミュレーションと数学fixtureのLQR演算 | 実機モデル、K_300、実トルク上限での検証 |
+| T-CTRL-08/09 | 脚長・Roll・Yaw、VMC、6軸換算・制限のSIL | 実機支持力・補償と符号、ゲイン調整 |
+| T-CTRL-10/11 | RobotSequence、ControlCycle、500 Hz SIL・無効化・FAULT | 保護限界の実機確認、本番操作・モータ経路統合 |
+
+根拠: [検証一覧](../verification/index.md)。未確定の機体定数を数学fixtureで代用しない。
+
 ## P0：固定脚長の基本バランシング（MOTOR-213）
 
 - [ ] **T-CTRL-01** 六節リンクのCAD幾何・組立分岐・RS06入力軸方向を照合。**完了：** 標準姿勢の脚長と脚角度がCADと一致。
