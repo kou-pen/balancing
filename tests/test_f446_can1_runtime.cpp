@@ -1,5 +1,7 @@
 #include "balancing_f446_can1_bridge.h"
 #include "balancing_app_bridge.h"
+#include "balancing/app/ApplicationObservation.hpp"
+#include "balancing/device/ImuObservation.hpp"
 
 #ifdef NDEBUG
 #undef NDEBUG
@@ -122,6 +124,8 @@ void __HAL_CAN_DISABLE_IT(CAN_HandleTypeDef* handle, std::uint32_t value)
 {
     enabledNotifications[busIndex(handle)] &= ~value;
 }
+
+balancing::ImuAttitude balancing::imuAttitude(std::uint64_t) noexcept { return {}; }
 
 int main(int argc, char** argv)
 {
@@ -282,6 +286,10 @@ int main(int argc, char** argv)
     BF446AppTimingSnapshot timing{};
     assert(balancing_app_timing_snapshot(&timing));
     assert(timing.sample_valid && !timing.elapsed_valid);
+    const auto initialCycle=balancing::applicationObservation();
+    assert(initialCycle->motors && initialCycle->cycle);
+    assert(initialCycle->cycle->estimateError==balancing::StateEstimateError::InvalidPeriod);
+    assert(initialCycle->cycle->sequence.state==balancing::RobotState::Disarmed);
 
     DWT->CYCCNT = 0x98u;  // 起動時のカウンタから168サイクル、ちょうど1 us。
     can1.ESR = CAN_ESR_BOFF;
@@ -299,6 +307,10 @@ int main(int argc, char** argv)
     balancing_app_control_tick();
     assert(balancing_app_timing_snapshot(&timing));
     assert(timing.elapsed_valid && timing.elapsed_us == 1u);
+    const auto faultCycle=balancing::applicationObservation();
+    assert(faultCycle->cycle->sequence.state==balancing::RobotState::Fault);
+    assert(faultCycle->fault && faultCycle->fault->primaryCause==balancing::FaultFlags::BusOff);
+    assert(!faultCycle->cycle->motorCommandPreview);
 
     DWT->CYCCNT = 0xffffff00u;
     balancing_f446_can_service();  // IRQがない区間を先にサンプルする。
