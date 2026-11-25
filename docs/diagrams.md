@@ -210,17 +210,17 @@ sequenceDiagram
 
     Note over EXT,F303: 物理非常停止は別経路で最優先
     par 主制御側
-        EXT->>F446: EMERGENCY_STOP（ID未確定）
+        EXT->>F446: EMERGENCY_STOP（拡張ID）
         F446->>F446: FAULTへ遷移しトルク出力を停止
     and 電源基板側
-        EXT->>F303: EMERGENCY_STOP（ID未確定）
+        EXT->>F303: EMERGENCY_STOP（拡張ID）
         F303->>F303: 主電源OFFをラッチ
     end
     Note over F446,MOT: 電源が先に切れる可能性があり停止指令の到達を保証しない
     Note over F446,F303: 復旧の基本順序：POWER_ON → CLEAR_FAULT → ARM
 </pre>
 
-**注意：** CAN非常停止に加え、物理非常停止は制御ソフトと独立した遮断手段とする。フレーム番号と送信元認証方式は[電源CAN仕様](specs/protocols/power_can2.md)と[上位CAN仕様](specs/protocols/remote_can2.md)で未確定として管理する。
+**注意：** CAN非常停止に加え、物理非常停止は制御ソフトと独立した遮断手段とする。フレーム番号は[電源CAN仕様](specs/protocols/power_can2.md)と[上位CAN仕様](specs/protocols/remote_can2.md)を参照。CAN IDの送信元は認証ではない。
 
 ## 6. 移行時の比較基準：旧C11制御コアと周辺アダプタ
 
@@ -499,7 +499,7 @@ flowchart TD
     APP --> C["ControlCycle / RobotSequence"]
     C --> D["DiagnosticsService：最新状態・独立FIFO"]
     C --> S["StatusIndicator：論理表示"]
-    D -.通信仕様未確定.-> PC["PC"]
+    D -.-> PC["Raspberry Pi：CAN2配信未接続"]
     S -.GPIO設定未確認.-> L["LED / Buzzer"]
 </pre>
 
