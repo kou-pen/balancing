@@ -171,3 +171,7 @@ ApplicationはMotorObservationSnapshotとImuAttitudeを同じ周期時刻で固�
 ## Raspberry Pi操作通信コーデック（実機未接続）
 
 `RemoteControlCodec` は運動指令、操作要求、操作結果と `CanFrame` を相互変換する。有限値と固定形式を検査し、操作元指定はSELECT_SOURCEのみ許す。物理上限・操作元の権限・受信鮮度・状態遷移は別責務。 [検証記録](../verification/f446-remote-control-codec-host.md)。
+
+## 診断・設定読み出しコーデック（実機未接続）
+
+`DiagnosticsCodec` は19種類のDTOに対する `encodeDiagnostic()` と、IDに対応する型を `DiagnosticPayload` として返す `decodeDiagnostic()` を提供する。観測鮮度・配信許可・FAULT再構成・設定番号の意味は別責務。未定義フラグと設定値は生ビット。 [検証記録](../verification/f446-diagnostics-codec-host.md)。
