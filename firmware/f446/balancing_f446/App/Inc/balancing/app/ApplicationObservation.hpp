@@ -1,6 +1,7 @@
 #pragma once
 #include "balancing_app_bridge.h"
 #include "balancing/app/ControlCycle.hpp"
+#include "balancing/app/PowerBoardService.hpp"
 #include "balancing/device/MotorObservation.hpp"
 
 namespace balancing {
@@ -12,6 +13,7 @@ struct ApplicationObservation {
     BF446AppTimingSnapshot timing{};
     std::optional<MotorObservationSnapshot> motors{};
     ImuAttitude imu{};
+    PowerBoardSnapshot power{};
     std::optional<ControlTickResult> cycle{};
     std::optional<FaultRecord> fault{};
 };
