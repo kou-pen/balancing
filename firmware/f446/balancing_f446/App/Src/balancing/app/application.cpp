@@ -16,6 +16,7 @@ namespace balancing {
 // 未検証値を人工fixtureで埋めない。所有者の寿命はControlCycleより長い。
 struct ObservationCycle {
     PowerBoardService power{};
+    RemoteControlService remote{};
     StateEstimator estimator{StateEstimatorConfig{}};
     RobotSequence sequence{ArmTimeoutConfig{}};
     BalanceControl controller{BalanceControlConfig{}};
@@ -61,6 +62,7 @@ public:
         observation_.motors.reset();
         observation_.imu = {};
         observation_.power = {};
+        observation_.operatorTarget.reset();
         observation_.cycle.reset();
         timing_.sample_valid = false;
         timing_.elapsed_valid = false;
@@ -106,6 +108,8 @@ public:
         // 初回・取得不能直後はfirstElapsed=0で推定を拒否する。
         observation_.cycle = control_->cycle->step(input);
         observation_.fault = control_->sequence.currentFault();
+        // 現在状態で操作目標を評価するが、位置基準やARMは未接続。
+        observation_.operatorTarget = control_->remote.update(control_->sequence.state(), nowUs);
         // 最新コピーを周期で消費してからのみ、受信側の異常を解除する。
         // 受信側のfault消費は実機FAULT解除ではない。
         (void)acknowledgeMotorObservation(motors->generation);
