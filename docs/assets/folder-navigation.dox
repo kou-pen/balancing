@@ -181,6 +181,7 @@
 | [f446-motor-frame-plan-host.md](../verification/f446-motor-frame-plan-host.md) | 6軸CAN符号化、停止優先・周期世代の模擬2バス検証 |
 | [f446-control-cycle-core-host.md](../verification/f446-control-cycle-core-host.md) | ControlCycleをテスト専用から本体Appに移し、初回時刻・停止・故障処理を検証 |
 | [f446-application-timing-host.md](../verification/f446-application-timing-host.md) | CAN1とApplicationの共通DWT時刻・周期診断 |
+| [f446-dual-can-runtime-host.md](../verification/f446-dual-can-runtime-host.md) | CAN1/2共通時計・受信監視・起動失敗の検証 |
 | [f446-source-layout.md](../verification/f446-source-layout.md) | 旧ソース配置の統合とCubeIDEビルド手順 |
 | [index.md](../verification/index.md) | 試験記録の案内、判定の意味、実機未検証の範囲 |
 | [issue10-observation-host.md](../verification/issue10-observation-host.md) | センサ、操作入力、IMUのホスト回帰 |
@@ -248,7 +249,7 @@
 |---|---|
 | @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing "balancing/" | 機能単位のフォルダ |
 | <a href="balancing__app__bridge_8h_source.html">balancing_app_bridge.h</a> | 生成Cコードからアプリに入る初期化・周期通知と周期診断API |
-| <a href="balancing__f446__can1__bridge_8h_source.html">balancing_f446_can1_bridge.h</a> | CAN1の起動、IRQ取り込み、イベント回収のC API |
+| <a href="balancing__f446__can1__bridge_8h_source.html">balancing_f446_can1_bridge.h</a> | CAN1/2の起動、IRQ取り込み、共通イベント回収のC API |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Inc_balancing balancing/
@@ -369,6 +370,7 @@
 | <a href="C620Motor_8hpp_source.html">C620Motor.hpp</a> | C620 1軸の受信値・鮮度取得のAPI |
 | <a href="Rs06Motor_8hpp_source.html">Rs06Motor.hpp</a> | RS06 1軸の有効化、停止、状態報告のAPI |
 | <a href="Can1Observation_8h_source.html">Can1Observation.h</a> | HAL非依存のCAN1受信監視コピーと採取時刻 |
+| <a href="Can2Observation_8h_source.html">Can2Observation.h</a> | CAN2の受信・左右分類・バス異常・共通評価時刻 |
 | <a href="balancing__f446__motor__bench__port_8h_source.html">balancing_f446_motor_bench_port.h</a> | F446の試運転ポートを操作するC API |
 */
 
@@ -488,5 +490,5 @@
 | <a href="C620Motor_8cpp_source.html">C620Motor.cpp</a> | C620 1軸の最新報告と受信時刻からの鮮度判定 |
 | <a href="Rs06Motor_8cpp_source.html">Rs06Motor.cpp</a> | RS06 1軸の有効化・停止フレームと応答の照合 |
 | <a href="balancing__f446__motor__bench__port_8c_source.html">balancing_f446_motor_bench_port.c</a> | F446 HALと単軸試運転の送受信・周期を接続 |
-| <a href="f446__can1__runtime_8cpp_source.html">f446_can1_runtime.cpp</a> | CAN1起動、受信フィルタ、IRQ、DWT時計、監視値の集計 |
+| <a href="f446__can1__runtime_8cpp_source.html">f446_can1_runtime.cpp</a> | CAN1/2起動、共有フィルタ、IRQ、共通DWT時計、独立した監視集計 |
 */

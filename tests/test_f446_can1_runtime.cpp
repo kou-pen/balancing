@@ -9,23 +9,26 @@
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 
 namespace {
 
 constexpr auto notifications = CAN_IT_TX_MAILBOX_EMPTY | CAN_IT_RX_FIFO0_MSG_PENDING |
                                CAN_IT_RX_FIFO0_OVERRUN | CAN_IT_BUSOFF | CAN_IT_ERROR;
 CAN_TypeDef can1{};
+CAN_TypeDef can2{};
 TestDwtRegisters dwt{};
 TestCoreDebugRegisters debug{};
 std::uint32_t primask{};
-std::uint32_t enabledNotifications{};
-std::array<CAN_FilterTypeDef, 2> installedFilters{};
+std::array<std::uint32_t, 2> enabledNotifications{};
+std::array<CAN_FilterTypeDef, 28> installedFilters{};
 std::size_t filterCount{};
 std::size_t startCount{};
 std::size_t stopCount{};
 bool filterFails{};
-bool startFails{};
-bool irqEnableFails{};
+int startFailsBus = -1;
+bool startTimeout{};
+int irqEnableFailsBus = -1;
 
 void pushReceive()
 {
@@ -35,11 +38,24 @@ void pushReceive()
     can1.RF0R.count = 1u;
 }
 
+void pushWheel(std::uint32_t id, std::uint32_t dlc = 8u)
+{
+    can2.sFIFOMailBox[0] = {id << 21u, dlc, 0u, 0u};
+    can2.RF0R.count = 1u;
+}
+
+std::size_t busIndex(const CAN_HandleTypeDef* handle)
+{
+    assert(handle->Instance == &can1 || handle->Instance == &can2);
+    return handle->Instance == &can1 ? 0u : 1u;
+}
+
 } // namespace
 
 TestDwtRegisters* DWT = &dwt;
 TestCoreDebugRegisters* CoreDebug = &debug;
 CAN_TypeDef* CAN1 = &can1;
+CAN_TypeDef* CAN2 = &can2;
 std::uint32_t SystemCoreClock = 168000000u;
 
 std::uint32_t __get_PRIMASK() { return primask; }
@@ -49,18 +65,21 @@ void __set_PRIMASK(std::uint32_t value) { primask = value; }
 
 HAL_StatusTypeDef HAL_CAN_ConfigFilter(CAN_HandleTypeDef* handle, const CAN_FilterTypeDef* filter)
 {
-    assert(handle->Instance == CAN1 && handle->State == HAL_CAN_STATE_READY);
+    assert(handle->State == HAL_CAN_STATE_READY);
+    assert((filter->FilterBank < 14u) == (busIndex(handle) == 0u));
     assert(filter->FilterBank < installedFilters.size());
     installedFilters[filter->FilterBank] = *filter;
     ++filterCount;
-    return filterFails && filter->FilterBank == 1u ? HAL_ERROR : HAL_OK;
+    return filterFails && filter->FilterBank == 15u ? HAL_ERROR : HAL_OK;
 }
 
 HAL_StatusTypeDef HAL_CAN_Start(CAN_HandleTypeDef* handle)
 {
-    assert(handle->State == HAL_CAN_STATE_READY && enabledNotifications == 0u);
+    assert(handle->State == HAL_CAN_STATE_READY && enabledNotifications[busIndex(handle)] == 0u);
+    assert(installedFilters[15].FilterActivation == ENABLE);
     ++startCount;
-    if (startFails) {
+    if (static_cast<int>(busIndex(handle)) == startFailsBus) {
+        if (startTimeout) handle->State = HAL_CAN_STATE_ERROR;
         return HAL_ERROR;
     }
     handle->State = HAL_CAN_STATE_LISTENING;
@@ -69,8 +88,9 @@ HAL_StatusTypeDef HAL_CAN_Start(CAN_HandleTypeDef* handle)
 
 HAL_StatusTypeDef HAL_CAN_Stop(CAN_HandleTypeDef* handle)
 {
-    assert(enabledNotifications == 0u);
+    assert(enabledNotifications[busIndex(handle)] == 0u);
     ++stopCount;
+    if (handle->State != HAL_CAN_STATE_LISTENING) return HAL_ERROR;
     handle->State = HAL_CAN_STATE_READY;
     return HAL_OK;
 }
@@ -78,74 +98,122 @@ HAL_StatusTypeDef HAL_CAN_Stop(CAN_HandleTypeDef* handle)
 HAL_StatusTypeDef HAL_CAN_ActivateNotification(CAN_HandleTypeDef* handle, std::uint32_t value)
 {
     assert(handle->State == HAL_CAN_STATE_LISTENING && value == notifications);
-    enabledNotifications = value;
-    if (irqEnableFails) {
+    enabledNotifications[busIndex(handle)] = value;
+    if (static_cast<int>(busIndex(handle)) == irqEnableFailsBus) {
         return HAL_ERROR;
     }
 
     // CANが通知有効化直後に割り込む場合にも、ポートは構築済み。
-    pushReceive();
-    assert(balancing_f446_can1_capture_irq());
+    BF446Can1Snapshot unpublished1{};
+    BF446Can2Snapshot unpublished2{};
+    assert(!balancing_f446_can1_snapshot(&unpublished1));
+    assert(!balancing_f446_can2_snapshot(&unpublished2));
+    if (busIndex(handle) == 0u) {
+        pushReceive();
+        assert(balancing_f446_can1_capture_irq());
+    } else {
+        pushWheel(0x201u);
+        assert(balancing_f446_can2_capture_irq());
+    }
     return HAL_OK;
 }
 
-void __HAL_CAN_DISABLE_IT(CAN_HandleTypeDef*, std::uint32_t value)
+void __HAL_CAN_DISABLE_IT(CAN_HandleTypeDef* handle, std::uint32_t value)
 {
-    enabledNotifications &= ~value;
+    enabledNotifications[busIndex(handle)] &= ~value;
 }
 
-int main()
+int main(int argc, char** argv)
 {
-    CAN_TypeDef can2{};
-    CAN_HandleTypeDef wrongBus{&can2, HAL_CAN_STATE_READY};
     CAN_HandleTypeDef handle{CAN1, HAL_CAN_STATE_READY};
+    CAN_HandleTypeDef handle2{CAN2, HAL_CAN_STATE_READY};
     BF446Can1Snapshot snapshot{};
-    assert(!balancing_f446_can1_start(nullptr));
-    assert(!balancing_f446_can1_start(&wrongBus));
+    BF446Can2Snapshot wheels{};
+    if (argc == 2 && std::strcmp(argv[1], "--rollback-failure") == 0) {
+        // 実HALのStartタイムアウトはERRORへ遷移し、Stopが拒否される。
+        // 復帰不能のCAN2を正常と公開せず、CAN1は停止し、再起動も拒否する。
+        startFailsBus = 1;
+        startTimeout = true;
+        assert(!balancing_f446_can_start(&handle, &handle2));
+        assert(handle.State == HAL_CAN_STATE_READY);
+        assert(handle2.State == HAL_CAN_STATE_ERROR);
+        assert(stopCount == 2u);
+        assert(!balancing_f446_can1_snapshot(&snapshot));
+        assert(!balancing_f446_can2_snapshot(&wheels));
+        assert(!balancing_f446_can1_capture_irq() && !balancing_f446_can2_capture_irq());
+        assert(enabledNotifications[0] == 0u && enabledNotifications[1] == 0u);
+        // 外からREADYへ変更されても、不明なハード状態で起動し直さない。
+        handle2.State = HAL_CAN_STATE_READY;
+        startFailsBus = -1;
+        const auto attempts = startCount;
+        assert(!balancing_f446_can_start(&handle, &handle2));
+        assert(startCount == attempts);
+        std::puts("PASS: failed CAN2 rollback is latched");
+        return 0;
+    }
+
+    assert(!balancing_f446_can_start(nullptr, &handle2));
+    assert(!balancing_f446_can_start(&handle2, &handle));
     assert(!balancing_f446_can1_capture_irq());
+    assert(!balancing_f446_can2_capture_irq());
     assert(!balancing_f446_can1_snapshot(&snapshot));
-    balancing_f446_can1_service();
+    assert(!balancing_f446_can2_snapshot(&wheels));
+    balancing_f446_can_service();
 
     DWT->CTRL = DWT_CTRL_NOCYCCNT_Msk;
-    assert(!balancing_f446_can1_start(&handle));
+    assert(!balancing_f446_can_start(&handle, &handle2));
     DWT->CTRL = 0u;
     assert(filterCount == 0u && startCount == 0u);
     filterFails = true;
-    assert(!balancing_f446_can1_start(&handle) && startCount == 0u);
+    assert(!balancing_f446_can_start(&handle, &handle2) && startCount == 0u);
     filterFails = false;
-    startFails = true;
-    assert(!balancing_f446_can1_start(&handle) && enabledNotifications == 0u);
-    startFails = false;
-    irqEnableFails = true;
-    assert(!balancing_f446_can1_start(&handle) && stopCount == 1u);
-    assert(!balancing_f446_can1_capture_irq() && enabledNotifications == 0u);
+    // CAN2の起動が失敗したら、先に成功したCAN1も停止する。
+    startFailsBus = 1;
+    assert(!balancing_f446_can_start(&handle, &handle2));
+    assert(stopCount == 1u && handle.State == HAL_CAN_STATE_READY);
+    startFailsBus = -1;
+    irqEnableFailsBus = 1;
+    assert(!balancing_f446_can_start(&handle, &handle2) && stopCount == 3u);
+    assert(!balancing_f446_can1_capture_irq() && !balancing_f446_can2_capture_irq());
+    assert(enabledNotifications[0] == 0u && enabledNotifications[1] == 0u);
+    assert(!balancing_f446_can2_snapshot(&wheels));
 
-    irqEnableFails = false;
+    irqEnableFailsBus = -1;
     DWT->CYCCNT = 0xfffffff0u;
-    assert(balancing_f446_can1_start(&handle));
+    assert(balancing_f446_can_start(&handle, &handle2));
     assert((DWT->CTRL & DWT_CTRL_CYCCNTENA_Msk) != 0u);
     assert((CoreDebug->DEMCR & CoreDebug_DEMCR_TRCENA_Msk) != 0u);
     const auto count = startCount;
-    assert(balancing_f446_can1_start(&handle) && startCount == count);
-    assert(!balancing_f446_can1_start(&wrongBus));
+    assert(balancing_f446_can_start(&handle, &handle2) && startCount == count);
+    assert(!balancing_f446_can_start(&handle2, &handle));
     assert(!balancing_f446_can1_snapshot(nullptr));
-    for (std::size_t bank = 0; bank < installedFilters.size(); ++bank) {
+    assert(!balancing_f446_can2_snapshot(nullptr));
+    for (std::size_t bank : {0u, 1u, 14u, 15u}) {
         const auto& f = installedFilters[bank];
         assert(f.FilterBank == bank && f.SlaveStartFilterBank == 14u);
         assert(f.FilterMode == CAN_FILTERMODE_IDMASK && f.FilterScale == CAN_FILTERSCALE_32BIT);
         assert(f.FilterActivation == ENABLE && f.FilterFIFOAssignment == CAN_FILTER_FIFO0);
-        assert(f.FilterIdHigh == ((bank == 0 ? 2u : 24u) << 11u));
-        assert(f.FilterIdLow == CAN_RI0R_IDE && f.FilterMaskIdHigh == 0xf800u);
+        if (bank < 14u) {
+            assert(f.FilterIdHigh == ((bank == 0 ? 2u : 24u) << 11u));
+            assert(f.FilterIdLow == CAN_RI0R_IDE && f.FilterMaskIdHigh == 0xf800u);
+        } else {
+            assert(f.FilterIdHigh == ((bank == 14u ? 0x201u : 0x202u) << 5u));
+            assert(f.FilterIdLow == 0u && f.FilterMaskIdHigh == 0xffe0u);
+        }
         assert(f.FilterMaskIdLow == (CAN_RI0R_IDE | CAN_RI0R_RTR));
     }
 
     assert(balancing_f446_can1_snapshot(&snapshot) && snapshot.rx_frames == 0u);
     assert(!snapshot.sampled);
+    assert(balancing_f446_can2_snapshot(&wheels) && !wheels.sampled);
     balancing_app_init();
-    balancing_f446_can1_service();
+    balancing_f446_can_service();
     assert(balancing_f446_can1_snapshot(&snapshot) && snapshot.rx_frames == 1u);
     assert(snapshot.last_rx_us == 0u);
     assert(snapshot.sampled && snapshot.sampled_at_us == 0u);
+    assert(balancing_f446_can2_snapshot(&wheels) && wheels.sampled);
+    assert(wheels.left_frames == 1u && wheels.right_frames == 0u);
+    assert(wheels.sampled_at_us == snapshot.sampled_at_us);
     balancing_app_control_tick();
     BF446AppTimingSnapshot timing{};
     assert(balancing_app_timing_snapshot(&timing));
@@ -157,43 +225,83 @@ int main()
     pushReceive();
     assert(balancing_f446_can1_capture_irq());
     assert(balancing_f446_can1_snapshot(&snapshot) && snapshot.rx_frames == 1u);
-    balancing_f446_can1_service();
+    balancing_f446_can_service();
     assert(balancing_f446_can1_snapshot(&snapshot) && snapshot.rx_frames == 2u);
     assert(snapshot.last_rx_us == 1u && snapshot.rx_loss_events == 1u);
     assert(snapshot.bus_off && snapshot.bus_off_events == 1u);
+    assert(balancing_f446_can2_snapshot(&wheels));
+    assert(!wheels.bus_off && wheels.rx_loss_events == 0u);
     assert(snapshot.sampled_at_us == snapshot.last_rx_us);
     balancing_app_control_tick();
     assert(balancing_app_timing_snapshot(&timing));
     assert(timing.elapsed_valid && timing.elapsed_us == 1u);
 
     DWT->CYCCNT = 0xffffff00u;
-    balancing_f446_can1_service();  // IRQがない区間を先にサンプルする。
+    balancing_f446_can_service();  // IRQがない区間を先にサンプルする。
     DWT->CYCCNT = 0x100u;
     can1.ESR = 0;
     pushReceive();
     assert(balancing_f446_can1_capture_irq());
-    balancing_f446_can1_service();
+    balancing_f446_can_service();
     assert(balancing_f446_can1_snapshot(&snapshot) && snapshot.rx_frames == 3u);
     assert(!snapshot.bus_off && snapshot.bus_off_events == 1u);
     assert(snapshot.last_rx_us == ((std::uint64_t{1} << 32u) + 0x110u) / 168u);
     assert(snapshot.sampled_at_us == snapshot.last_rx_us);
     const auto afterWrap = snapshot.sampled_at_us;
+    // CAN2のIRQも同じ時計を読む。短いフレームは分類件数に含めない。
+    DWT->CYCCNT += 168u;
+    can2.ESR = CAN_ESR_BOFF;
+    can2.RF0R.flags = CAN_RF0R_FOVR0;
+    pushWheel(0x202u);
+    primask = 1u;
+    assert(balancing_f446_can2_capture_irq());
+    assert(primask == 1u);
+    primask = 0u;
+    pushWheel(0x201u, 7u);
+    assert(balancing_f446_can2_capture_irq());
+    balancing_f446_can_service();
+    assert(balancing_f446_can2_snapshot(&wheels));
+    assert(wheels.rx_frames == 3u && wheels.left_frames == 1u && wheels.right_frames == 1u);
+    assert(wheels.bus_off && wheels.bus_off_events == 1u && wheels.rx_loss_events == 1u);
+    assert(wheels.last_rx_us == afterWrap + 1u);
+    assert(balancing_f446_can1_snapshot(&snapshot));
+    assert(!snapshot.bus_off && snapshot.rx_loss_events == 1u);
+    assert(snapshot.sampled_at_us == wheels.sampled_at_us);
+    can2.ESR = 0;
+    assert(balancing_f446_can2_capture_irq());
+    balancing_f446_can_service();
+    assert(balancing_f446_can2_snapshot(&wheels) && !wheels.bus_off);
+    assert(wheels.bus_off_events == 1u);
     balancing_app_control_tick();
     assert(balancing_app_timing_snapshot(&timing));
-    assert(timing.sample_valid && timing.sampled_at_us == afterWrap);
-    assert(timing.elapsed_valid && timing.elapsed_us == afterWrap - 1u);
+    assert(timing.sample_valid && timing.sampled_at_us == afterWrap + 1u);
+    assert(timing.elapsed_valid && timing.elapsed_us == afterWrap);
 
     // IRQなしでもserviceの時刻は進む。最後のRX時刻は変更しない。
     DWT->CYCCNT += 168u * 2000u;
-    balancing_f446_can1_service();
+    balancing_f446_can_service();
     assert(balancing_f446_can1_snapshot(&snapshot));
-    assert(snapshot.last_rx_us == afterWrap && snapshot.sampled_at_us == afterWrap + 2000u);
+    assert(snapshot.last_rx_us == afterWrap && snapshot.sampled_at_us == afterWrap + 2001u);
     balancing_app_control_tick();
     assert(balancing_app_timing_snapshot(&timing));
     assert(timing.elapsed_valid && timing.elapsed_us == 2000u);
-    for (const auto& mailbox : can1.sTxMailBox) {
-        assert((mailbox.TIR & CAN_TI0R_TXRQ) == 0u);
+    for (const auto* bus : {CAN1, CAN2}) {
+        for (const auto& mailbox : bus->sTxMailBox) {
+            assert((mailbox.TIR & CAN_TI0R_TXRQ) == 0u);
+        }
     }
+    // 一方のキューを溢れさせても他方の新規受信は回収できる。
+    for (unsigned i = 0; i < 40u; ++i) {
+        pushReceive();
+        assert(balancing_f446_can1_capture_irq());
+    }
+    pushWheel(0x202u);
+    assert(balancing_f446_can2_capture_irq());
+    balancing_f446_can_service();
+    assert(balancing_f446_can2_snapshot(&wheels) && wheels.right_frames == 2u);
+    assert(balancing_f446_can1_snapshot(&snapshot) && snapshot.rx_loss_events > 1u);
+    assert(wheels.rx_loss_events == 1u);
+    assert(wheels.sampled_at_us == snapshot.sampled_at_us);
     assert(primask == 0u);
-    std::puts("PASS: F446 CAN1 boot, IRQ routing, receive-only monitor and clock wrap");
+    std::puts("PASS: F446 dual CAN boot, IRQ routing, independent monitors and shared clock wrap");
 }

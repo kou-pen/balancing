@@ -153,7 +153,7 @@ set(BALANCING_CAN_DISPATCH_SOURCES
     ${F446_APP}/Src/balancing/communication/can/CanTxScheduler.cpp
 )
 
-# Startup, RX observation and IRQ ownership at the STM32F446 CAN1 boundary.
+# Startup, RX observation and IRQ ownership at both STM32F446 CAN buses.
 add_executable(balancing_f446_can1_runtime_tests
     tests/test_f446_can1_runtime.cpp
     ${F446_APP}/Src/balancing/app/application.cpp
@@ -167,6 +167,7 @@ target_include_directories(balancing_f446_can1_runtime_tests PRIVATE
 )
 target_compile_options(balancing_f446_can1_runtime_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_can1_runtime_tests COMMAND balancing_f446_can1_runtime_tests)
+add_test(NAME balancing_f446_can_rollback_failure_tests COMMAND balancing_f446_can1_runtime_tests --rollback-failure)
 
 # A shared main-loop poll with separate bxCAN IRQ sources.
 add_executable(balancing_f446_can_event_poll_tests

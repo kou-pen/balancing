@@ -17,6 +17,7 @@
 | 6軸CAN指令計画（SIL） | [CAN符号化・停止優先のホスト検証](f446-motor-frame-plan-host.md) | Type1×4と0x200×1の実コーデック照合、停止優先・旧指令不復活・ゼロ電流 |
 | ControlCycleのC++17本体化 | [時刻付き制御周期のホスト検証](f446-control-cycle-core-host.md) | 旧テスト専用実行器の本体移動、実測dt、稼働中更新欠落・故障時演算抑止 |
 | Applicationの周期診断 | [共通DWT時計とApplication](f446-application-timing-host.md) | CAN1受信時刻・実測周期、周回、未採取・重複・逆行 |
+| CAN1/2の共通受信ランタイム | [両CANの起動・共通時計](f446-dual-can-runtime-host.md) | 共有フィルタ、バス別IRQ・異常、復帰不能時の起動拒否 |
 | F446 CAN1の送受信と軸別トークン | [CAN1ポートとRS06の接続検証](f446-can1-rs06-port-host.md) | メールボックス再利用、受信あふれ、バスオフ、4軸ARMの結合 |
 | RS06 4軸の有効化と停止 | [MotorServiceの模擬CAN検証](motor-service-rs06-host.md) | Type 3完了と新規応答の照合、4軸別のType 4再試行、バスオフ・期限の故障注入 |
 | F446の11ソース構成 | [Issue #9脚長・Rollホスト検証](issue9-leg-pd-host.md) | Debug/Releaseで新しい脚長PDソースを含むARMクロスビルドPASS（実機未実施） |

@@ -68,7 +68,7 @@ struct CAN_TypeDef {
     TestRxStatus RF0R{sFIFOMailBox};
 };
 
-enum HAL_CAN_StateTypeDef { HAL_CAN_STATE_READY = 1, HAL_CAN_STATE_LISTENING = 2 };
+enum HAL_CAN_StateTypeDef { HAL_CAN_STATE_READY = 1, HAL_CAN_STATE_LISTENING = 2, HAL_CAN_STATE_ERROR = 3 };
 struct CAN_HandleTypeDef { CAN_TypeDef* Instance; HAL_CAN_StateTypeDef State; };
 
 inline HAL_CAN_StateTypeDef HAL_CAN_GetState(const CAN_HandleTypeDef* h) { return h->State; }
@@ -120,3 +120,4 @@ extern TestDwtRegisters* DWT;
 extern TestCoreDebugRegisters* CoreDebug;
 extern std::uint32_t SystemCoreClock;
 extern CAN_TypeDef* CAN1;
+extern CAN_TypeDef* CAN2;

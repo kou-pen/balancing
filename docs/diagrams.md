@@ -407,3 +407,23 @@ flowchart LR
 </pre>
 
 実機ControlCycle・CAN2・IMUとモータ送信にはまだ接続しない。
+
+## CAN1/2共通受信ランタイム
+
+<pre class="mermaid">
+flowchart TB
+    I1["CAN1 IRQ"] --> P1["CAN1 CanPort：独立キュー"]
+    I2["CAN2 IRQ"] --> P2["CAN2 CanPort：独立キュー"]
+    DWT["共有DWT時計"] --> I1
+    DWT --> I2
+    P1 --> POLL["CanEventPoll：交互回収"]
+    P2 --> POLL
+    POLL --> R["CanRouter：分類"]
+    R --> S1["CAN1監視コピー"]
+    R --> S2["CAN2監視コピー"]
+    DWT --> S1
+    DWT --> S2
+    S1 --> APP["Application：周期診断"]
+</pre>
+
+共通service回収後の評価時刻は両コピーで同じ。機器への配送・ARM・指令送信は未接続。
