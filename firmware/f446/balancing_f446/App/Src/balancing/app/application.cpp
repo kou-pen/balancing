@@ -1,6 +1,8 @@
-#include "../../../Inc/balancing_app_bridge.h"
+#include "balancing_app_bridge.h"
+#include "balancing/device/Can1Observation.h"
 
 #include <cstdint>
+#include <optional>
 
 /*
  * CubeMX生成main.cからはC ABIのみを公開する。C++のApplicationは
@@ -17,14 +19,14 @@ public:
      */
     void init() noexcept
     {
-        control_ticks_ = 0;
+        timing_ = {};
+        previousUs_.reset();
         initialized_ = true;
     }
 
     /*
-     * 2ms制御ティックの将来的な接続点。
-     * 現状は呼出し回数を記録するだけで、C11コアやCANは駆動しない。
-     * 単なるTIM7割込みを安全な500Hz制御実行と混同しない。
+     * 既存mainがCAN1イベントを回収した直後の診断周期。
+     * 実測時刻を採用し、TIM7の呼出し回数から2msを仮定しない。
      */
     void controlTick() noexcept
     {
@@ -32,11 +34,37 @@ public:
             return;
         }
 
-        /* wrapするuint32_tは診断用のカウンタであり、
-         * 安全タイムアウトや測定時刻の代用には使わない。 */
-        ++control_ticks_;
-        // TODO(T-F446-11): 既存のC11制御コア、CAN1/2アダプタと結合する。
-        // 明示的な安全確認とモータID/換算値の確定までは出力を行わない。
+        ++timing_.control_ticks;
+        timing_.sample_valid = false;
+        timing_.elapsed_valid = false;
+        timing_.sampled_at_us = 0;
+        timing_.elapsed_us = 0;
+
+        BF446Can1Snapshot observation{};
+        if (!balancing_f446_can1_snapshot(&observation) || !observation.sampled) {
+            // 取得不能区間をまたいだ差分は一周期の実測値として公開しない。
+            previousUs_.reset();
+            return;
+        }
+        const auto nowUs = observation.sampled_at_us;
+        if (previousUs_) {
+            if (nowUs == *previousUs_) {
+                ++timing_.duplicate_samples;
+                return;
+            }
+            if (nowUs < *previousUs_) {
+                // 逆行した時計で正常な基準を巻き戻さない。
+                ++timing_.clock_regressions;
+                return;
+            }
+            timing_.elapsed_us = nowUs - *previousUs_;
+            timing_.elapsed_valid = true;
+        }
+        // 初回は採取時刻だけ有効。次の異なる時刻が来て初めて差分を得る。
+        previousUs_ = nowUs;
+        timing_.sampled_at_us = nowUs;
+        timing_.sample_valid = true;
+        // TODO(T-F446-11): 実IMU/CAN2/校正を確認してからControlCycleへ接続する。
     }
 
     /*
@@ -55,11 +83,21 @@ public:
      * 実行時刻の正確性や安全動作の証明にはならない。 */
     std::uint32_t controlTickCount() const noexcept
     {
-        return control_ticks_;
+        return timing_.control_ticks;
+    }
+
+    bool timingSnapshot(BF446AppTimingSnapshot* snapshot) const noexcept
+    {
+        if (!initialized_ || snapshot == nullptr) {
+            return false;
+        }
+        *snapshot = timing_;
+        return true;
     }
 
 private:
-    std::uint32_t control_ticks_{0};
+    BF446AppTimingSnapshot timing_{};
+    std::optional<std::uint64_t> previousUs_{};
     bool initialized_{false};
 };
 
@@ -93,6 +131,12 @@ void balancing_app_poll(void)
 uint32_t balancing_app_control_tick_count(void)
 {
     return balancing::application.controlTickCount();
+}
+
+/* 主ループの診断コピー。センサ・駆動の状態判定とは分離する。 */
+bool balancing_app_timing_snapshot(BF446AppTimingSnapshot* snapshot)
+{
+    return balancing::application.timingSnapshot(snapshot);
 }
 
 } // extern "C"

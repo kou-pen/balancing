@@ -156,6 +156,7 @@ set(BALANCING_CAN_DISPATCH_SOURCES
 # Startup, RX observation and IRQ ownership at the STM32F446 CAN1 boundary.
 add_executable(balancing_f446_can1_runtime_tests
     tests/test_f446_can1_runtime.cpp
+    ${F446_APP}/Src/balancing/app/application.cpp
     ${BALANCING_CAN_DISPATCH_SOURCES}
     ${F446_APP}/Src/balancing/communication/can/CanPort.cpp
     ${F446_APP}/Src/balancing/device/f446_can1_runtime.cpp

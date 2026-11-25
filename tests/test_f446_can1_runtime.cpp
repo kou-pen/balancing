@@ -1,4 +1,5 @@
 #include "balancing_f446_can1_bridge.h"
+#include "balancing_app_bridge.h"
 
 #ifdef NDEBUG
 #undef NDEBUG
@@ -139,9 +140,16 @@ int main()
     }
 
     assert(balancing_f446_can1_snapshot(&snapshot) && snapshot.rx_frames == 0u);
+    assert(!snapshot.sampled);
+    balancing_app_init();
     balancing_f446_can1_service();
     assert(balancing_f446_can1_snapshot(&snapshot) && snapshot.rx_frames == 1u);
     assert(snapshot.last_rx_us == 0u);
+    assert(snapshot.sampled && snapshot.sampled_at_us == 0u);
+    balancing_app_control_tick();
+    BF446AppTimingSnapshot timing{};
+    assert(balancing_app_timing_snapshot(&timing));
+    assert(timing.sample_valid && !timing.elapsed_valid);
 
     DWT->CYCCNT = 0x98u;  // 起動時のカウンタから168サイクル、ちょうど1 us。
     can1.ESR = CAN_ESR_BOFF;
@@ -153,6 +161,10 @@ int main()
     assert(balancing_f446_can1_snapshot(&snapshot) && snapshot.rx_frames == 2u);
     assert(snapshot.last_rx_us == 1u && snapshot.rx_loss_events == 1u);
     assert(snapshot.bus_off && snapshot.bus_off_events == 1u);
+    assert(snapshot.sampled_at_us == snapshot.last_rx_us);
+    balancing_app_control_tick();
+    assert(balancing_app_timing_snapshot(&timing));
+    assert(timing.elapsed_valid && timing.elapsed_us == 1u);
 
     DWT->CYCCNT = 0xffffff00u;
     balancing_f446_can1_service();  // IRQがない区間を先にサンプルする。
@@ -164,6 +176,21 @@ int main()
     assert(balancing_f446_can1_snapshot(&snapshot) && snapshot.rx_frames == 3u);
     assert(!snapshot.bus_off && snapshot.bus_off_events == 1u);
     assert(snapshot.last_rx_us == ((std::uint64_t{1} << 32u) + 0x110u) / 168u);
+    assert(snapshot.sampled_at_us == snapshot.last_rx_us);
+    const auto afterWrap = snapshot.sampled_at_us;
+    balancing_app_control_tick();
+    assert(balancing_app_timing_snapshot(&timing));
+    assert(timing.sample_valid && timing.sampled_at_us == afterWrap);
+    assert(timing.elapsed_valid && timing.elapsed_us == afterWrap - 1u);
+
+    // IRQなしでもserviceの時刻は進む。最後のRX時刻は変更しない。
+    DWT->CYCCNT += 168u * 2000u;
+    balancing_f446_can1_service();
+    assert(balancing_f446_can1_snapshot(&snapshot));
+    assert(snapshot.last_rx_us == afterWrap && snapshot.sampled_at_us == afterWrap + 2000u);
+    balancing_app_control_tick();
+    assert(balancing_app_timing_snapshot(&timing));
+    assert(timing.elapsed_valid && timing.elapsed_us == 2000u);
     for (const auto& mailbox : can1.sTxMailBox) {
         assert((mailbox.TIR & CAN_TI0R_TXRQ) == 0u);
     }

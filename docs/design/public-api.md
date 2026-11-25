@@ -141,4 +141,8 @@ App本体の `ControlCycle` は `MotorCommand::hasVerifiedConfiguration()` がfa
 
 `ControlCycle::step(ControlTickInput)` は、元の`tests/support/SilControlCycle.hpp`の数学経路をApp層へ移し、`StateEstimator` → `RobotSequence` → `BalanceControl` → `MotorCommand`を一周期にまとめる。初回の実測`firstElapsed`が必要であり、未取得時に2msを捏造しない。以降は観測スナップショットの共通`sampledAtUs`から実測時間差を得る。6msの更新空白をFAULTとするのはBALANCING中のみ。非常停止・DISARMがすでに分かる周期は数学トルクの候補を計算しない。
 
-本体化は**実行経路の公開クラスと処理順の確定**であり、現時点の`Application::controlTick()`からは呼ばない。実I2C/ CAN2、単調時刻供給、実機の幾何・ゲイン/限界が未検証のため、数学上の`fixtureOnly`はモータ送信へ接続しない。詳細は [ControlCycle本体化の検証](../verification/f446-control-cycle-core-host.md)。
+本体化は**実行経路の公開クラスと処理順の確定**であり、現時点の`Application::controlTick()`からは呼ばない。実I2C/CAN2、ControlCycleへの単調時刻供給、実機の幾何・ゲイン/限界が未検証のため、数学上の`fixtureOnly`はモータ送信へ接続しない。詳細は [ControlCycle本体化の検証](../verification/f446-control-cycle-core-host.md)。
+
+## Applicationの実測周期診断
+
+既存CAN1ランタイムでDWT時計を回収後に採取し、`Can1Observation.h`のHAL非依存C APIを通してApplicationへ渡す。初回や取得不能後の初回には差分を確定せず、重複・逆行時は診断カウンタを更新して時刻と差分を無効とする。通常の観測時刻と受信時刻を区別し、TIM7回数から実測時間を推測しない。`balancing_app_timing_snapshot()`は読み取り専用であり、ControlCycleの実機呼出・ARM・送信には接続しない。[検証記録](../verification/f446-application-timing-host.md)。
