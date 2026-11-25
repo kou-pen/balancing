@@ -533,3 +533,15 @@ flowchart TD
 ```
 
 実機フィルタの拡張は未実施。分類はフレーム外形のみであり、操作許可を意味しない。
+
+## CAN2受信フィルタ構成
+
+```mermaid
+flowchart TD
+    P["makeCan2FilterPlan(false)"] --> H["installCan2Filters：bank14のみ有効"]
+    H --> F["HAL：32bit List / FIFO0"]
+    F --> R["CanPort → CanRouter"]
+    Q["true：自作12 IDの6バンク（ホスト生成試験のみ）"] -.-> H
+```
+
+自作フィルタはサービス結合前のため有効化しない。将来の全構成でも7バンクが空く。

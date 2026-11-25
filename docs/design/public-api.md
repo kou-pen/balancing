@@ -179,3 +179,7 @@ ApplicationはMotorObservationSnapshotとImuAttitudeを同じ周期時刻で固�
 ## CAN2受信分類（HALフィルタ未接続）
 
 `CanRouter::dispatch()` は自作CAN2の12受信IDを6分類へ振り分け、従来の `CanEventSink` に採取時刻付きで渡す。 `MotorCanLink` は既存軸だけを担当。内容検査、サービス接続、実際のフィルタ変更は後続工程。 [検証記録](../verification/f446-can2-rx-routing-host.md)。
+
+## CAN2受信フィルタ
+
+`makeCan2FilterPlan(false)` はC620標準2 IDを1バンクに、trueは自作12 IDを追加し計7バンクに配置する。32bit Listを使用し、CAN1のMaskは維持する。現行起動はfalse固定で未使用バンクを明示無効化する。 [検証記録](../verification/f446-can2-filter-plan-host.md)。
