@@ -601,6 +601,17 @@ for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-saniti
         check=True, cwd=ROOT, timeout=30)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
+# Pi操作通信の固定IDとpayload。実機駆動なし。
+for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"])]:
+    path = OUT / f"test_f446_remote_control_codec{suffix}"
+    subprocess.run(["g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
+        "-I", str(F446_APP / "Inc"),
+        *[str(app_source / ("communication/can/" + name)) for name in
+          ("RemoteControlCodec.cpp", "ProtocolId.cpp", "ProtocolPayload.cpp")],
+        str(ROOT / "tests/test_f446_remote_control_codec.cpp"), *flags, "-o", str(path)],
+        check=True, cwd=ROOT, timeout=30)
+    subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
+
 print("[CubeIDE C++設定回帰試験] 実行", flush=True)
 subprocess.run(
     [
