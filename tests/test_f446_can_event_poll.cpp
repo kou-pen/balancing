@@ -6,6 +6,7 @@
 #include "balancing/communication/can/CanTxScheduler.hpp"
 #include "balancing/communication/can/MotorFramePlan.hpp"
 #include "balancing/control/controller/MotorCommand.hpp"
+#include "balancing/control/estimator/WheelOdometry.hpp"
 
 #ifdef NDEBUG
 #undef NDEBUG
@@ -887,6 +888,71 @@ void testMotorCanLinkCollectsSixAxesForOneCycle()
     assert(snapshot.c620[0].fresh && snapshot.rs06[0].fresh);
 }
 
+void testWheelContinuityThroughCanFifo()
+{
+    // 人工間隔・半径・減速比。実機の校正値ではない。
+    Fixture can1, can2;
+    MotorService motors{{{11,12,13,14},0xa6}, {{{4000,true},{4000,true}}}};
+    CanTxScheduler tx1{can1.port}, tx2{can2.port};
+    MotorCanLink link{motors,tx1};
+    CanRouter router{link,&tx1,&tx2};
+    WheelOdometry odom{{{{0.1f,10.0f,1.0f,true},{0.1f,10.0f,-1.0f,true}}}};
+    auto poll = [&]() { pollCanEvents(&can1.port,&can2.port,router); };
+    auto word = [](unsigned raw) { return (raw >> 8) | ((raw & 0xff) << 8); };
+    can2.pushRx(0x201,1000,false,8,word(0));
+    can2.pushRx(0x202,1000,false,8,word(0));
+    poll();
+    odom.update(motors.feedback(1000));
+
+    // 一回のIRQでFIFOの複数フレームに同じ時刻が付く。
+    can2.registers.sFIFOMailBox[0] = {0x201u << 21,8,word(3000),0};
+    can2.registers.sFIFOMailBox[1] = {0x201u << 21,8,word(6000),0};
+    can2.registers.RF0R.count = 2;
+    can2.port.captureInterrupt(2000);
+    can2.pushRx(0x202,2000,false,8,word(1));
+    poll();
+    const auto valid = motors.feedback(2000);
+    assert(valid.c620[0].position->counts == 6000);
+    assert(valid.c620[0].latest->sequence == 3);
+    assert(odom.update(valid)[0] == WheelUpdateResult::Updated);
+
+    // 既知IDの短いDLCは片側だけの連続性を無効にする。
+    can2.pushRx(0x201,2100,false,7,word(6001));
+    poll();
+    assert(!motors.feedback(2100).c620[0].position);
+    assert(motors.feedback(2100).c620[1].position);
+    assert(odom.update(motors.feedback(2100))[0] == WheelUpdateResult::ContinuityUnavailable);
+
+    // RxLostは古い通常RXより先に配送される。残存フレームで再基準化しない。
+    can2.pushRx(0x202,2200,false,8,word(2));
+    can2.registers.RF0R.flags = CAN_RF0R_FOVR0;
+    can2.port.captureInterrupt(2300);
+    poll();
+    const auto lost = motors.feedback(2300);
+    assert(lost.c620[1].latest->report.encoder_raw == 2);
+    assert(lost.c620[1].continuity == C620ContinuityStatus::TransportLost);
+    assert(!lost.c620[1].position);
+    assert(odom.update(lost)[1] == WheelUpdateResult::ContinuityUnavailable);
+    assert(odom.update(valid)[1] == WheelUpdateResult::ContinuityUnavailable);
+    can2.registers.ESR = CAN_ESR_BOFF;
+    can2.port.captureInterrupt(2400);
+    poll();
+    assert(!motors.resetWheelReference());
+    can2.registers.ESR = 0;
+    can2.port.captureInterrupt(2500);
+    poll();
+    assert(!motors.feedback(2500).c620[1].position);
+    assert(motors.resetWheelReference());
+    odom.reset();
+    can2.pushRx(0x201,3000,false,8,word(6010));
+    can2.pushRx(0x202,3000,false,8,word(3));
+    poll();
+    const auto reset = motors.feedback(3000);
+    assert(reset.c620[0].position->counts == 0 && reset.c620[1].position->counts == 0);
+    assert(odom.update(reset)[0] == WheelUpdateResult::Updated);
+    assert(odom.snapshot().wheel[0].fresh && odom.snapshot().wheel[1].fresh);
+}
+
 void testMotorCanLinkArmRequiresNewCan1ReportsAfterTransmission()
 {
     MotorLinkFixture f;
@@ -1131,6 +1197,7 @@ int main()
     testFailedStopsRequireNewTokensAndAreIndependentBetweenBuses();
     testStopWaitSurvivesNotReadyAndBusOff();
     testMotorCanLinkCollectsSixAxesForOneCycle();
+    testWheelContinuityThroughCanFifo();
     testMotorCanLinkArmRequiresNewCan1ReportsAfterTransmission();
     testMotorCanLinkDisarmDropsUnacceptedEnableAndWaitsForSameAxis();
     testMotorCanLinkRetryAndFeedbackIgnoreForeignEvents();

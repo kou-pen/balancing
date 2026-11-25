@@ -92,7 +92,7 @@ bool isError(const std::variant<ControlSnapshot, StateEstimateError>& result, T 
 
 void testSixAxisAndImuOneTick()
 {
-    MotorService motors{{{1, 2, 3, 4}, 0xa6}};
+    MotorService motors{{{1, 2, 3, 4}, 0xa6}, {{{4000, true}, {4000, true}}}};
     motors.onC620Frame(kLeft, 7000);
     motors.onC620Frame(kRight, 7001);
 
@@ -144,7 +144,13 @@ void testSixAxisAndImuOneTick()
     assert(updated.wheelReceivedAtUs[1] == 10001);
 
     // resetは新原点を開始するための明示操作。通常ARM/DISARMでは行わない。
+    assert(motors.resetWheelReference());
     estimator.reset();
+    assert(isError(estimator.update(input, 2000us), StateEstimateError::WheelFeedbackUnavailable));
+    motors.onC620Frame(kLeft2, 12000);
+    motors.onC620Frame(kRight2, 12001);
+    input.motors = motors.feedback(13000);
+    fillLegs(input.motors, 12000);
     const auto restarted = estimator.update(input, 2000us);
     assert(std::holds_alternative<ControlSnapshot>(restarted));
     near(std::get<ControlSnapshot>(restarted).chassis.positionM, 0.0f);
@@ -189,7 +195,7 @@ void testInvalidInputDoesNotProducePartialSnapshot()
 
 void testStaleWheelBoundaryAndImuRecovery()
 {
-    MotorService motors{{{1, 2, 3, 4}, 0xa6}};
+    MotorService motors{{{1, 2, 3, 4}, 0xa6}, {{{4000, true}, {4000, true}}}};
     motors.onC620Frame(kLeft, 7000);
     motors.onC620Frame(kRight, 7001);
     StateEstimator estimator{fixtureConfig()};
@@ -201,19 +207,27 @@ void testStaleWheelBoundaryAndImuRecovery()
     assert(isError(estimator.update(input, 2000us),
                    StateEstimateError::WheelFeedbackUnavailable));
 
-    input.imu.fresh = false;
+    // 21msの受信空白では新しい報告だけで位置を復旧させない。
     motors.onC620Frame(kLeft2, 28000);
     motors.onC620Frame(kRight2, 28001);
     input.motors = motors.feedback(29000);
     fillLegs(input.motors, 28000);
+    assert(isError(estimator.update(input, 2000us), StateEstimateError::WheelFeedbackUnavailable));
+    assert(motors.resetWheelReference());
+    estimator.reset();
+    input.imu.fresh = false;
+    motors.onC620Frame(kLeft2, 30000);
+    motors.onC620Frame(kRight2, 30001);
+    input.motors = motors.feedback(31000);
+    fillLegs(input.motors, 30000);
     assert(isError(estimator.update(input, 2000us),
                    StateEstimateError::ImuUnavailable));
     input.imu.fresh = true;
-    input.imu.receivedAtUs = 29000;
+    input.imu.receivedAtUs = 31000;
     // IMU回復周期には、欠損中の新規CAN報告を二重加算せずに使える。
     const auto recovered = estimator.update(input, 2000us);
     assert(std::holds_alternative<ControlSnapshot>(recovered));
-    assert(std::get<ControlSnapshot>(recovered).wheelReceivedAtUs[0] == 28000);
+    assert(std::get<ControlSnapshot>(recovered).wheelReceivedAtUs[0] == 30000);
 }
 } // namespace
 

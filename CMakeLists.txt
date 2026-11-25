@@ -172,6 +172,7 @@ add_test(NAME balancing_f446_can_rollback_failure_tests COMMAND balancing_f446_c
 # A shared main-loop poll with separate bxCAN IRQ sources.
 add_executable(balancing_f446_can_event_poll_tests
     tests/test_f446_can_event_poll.cpp
+    ${F446_APP}/Src/balancing/control/estimator/WheelOdometry.cpp
     ${F446_APP}/Src/balancing/communication/can/MotorFramePlan.cpp
     ${F446_APP}/Src/balancing/control/controller/MotorCommand.cpp
     ${BALANCING_CAN_DISPATCH_SOURCES}
