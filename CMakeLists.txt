@@ -320,3 +320,12 @@ add_executable(balancing_f446_protocol_codec_tests tests/test_f446_protocol_code
 target_include_directories(balancing_f446_protocol_codec_tests PRIVATE ${F446_APP}/Inc)
 target_compile_options(balancing_f446_protocol_codec_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_protocol_codec_tests COMMAND balancing_f446_protocol_codec_tests)
+
+# F303通信の純粋コーデック。実機I/Oなし。
+add_executable(balancing_f446_power_board_codec_tests tests/test_f446_power_board_codec.cpp
+    ${F446_APP}/Src/balancing/communication/can/PowerBoardCodec.cpp
+    ${F446_APP}/Src/balancing/communication/can/ProtocolId.cpp
+    ${F446_APP}/Src/balancing/communication/can/ProtocolPayload.cpp)
+target_include_directories(balancing_f446_power_board_codec_tests PRIVATE ${F446_APP}/Inc)
+target_compile_options(balancing_f446_power_board_codec_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME balancing_f446_power_board_codec_tests COMMAND balancing_f446_power_board_codec_tests)
