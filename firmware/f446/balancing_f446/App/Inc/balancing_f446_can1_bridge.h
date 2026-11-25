@@ -54,7 +54,7 @@ namespace balancing {
  *  @spec{BOARD-F446-001}
  */
 bool startCanObservation(CAN_HandleTypeDef* can1, CAN_HandleTypeDef* can2,
-                         const MotorObservationConfig& config) noexcept;
+                         const MotorObservationConfig& config, bool selfDefinedCan2=false) noexcept;
 }
 #endif
 

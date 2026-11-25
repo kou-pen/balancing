@@ -117,6 +117,12 @@ public:
      */
     CanTxSubmitResult trySubmit(const CanFrame& frame, TxToken token, std::uint64_t nowUs) noexcept;
 
+    /** @brief 背景CAN通信を最大1メールボックスだけ受付。停止・通常・周期待ちが優先。
+     * @note 受付済み背景通信の終端は周期送信を待たせない。物理バス遅延の保証ではない。
+     * @spec{BOARD-F446-001}
+     */
+    CanTxSubmitResult trySubmitBackground(const CanFrame& frame, TxToken token,
+                                         std::uint64_t nowUs) noexcept;
     /** @brief 新しい周期のフレーム一式で、このバスの周期送信待ちを置き換える。
      *  @param[in] batch 非ゼロで単調増加する世代番号、絶対期限 [us]、対象別フレーム。
      *  @param[in] nowUs CanPortと共通の単調時計の時刻 [us]。
@@ -174,6 +180,7 @@ private:
         std::uint64_t acceptedAtUs{0};
         std::uint64_t periodicGeneration{0};
         bool normalEvent{false};
+        bool background{false};
     };
 
     enum class StopState : std::uint8_t { Idle, Pending, InFlight, RetryRequired };

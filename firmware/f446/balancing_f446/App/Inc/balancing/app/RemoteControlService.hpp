@@ -1,5 +1,6 @@
 #pragma once
 #include "balancing/app/RobotSequence.hpp"
+#include "balancing/communication/can/CanTypes.hpp"
 #include "balancing/app/balancing_operator_input.h"
 
 namespace balancing {
@@ -23,6 +24,18 @@ public:
      */
     bool acceptDecoded(BOperatorSource source, const BOperatorSample& sample,
                        bool newSampleProven, std::uint64_t nowUs) noexcept;
+    /** @brief CAN運動指令を復号して選択元・受信期限を検査する。
+     * @spec{PROTO-REMOTE-001}
+     */
+    bool acceptCanMotion(const CanFrame& frame,std::uint64_t receivedAtUs,std::uint64_t nowUs) noexcept;
+    /** @brief 初期化済みの操作元。未設定なら空。
+     * @spec{PROTO-REMOTE-001}
+     */
+    std::optional<BOperatorSource> selectedSource() const noexcept;
+    /** @brief CAN欠落時に旧入力と中立確認を破棄する。選択元と減速状態は維持。
+     * @spec{BEHAV-001}
+     */
+    void invalidateCanInput() noexcept;
     /** @brief 操作量の周期コピー。ARM要求は生成しない。
      * @spec{BEHAV-001}
      */

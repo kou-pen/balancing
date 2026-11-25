@@ -48,6 +48,10 @@ public:
      */
     bool acceptCanStatus(CanBus bus, CanRxTarget target, const CanFrame& frame,
                          std::uint64_t receivedAtUs, std::uint64_t nowUs) noexcept;
+    /** @brief CAN2欠落・bus-offで最新報告の有効性を取り消す。FAULT保持は維持。
+     * @spec{PROTO-PWR-001}
+     */
+    void invalidateCanStatus() noexcept;
     /** @brief 同一周期時刻における電源状態。ONかつ鮮度成立のみready。
      * @spec{BOARD-F446-001}
      */
@@ -59,5 +63,6 @@ public:
 private:
     std::optional<PowerStatusReport> latest_{};
     bool faultPending_{false};
+    bool statusInvalidated_{false};
 };
 }

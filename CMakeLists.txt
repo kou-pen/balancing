@@ -113,11 +113,18 @@ set(BALANCING_POWER_CODEC_SOURCES
     ${F446_APP}/Src/balancing/communication/can/ProtocolId.cpp
     ${F446_APP}/Src/balancing/communication/can/ProtocolPayload.cpp
 )
+set(BALANCING_CAN2_SERVICE_SOURCES
+    ${F446_APP}/Src/balancing/app/Can2ServiceLink.cpp
+    ${F446_APP}/Src/balancing/communication/can/RemoteControlCodec.cpp
+    ${F446_APP}/Src/balancing/communication/can/DiagnosticsCodec.cpp
+)
+set(BALANCING_CAN2_TX_SOURCE ${F446_APP}/Src/balancing/app/Can2ServiceLinkTx.cpp)
 add_executable(balancing_cpp_app_tests
     tests/test_cpp_app.cpp
     ${BALANCING_CONTROL_MATH_SOURCES}
     ${F446_APP}/Src/balancing/app/RobotSequence.cpp
     ${F446_APP}/Src/balancing/app/application.cpp
+    ${BALANCING_CAN2_SERVICE_SOURCES}
     ${F446_APP}/Src/balancing/app/PowerBoardService.cpp
     ${BALANCING_POWER_CODEC_SOURCES}
     ${F446_APP}/Src/balancing/app/RemoteControlService.cpp
@@ -178,10 +185,12 @@ set(BALANCING_CAN_DISPATCH_SOURCES
 # Startup, RX observation and IRQ ownership at both STM32F446 CAN buses.
 add_executable(balancing_f446_can1_runtime_tests
     tests/test_f446_can1_runtime.cpp
+    ${BALANCING_CAN2_TX_SOURCE}
     ${BALANCING_CONTROL_MATH_SOURCES}
     ${BALANCING_RS06_SERVICE_SOURCES}
     ${F446_APP}/Src/balancing/app/MotorCanLink.cpp
     ${F446_APP}/Src/balancing/app/application.cpp
+    ${BALANCING_CAN2_SERVICE_SOURCES}
     ${F446_APP}/Src/balancing/app/PowerBoardService.cpp
     ${BALANCING_POWER_CODEC_SOURCES}
     ${F446_APP}/Src/balancing/app/RemoteControlService.cpp
@@ -201,10 +210,14 @@ target_compile_options(balancing_f446_can1_runtime_tests PRIVATE -Wall -Wextra -
 add_test(NAME balancing_f446_can1_runtime_tests COMMAND balancing_f446_can1_runtime_tests)
 add_test(NAME balancing_f446_can_rollback_failure_tests COMMAND balancing_f446_can1_runtime_tests --rollback-failure)
 add_test(NAME balancing_f446_motor_observation_tests COMMAND balancing_f446_can1_runtime_tests --motor-observation)
+add_test(NAME balancing_f446_can2_services_tests COMMAND balancing_f446_can1_runtime_tests --can2-services)
 
 # A shared main-loop poll with separate bxCAN IRQ sources.
 add_executable(balancing_f446_can_event_poll_tests
     tests/test_f446_can_event_poll.cpp
+    ${BALANCING_CAN2_SERVICE_SOURCES}
+    ${BALANCING_CAN2_TX_SOURCE}
+    ${F446_APP}/Src/balancing/app/RemoteControlService.cpp
     ${F446_APP}/Src/balancing/app/PowerBoardService.cpp
     ${BALANCING_POWER_CODEC_SOURCES}
     ${F446_APP}/Src/balancing/app/DiagnosticsService.cpp
@@ -308,7 +321,10 @@ target_compile_options(balancing_f446_power_service_tests PRIVATE -Wall -Wextra 
 add_test(NAME balancing_f446_power_service_tests COMMAND balancing_f446_power_service_tests)
 
 add_executable(balancing_f446_remote_service_tests tests/test_f446_remote_control_service.cpp
-    ${F446_APP}/Src/balancing/app/RemoteControlService.cpp)
+    ${F446_APP}/Src/balancing/app/RemoteControlService.cpp
+    ${F446_APP}/Src/balancing/communication/can/RemoteControlCodec.cpp
+    ${F446_APP}/Src/balancing/communication/can/ProtocolPayload.cpp
+    ${F446_APP}/Src/balancing/communication/can/ProtocolId.cpp)
 target_link_libraries(balancing_f446_remote_service_tests PRIVATE balancing_core m)
 target_compile_options(balancing_f446_remote_service_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_remote_service_tests COMMAND balancing_f446_remote_service_tests)

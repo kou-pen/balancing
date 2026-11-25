@@ -2,6 +2,7 @@
 #include "balancing_app_bridge.h"
 #include "balancing/app/ControlCycle.hpp"
 #include "balancing/app/PowerBoardService.hpp"
+#include "balancing/app/Can2ServiceLink.hpp"
 #include "balancing/app/RemoteControlService.hpp"
 #include "balancing/app/DiagnosticsService.hpp"
 #include "balancing/app/StatusIndicator.hpp"
@@ -21,6 +22,7 @@ struct ApplicationObservation {
     std::optional<ControlTickResult> cycle{};
     std::optional<FaultRecord> fault{};
     DiagnosticSummary diagnostics{};
+    Can2ServiceSummary can2{};
     std::optional<IndicatorState> indicator{};
 };
 
@@ -29,4 +31,26 @@ struct ApplicationObservation {
  * @spec{BOARD-F446-001}
  */
 std::optional<ApplicationObservation> applicationObservation() noexcept;
+
+/** @brief 非駆動のCAN2結合試験設定。診断領域はApplicationより長寿命。
+ * @spec{BOARD-F446-001}
+ */
+struct Can2ObservationProfile {
+    Can2ServiceConfig communication{};
+    BOperatorInputConfig operatorConfig{};
+    DiagnosticSlot* faultSlots{};
+    std::size_t faultCapacity{};
+};
+/** @brief 起動前にだけ非駆動試験設定を注入する。実機電源要求は常に無効。
+ * @spec{BOARD-F446-001}
+ */
+bool initializeCan2Observation(const Can2ObservationProfile&) noexcept;
+/** @brief 主ループ専用。無効設定・未初期化では空。
+ * @spec{BOARD-F446-001}
+ */
+Can2ServiceLink* applicationCan2Link() noexcept;
+/** @brief CANランタイムの背景送信を一度進める。既定起動では何もしない。
+ * @spec{BOARD-F446-001}
+ */
+void serviceCan2ApplicationTx() noexcept;
 }

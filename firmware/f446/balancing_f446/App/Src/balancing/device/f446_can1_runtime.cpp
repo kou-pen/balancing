@@ -1,6 +1,7 @@
 #include "balancing_f446_can1_bridge.h"
 
 #include "balancing/app/CanEventPoll.hpp"
+#include "balancing/app/ApplicationObservation.hpp"
 #include "balancing/app/MotorCanLink.hpp"
 #include "balancing/communication/can/CanPort.hpp"
 #include "balancing/communication/can/Can2FilterPlan.hpp"
@@ -42,10 +43,10 @@ bool installCan1Filters(CAN_HandleTypeDef& handle)
     return true;
 }
 
-bool installCan2Filters(CAN_HandleTypeDef& handle)
+bool installCan2Filters(CAN_HandleTypeDef& handle,bool selfDefinedCan2)
 {
-    // 自作通信はService接続前なので未有効化。既存車輪観測だけを受け取る。
-    const auto plan=balancing::makeCan2FilterPlan(false);
+    // 既定は車輪のみ。明示設定済みの非駆動試験でだけ自作通信を追加する。
+    const auto plan=balancing::makeCan2FilterPlan(selfDefinedCan2);
     CAN_FilterTypeDef filter{};
     filter.FilterMode = CAN_FILTERMODE_IDLIST;
     filter.FilterScale = CAN_FILTERSCALE_32BIT;
@@ -72,12 +73,12 @@ bool installCan2Filters(CAN_HandleTypeDef& handle)
 class CanRuntime final : private balancing::CanEventSink {
 public:
     CanRuntime(CAN_HandleTypeDef& can1, CAN_HandleTypeDef& can2, std::uint32_t cyclesPerUs,
-               const balancing::MotorObservationConfig& config) noexcept
+               const balancing::MotorObservationConfig& config,bool selfDefinedCan2) noexcept
         : port1{can1}, port2{can2}, handle1{can1}, handle2{can2},
           motors_{config.rs06MappingVerified ? config.rs06 : balancing::Rs06BusConfig{},
                   config.wheelContinuity},
           link_{motors_, tx1_}, mappingVerified_{config.rs06MappingVerified && motors_.hasRs06Configuration()},
-          cyclesPerUs_{cyclesPerUs}, lastCycle_{DWT->CYCCNT}
+          selfDefinedCan2_{selfDefinedCan2}, cyclesPerUs_{cyclesPerUs}, lastCycle_{DWT->CYCCNT}
     {
     }
 
@@ -113,6 +114,14 @@ public:
             pendingFaults_, mappingVerified_};
     }
 
+    bool selfDefinedCan2() const noexcept { return selfDefinedCan2_; }
+
+    void serviceCan2Tx() noexcept
+    {
+        if (!selfDefinedCan2_) return;
+        if (auto* link=balancing::applicationCan2Link()) link->submitPending(tx2_,sampleClock());
+    }
+
     bool acknowledge(std::uint64_t generation) noexcept
     {
         if (!observation || observation->generation != generation) return false;
@@ -134,6 +143,10 @@ private:
                       std::uint64_t atUs) noexcept override
     {
         link_.onCanReceive(bus, target, frame, atUs);
+        // ポート採取時刻はそのまま、評価時刻は配送時に同じDWTから採る。
+        if (selfDefinedCan2_ && bus==balancing::CanBus::Can2)
+            if (auto* link=balancing::applicationCan2Link())
+                link->receive(bus,target,frame,atUs,sampleClock());
         // 監視値はポートが回収した受信の集計。機器の鮮度や正常応答の判定には使わない。
         if (bus == balancing::CanBus::Can1) {
             ++snapshot1.rx_frames;
@@ -154,11 +167,19 @@ private:
     {
         // 受信専用。終端の配送だけで、送信候補は生成しない。
         link_.onCanTransmit(bus, token, outcome, atUs);
+        if (selfDefinedCan2_ && bus==balancing::CanBus::Can2)
+            if (auto* link=balancing::applicationCan2Link())
+                link->onTxTerminal(bus,token,outcome,atUs);
     }
 
     void onCanPortStatus(balancing::CanBus bus, balancing::CanEventKind kind, std::uint64_t atUs) noexcept override
     {
         link_.onCanPortStatus(bus, kind, atUs);
+        if (selfDefinedCan2_ && bus==balancing::CanBus::Can2)
+            if (auto* link=balancing::applicationCan2Link())
+                // 欠落通知は最初の欠落時刻を保持する。後続欠落もあり得るため、
+                // ここでは回収時刻までの旧フレームを保守的に無効化する。
+                link->onPortStatus(bus,kind,sampleClock());
         // 集計はバスごと。片側の欠落や復旧をもう片側へ伝播させない。
         if (bus == balancing::CanBus::Can1) {
             updateStatus(snapshot1, kind);
@@ -191,6 +212,7 @@ private:
     balancing::MotorService motors_;
     balancing::MotorCanLink link_;
     bool mappingVerified_;
+    bool selfDefinedCan2_;
     std::uint64_t observationGeneration_{0};
     balancing::FaultFlags pendingFaults_{balancing::FaultFlags::None};
     std::uint32_t cyclesPerUs_;
@@ -213,12 +235,13 @@ extern "C" bool balancing_f446_can_start(CAN_HandleTypeDef* can1, CAN_HandleType
 }
 
 bool balancing::startCanObservation(CAN_HandleTypeDef* can1, CAN_HandleTypeDef* can2,
-                                    const MotorObservationConfig& config) noexcept
+                                    const MotorObservationConfig& config,bool selfDefinedCan2) noexcept
 {
     if (started) {
-        return &runtime->handle1 == can1 && &runtime->handle2 == can2;
+        return &runtime->handle1 == can1 && &runtime->handle2 == can2 &&
+               runtime->selfDefinedCan2()==selfDefinedCan2;
     }
-    if (rollbackFailed || runtime || can1 == nullptr || can2 == nullptr ||
+    if ((selfDefinedCan2 && !applicationCan2Link()) || rollbackFailed || runtime || can1 == nullptr || can2 == nullptr ||
         can1->Instance != CAN1 || can2->Instance != CAN2 ||
         HAL_CAN_GetState(can1) != HAL_CAN_STATE_READY ||
         HAL_CAN_GetState(can2) != HAL_CAN_STATE_READY ||
@@ -229,7 +252,7 @@ bool balancing::startCanObservation(CAN_HandleTypeDef* can1, CAN_HandleTypeDef* 
     CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
     DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
     if ((DWT->CTRL & DWT_CTRL_CYCCNTENA_Msk) == 0u ||
-        !installCan1Filters(*can1) || !installCan2Filters(*can2)) {
+        !installCan1Filters(*can1) || !installCan2Filters(*can2,selfDefinedCan2)) {
         return false;
     }
     // HAL_CAN_Start失敗時もHALがLISTENINGへ移行済みの場合がある。
@@ -252,7 +275,7 @@ bool balancing::startCanObservation(CAN_HandleTypeDef* can1, CAN_HandleTypeDef* 
     // NVICはCubeMXが先に有効化するため、構築途中のポートをIRQに見せない。
     const auto constructionMask = __get_PRIMASK();
     __disable_irq();
-    runtime.emplace(*can1, *can2, SystemCoreClock / microsecondsPerSecond, config);
+    runtime.emplace(*can1, *can2, SystemCoreClock / microsecondsPerSecond, config,selfDefinedCan2);
     __set_PRIMASK(constructionMask);
     if (HAL_CAN_ActivateNotification(can1, notifications) != HAL_OK ||
         HAL_CAN_ActivateNotification(can2, notifications) != HAL_OK) {
@@ -328,4 +351,9 @@ std::optional<std::uint64_t> balancing::observationClockUs() noexcept
 {
     if (!started) return std::nullopt;
     return runtime->sampleClock();
+}
+
+void balancing::serviceCan2ApplicationTx() noexcept
+{
+    if (started) runtime->serviceCan2Tx();
 }
