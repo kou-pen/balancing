@@ -511,7 +511,7 @@ flowchart TD
 flowchart TD
     P["PowerBoardCodec"] --> I["ProtocolId：ID・DLC検査"]
     R["RemoteControlCodec"] --> I
-    D["診断Codec（予定）"] --> I
+    D["DiagnosticsCodec"] --> I
     P --> B["ProtocolPayload：Big endian変換"]
     R --> B
     D --> B
@@ -519,4 +519,4 @@ flowchart TD
     B --> F
 ```
 
-共通処理・電源・操作Codecは実装済み。診断CodecとCAN2送受信への接続は未実施。
+共通処理・電源・操作・診断Codecは実装済み。CAN2送受信・各Serviceへの接続は未実施。

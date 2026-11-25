@@ -313,6 +313,7 @@
 | <a href="ProtocolPayload_8hpp_source.html">ProtocolPayload.hpp</a> | Big endianの整数・float32変換API |
 | <a href="PowerBoardCodec_8hpp_source.html">PowerBoardCodec.hpp</a> | 電源状態・要求・応答と非常停止の公開API |
 | <a href="RemoteControlCodec_8hpp_source.html">RemoteControlCodec.hpp</a> | 運動指令・操作要求・応答の公開API |
+| <a href="DiagnosticsCodec_8hpp_source.html">DiagnosticsCodec.hpp</a> | 診断と設定読み出し19種類の型と公開API |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_control control/
@@ -455,6 +456,7 @@
 | <a href="ProtocolPayload_8cpp_source.html">ProtocolPayload.cpp</a> | DLC境界・非有限値を検査するデータ変換 |
 | <a href="PowerBoardCodec_8cpp_source.html">PowerBoardCodec.cpp</a> | 電源フレームの符号化・復号と形式検査 |
 | <a href="RemoteControlCodec_8cpp_source.html">RemoteControlCodec.cpp</a> | 操作フレームの符号化・復号と形式検査 |
+| <a href="DiagnosticsCodec_8cpp_source.html">DiagnosticsCodec.cpp</a> | 診断フレームの符号化・型付き復号・値の検査 |
 | <a href="CanRouter_8cpp_source.html">CanRouter.cpp</a> | 受信、送信終端、バス状態を上位へ振り分ける処理 |
 | <a href="CanTxScheduler_8cpp_source.html">CanTxScheduler.cpp</a> | 停止送信の優先順位と再試行、通常FIFO、周期指令の期限と終端照合 |
 | <a href="MotorFramePlan_8cpp_source.html">MotorFramePlan.cpp</a> | 状態別の通常トルク抑止とC11コーデックによる5フレーム生成 |
