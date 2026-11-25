@@ -377,7 +377,7 @@ can_dispatch_common = [
     str(rs06_source / "app" / "CanEventPoll.cpp"),
 ]
 for test, extra_sources in [
-    ("test_f446_can1_runtime", rs06_service_sources + app_math_cpp + [str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "device" / "f446_can1_runtime.cpp"), str(rs06_source / "app" / "application.cpp")]),
+    ("test_f446_can1_runtime", rs06_service_sources + app_math_cpp + [str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "device" / "f446_can1_runtime.cpp"), str(rs06_source / "communication" / "can" / "Can2FilterPlan.cpp"), str(rs06_source / "app" / "application.cpp")]),
     ("test_f446_can_event_poll", rs06_service_sources + app_math_cpp + [str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "communication" / "can" / "MotorFramePlan.cpp"), str(rs06_source / "control" / "filter" / "ImuAttitudeSource.cpp")]),
 ]:
     for suffix, flags in [
