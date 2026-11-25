@@ -106,7 +106,7 @@ struct CAN_FilterTypeDef {
     std::uint32_t FilterFIFOAssignment, FilterBank, FilterMode, FilterScale;
     std::uint32_t FilterActivation, SlaveStartFilterBank;
 };
-enum HAL_StatusTypeDef { HAL_OK, HAL_ERROR };
+enum HAL_StatusTypeDef { HAL_OK, HAL_ERROR, HAL_BUSY };
 HAL_StatusTypeDef HAL_CAN_ConfigFilter(CAN_HandleTypeDef*, const CAN_FilterTypeDef*);
 HAL_StatusTypeDef HAL_CAN_Start(CAN_HandleTypeDef*);
 HAL_StatusTypeDef HAL_CAN_Stop(CAN_HandleTypeDef*);
@@ -121,3 +121,16 @@ extern TestCoreDebugRegisters* CoreDebug;
 extern std::uint32_t SystemCoreClock;
 extern CAN_TypeDef* CAN1;
 extern CAN_TypeDef* CAN2;
+
+struct I2C_TypeDef { std::uint32_t SR2{0}; };
+enum HAL_I2C_StateTypeDef { HAL_I2C_STATE_READY, HAL_I2C_STATE_BUSY };
+struct I2C_HandleTypeDef { I2C_TypeDef* Instance; HAL_I2C_StateTypeDef State; };
+inline HAL_I2C_StateTypeDef HAL_I2C_GetState(I2C_HandleTypeDef* h) { return h->State; }
+constexpr std::uint32_t I2C_SR2_BUSY=2u;
+constexpr std::uint16_t I2C_MEMADD_SIZE_8BIT=1u;
+constexpr int I2C1_EV_IRQn=31,I2C1_ER_IRQn=32;
+extern I2C_TypeDef* I2C1;
+HAL_StatusTypeDef HAL_I2C_Mem_Read_IT(I2C_HandleTypeDef*,std::uint16_t,std::uint16_t,std::uint16_t,std::uint8_t*,std::uint16_t);
+HAL_StatusTypeDef HAL_I2C_Mem_Write_IT(I2C_HandleTypeDef*,std::uint16_t,std::uint16_t,std::uint16_t,std::uint8_t*,std::uint16_t);
+void HAL_NVIC_SetPriority(int,int,int);
+void HAL_NVIC_EnableIRQ(int);

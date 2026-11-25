@@ -510,6 +510,18 @@ for suffix, flags in [
     )
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
+# F446 asynchronous I2C and BNO055 DRDY with host register fixture.
+for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"])]:
+    path = OUT / f"test_f446_imu_runtime{suffix}"
+    subprocess.run(["g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
+        "-I", str(F446_APP / "Inc"), "-I", str(ROOT / "tests" / "stubs_can1"),
+        *[str(rs06_source / name) for name in ("device/I2cPort.cpp", "device/Bno055.cpp",
+           "device/f446_imu_runtime.cpp", "control/filter/ImuAttitudeSource.cpp")],
+        str(ROOT / "tests" / "test_f446_imu_runtime.cpp"),
+        str(OUT / f"estimator_c_attitude{suffix}.o"), *flags, "-lm", "-o", str(path)],
+        check=True, cwd=ROOT, timeout=30)
+    subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
+
 print("[CubeIDE C++設定回帰試験] 実行", flush=True)
 subprocess.run(
     [
