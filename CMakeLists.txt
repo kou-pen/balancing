@@ -114,6 +114,7 @@ add_executable(balancing_cpp_app_tests
     ${F446_APP}/Src/balancing/app/RobotSequence.cpp
     ${F446_APP}/Src/balancing/app/application.cpp
     ${F446_APP}/Src/balancing/app/PowerBoardService.cpp
+    ${F446_APP}/Src/balancing/app/RemoteControlService.cpp
 )
 target_include_directories(balancing_cpp_app_tests PRIVATE
     ${F446_APP}/Inc
@@ -173,6 +174,7 @@ add_executable(balancing_f446_can1_runtime_tests
     ${F446_APP}/Src/balancing/app/MotorCanLink.cpp
     ${F446_APP}/Src/balancing/app/application.cpp
     ${F446_APP}/Src/balancing/app/PowerBoardService.cpp
+    ${F446_APP}/Src/balancing/app/RemoteControlService.cpp
     ${BALANCING_CAN_DISPATCH_SOURCES}
     ${F446_APP}/Src/balancing/communication/can/CanPort.cpp
     ${F446_APP}/Src/balancing/device/f446_can1_runtime.cpp
@@ -287,3 +289,9 @@ add_executable(balancing_f446_power_service_tests tests/test_f446_power_board_se
 target_include_directories(balancing_f446_power_service_tests PRIVATE ${F446_APP}/Inc)
 target_compile_options(balancing_f446_power_service_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_power_service_tests COMMAND balancing_f446_power_service_tests)
+
+add_executable(balancing_f446_remote_service_tests tests/test_f446_remote_control_service.cpp
+    ${F446_APP}/Src/balancing/app/RemoteControlService.cpp)
+target_link_libraries(balancing_f446_remote_service_tests PRIVATE balancing_core m)
+target_compile_options(balancing_f446_remote_service_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME balancing_f446_remote_service_tests COMMAND balancing_f446_remote_service_tests)

@@ -111,7 +111,7 @@ for label, flags in [
 # Both Application tests now link the actual C++ control cycle and C11 math.
 app_source = F446_APP / "Src" / "balancing"
 app_math_cpp = [str(app_source / name) for name in (
-    "app/ControlCycle.cpp", "app/PowerBoardService.cpp", "control/controller/MotorCommand.cpp",
+    "app/ControlCycle.cpp", "app/PowerBoardService.cpp", "app/RemoteControlService.cpp", "control/controller/MotorCommand.cpp",
     "control/controller/BalanceControl.cpp", "control/estimator/StateEstimator.cpp",
     "control/estimator/LegKinematics.cpp", "control/estimator/WheelOdometry.cpp")]
 app_math_objects = {}
@@ -119,7 +119,7 @@ for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-saniti
     app_math_objects[suffix] = []
     for index, source in enumerate(("control/controller/balancing_core.c",
         "control/controller/balancing_leg_pd.c", "control/controller/balancing_yaw_pi.c",
-        "control/estimator/balancing_leg_kinematics.c")):
+        "control/estimator/balancing_leg_kinematics.c", "app/balancing_operator_input.c")):
         obj = OUT / f"app_math_{index}{suffix}.o"
         subprocess.run(["gcc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
             "-I", str(F446_APP / "Inc"), "-c", str(app_source / source), *flags,
@@ -553,6 +553,14 @@ for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-saniti
         "-I", str(F446_APP / "Inc"), str(app_source / "app/PowerBoardService.cpp"),
         str(app_source / "app/RobotSequence.cpp"), str(ROOT / "tests/test_f446_power_board_service.cpp"),
         *flags, "-o", str(path)], check=True, cwd=ROOT, timeout=30)
+    subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
+
+for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"])]:
+    path = OUT / f"test_f446_remote_control_service{suffix}"
+    subprocess.run(["g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
+        "-I", str(F446_APP / "Inc"), str(app_source / "app/RemoteControlService.cpp"),
+        str(ROOT / "tests/test_f446_remote_control_service.cpp"), *app_math_objects[suffix],
+        *flags, "-lm", "-o", str(path)], check=True, cwd=ROOT, timeout=30)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
 print("[CubeIDE C++設定回帰試験] 実行", flush=True)
