@@ -108,12 +108,18 @@ set(BALANCING_CONTROL_MATH_SOURCES
     ${F446_APP}/Src/balancing/control/estimator/LegKinematics.cpp
     ${F446_APP}/Src/balancing/control/estimator/WheelOdometry.cpp
 )
+set(BALANCING_POWER_CODEC_SOURCES
+    ${F446_APP}/Src/balancing/communication/can/PowerBoardCodec.cpp
+    ${F446_APP}/Src/balancing/communication/can/ProtocolId.cpp
+    ${F446_APP}/Src/balancing/communication/can/ProtocolPayload.cpp
+)
 add_executable(balancing_cpp_app_tests
     tests/test_cpp_app.cpp
     ${BALANCING_CONTROL_MATH_SOURCES}
     ${F446_APP}/Src/balancing/app/RobotSequence.cpp
     ${F446_APP}/Src/balancing/app/application.cpp
     ${F446_APP}/Src/balancing/app/PowerBoardService.cpp
+    ${BALANCING_POWER_CODEC_SOURCES}
     ${F446_APP}/Src/balancing/app/RemoteControlService.cpp
     ${F446_APP}/Src/balancing/app/DiagnosticsService.cpp
     ${F446_APP}/Src/balancing/app/StatusIndicator.cpp
@@ -177,6 +183,7 @@ add_executable(balancing_f446_can1_runtime_tests
     ${F446_APP}/Src/balancing/app/MotorCanLink.cpp
     ${F446_APP}/Src/balancing/app/application.cpp
     ${F446_APP}/Src/balancing/app/PowerBoardService.cpp
+    ${BALANCING_POWER_CODEC_SOURCES}
     ${F446_APP}/Src/balancing/app/RemoteControlService.cpp
     ${F446_APP}/Src/balancing/app/DiagnosticsService.cpp
     ${F446_APP}/Src/balancing/app/StatusIndicator.cpp
@@ -198,6 +205,8 @@ add_test(NAME balancing_f446_motor_observation_tests COMMAND balancing_f446_can1
 # A shared main-loop poll with separate bxCAN IRQ sources.
 add_executable(balancing_f446_can_event_poll_tests
     tests/test_f446_can_event_poll.cpp
+    ${F446_APP}/Src/balancing/app/PowerBoardService.cpp
+    ${BALANCING_POWER_CODEC_SOURCES}
     ${F446_APP}/Src/balancing/app/DiagnosticsService.cpp
     ${BALANCING_CONTROL_MATH_SOURCES}
     ${F446_APP}/Src/balancing/control/filter/ImuAttitudeSource.cpp
@@ -292,6 +301,7 @@ add_test(NAME balancing_f446_imu_runtime_tests COMMAND balancing_f446_imu_runtim
 
 add_executable(balancing_f446_power_service_tests tests/test_f446_power_board_service.cpp
     ${F446_APP}/Src/balancing/app/PowerBoardService.cpp
+    ${BALANCING_POWER_CODEC_SOURCES}
     ${F446_APP}/Src/balancing/app/RobotSequence.cpp)
 target_include_directories(balancing_f446_power_service_tests PRIVATE ${F446_APP}/Inc)
 target_compile_options(balancing_f446_power_service_tests PRIVATE -Wall -Wextra -Wpedantic)
