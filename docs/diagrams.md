@@ -471,3 +471,20 @@ flowchart LR
 </pre>
 
 未検証の取得条件・静止証明では姿勢無効。
+
+
+## Applicationの観測周期（非駆動）
+
+<pre class="mermaid">
+flowchart TD
+    CAN["CAN1/2：MotorObservationSnapshot"] --> APP["Application：共通周期時刻"]
+    IMU["ImuAttitude：元時刻・鮮度"] --> APP
+    APP --> CYCLE["ControlCycle"]
+    CYCLE --> EST["StateEstimator"]
+    EST --> SEQ["RobotSequence / BalanceControl"]
+    SEQ --> OUT["ApplicationObservation：診断のみ"]
+    SEQ -.人工値のSILのみ.-> PLAN["MotorCommand / MotorFramePlan"]
+    PLAN -.模擬送信のみ.-> TX["CanTxScheduler"]
+</pre>
+
+本番の送信・操作・電源・校正接続は未実施。SILの出力を実機送信に転用しない。

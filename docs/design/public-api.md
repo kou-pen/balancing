@@ -154,3 +154,8 @@ App本体の `ControlCycle` は `MotorCommand::hasVerifiedConfiguration()` がfa
 ## C620受信順の累積位置
 
 `C620Motor` は各報告の最短一周差を積算し、`C620AxisFeedback` に通信鮮度とは独立した累積位置・受理番号・原点世代・連続性を返す。半周未満の外部検証済み取得間隔設定が必須。CAN2のRxLost/BusOff、既知IDの復号失敗、時刻逆行、半回転差などで連続性を無効にし、正常報告で自動復旧しない。`WheelOdometry` は累積位置を距離とRPM速度へ換算する。明示原点再設定には `MotorService::resetWheelReference()` と `StateEstimator::reset()` の同期が必要。実機の上位操作は未接続。[検証記録](../verification/f446-c620-continuity-host.md)。
+
+
+## Applicationの観測周期統合（非駆動）
+
+ApplicationはMotorObservationSnapshotとImuAttitudeを同じ周期時刻で固定し、ControlCycleへ渡す。既定プロファイルは校正・モデル・駆動限界・電源・機構・操作条件が未検証で、ARM/指令送信に接続しない。ApplicationObservationは周期・6軸・姿勢・状態推定・FAULTの診断コピー。取得不能・時計異常では旧周期結果を返さない。最新回収番号の異常通知消費はFAULT解除とは独立する。[統合検証](../verification/f446-application-observation-cycle-host.md)。
