@@ -561,3 +561,31 @@ flowchart TD
 ```
 
 実機の配送先、フィルタ有効化、送信・ARM条件は変更しない。検証記録は [電源状態の受信境界](verification/f446-power-status-receive-host.md)。
+
+
+## CAN2通信統合（非駆動）
+
+```mermaid
+flowchart TD
+    IRQ["CAN2 IRQ・DWT採取"] --> P["CanPort / pollCanEvents"]
+    P --> R["CanRouter"]
+    R --> M["MotorCanLink：C620"]
+    R --> L["Can2ServiceLink"]
+    L --> PW["PowerBoardService"]
+    L --> RC["RemoteControlService"]
+    L --> E["操作イベント・E-STOP"]
+    PW --> A["Application：観測周期"]
+    RC --> A
+    E --> A
+    A --> S["ControlCycle / RobotSequence"]
+    S --> L
+    S --> D["DiagnosticsService：FAULT 3部分"]
+    D --> TX["Can2ServiceLink::submitPending"]
+    L --> TX
+    A --> TX
+    TX --> BG["CAN2 CanTxScheduler：背景1枠"]
+    BG --> PORT["CanPort"]
+    PORT -->|"Tx終端"| L
+```
+
+明示プロファイル時のホスト検証経路。既定起動は自作フィルタ・送信無効。背景送信は停止・通常・周期待ちより下位。通常モータ駆動経路・実機電源操作は含めない。
