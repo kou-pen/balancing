@@ -278,6 +278,7 @@
 | <a href="PowerBoardService_8hpp_source.html">PowerBoardService.hpp</a> | 電源の論理状態・500ms期限・故障保持 |
 | <a href="RemoteControlService_8hpp_source.html">RemoteControlService.hpp</a> | 復号済み操作・切替・復帰管理 |
 | <a href="DiagnosticsService_8hpp_source.html">DiagnosticsService.hpp</a> | 診断イベント・固定領域・送信進捗 |
+| <a href="StatusIndicator_8hpp_source.html">StatusIndicator.hpp</a> | 状態別の論理表示パターン |
 | <a href="MotorService_8hpp_source.html">MotorService.hpp</a> | RS06のARM・停止と、脚・車輪6軸の周期観測をまとめるAPI |
 | <a href="MotorCanLink_8hpp_source.html">MotorCanLink.hpp</a> | CAN1・CAN2の機器報告の配送、RS06の送信・終端接続 |
 | <a href="RobotSequence_8hpp_source.html">RobotSequence.hpp</a> | 運転状態、FAULT、要求と結果の公開型 |
@@ -381,6 +382,8 @@
 | <a href="I2cPort_8hpp_source.html">I2cPort.hpp</a> | 非同期I2C転送の契約 |
 | <a href="Bno055_8hpp_source.html">Bno055.hpp</a> | ACCGYRO取得とDRDY・時間窓 |
 | <a href="ImuObservation_8hpp_source.html">ImuObservation.hpp</a> | 姿勢の周期読取API |
+| <a href="Led_8hpp_source.html">Led.hpp</a> | 明示極性付きLED・RGB論理出力 |
+| <a href="Buzzer_8hpp_source.html">Buzzer.hpp</a> | 時刻差による単発鳴動・停止 |
 | <a href="balancing__f446__motor__bench__port_8h_source.html">balancing_f446_motor_bench_port.h</a> | F446の試運転ポートを操作するC API |
 */
 
@@ -420,6 +423,7 @@
 | <a href="PowerBoardService_8cpp_source.html">PowerBoardService.cpp</a> | 復号済み報告の受理と電源鮮度評価 |
 | <a href="RemoteControlService_8cpp_source.html">RemoteControlService.cpp</a> | C11操作数学とC++状態の接続 |
 | <a href="DiagnosticsService_8cpp_source.html">DiagnosticsService.cpp</a> | 重要通常FIFO、3部分の終端照合 |
+| <a href="StatusIndicator_8cpp_source.html">StatusIndicator.cpp</a> | FAULT優先と時刻差による点滅・鳴動 |
 | <a href="balancing__motor__bench_8c_source.html">balancing_motor_bench.c</a> | 単軸試運転のコマンド、状態遷移、停止条件 |
 | <a href="balancing__operator__input_8c_source.html">balancing_operator_input.c</a> | 操作元選択、通信断、ニュートラル確認、指令値の整形 |
 */
