@@ -183,6 +183,7 @@ add_executable(balancing_f446_can1_runtime_tests
     ${BALANCING_CAN_DISPATCH_SOURCES}
     ${F446_APP}/Src/balancing/communication/can/CanPort.cpp
     ${F446_APP}/Src/balancing/device/f446_can1_runtime.cpp
+    ${F446_APP}/Src/balancing/communication/can/Can2FilterPlan.cpp
 )
 target_include_directories(balancing_f446_can1_runtime_tests PRIVATE
     tests/stubs_can1

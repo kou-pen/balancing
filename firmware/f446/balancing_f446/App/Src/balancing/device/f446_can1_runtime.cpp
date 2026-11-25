@@ -3,6 +3,7 @@
 #include "balancing/app/CanEventPoll.hpp"
 #include "balancing/app/MotorCanLink.hpp"
 #include "balancing/communication/can/CanPort.hpp"
+#include "balancing/communication/can/Can2FilterPlan.hpp"
 #include "balancing/communication/can/CanRouter.hpp"
 #include "balancing/communication/can/CanTxScheduler.hpp"
 
@@ -43,24 +44,27 @@ bool installCan1Filters(CAN_HandleTypeDef& handle)
 
 bool installCan2Filters(CAN_HandleTypeDef& handle)
 {
+    // 自作通信はService接続前なので未有効化。既存車輪観測だけを受け取る。
+    const auto plan=balancing::makeCan2FilterPlan(false);
     CAN_FilterTypeDef filter{};
-    filter.FilterMode = CAN_FILTERMODE_IDMASK;
+    filter.FilterMode = CAN_FILTERMODE_IDLIST;
     filter.FilterScale = CAN_FILTERSCALE_32BIT;
     filter.FilterFIFOAssignment = CAN_FILTER_FIFO0;
-    filter.FilterActivation = ENABLE;
-    // bxCANのバンク分割は共有。CAN1のbank0/1とは重ならない。
     filter.SlaveStartFilterBank = 14u;
-    filter.FilterBank = 14u;
-    filter.FilterMaskIdHigh = 0xffe0u;
-    filter.FilterMaskIdLow = CAN_RI0R_IDE | CAN_RI0R_RTR;
-    for (const auto id : {0x201u, 0x202u}) {
-        // 標準11bit IDは上位11bit。拡張・リモートフレームも排除する。
-        filter.FilterIdHigh = id << 5u;
-        filter.FilterIdLow = 0u;
-        if (HAL_CAN_ConfigFilter(&handle, &filter) != HAL_OK) {
-            return false;
-        }
-        ++filter.FilterBank;
+
+    // CAN2の全所有バンクを明示設定する。旧設定や起動再試行で
+    // 残ったフィルタを有効のままにしない。CAN1の0～13には触れない。
+    for (std::size_t i=0;i<14;++i) {
+        filter.FilterBank=14u+static_cast<std::uint32_t>(i);
+        const bool active=i<plan.count;
+        const auto word=active ? plan.entries[i] : balancing::Can2FilterWord{};
+        filter.FilterActivation=active ? ENABLE : DISABLE;
+        filter.FilterIdHigh=word.first >> 16u;
+        filter.FilterIdLow=word.first & 0xffffu;
+        // HALの名前はMaskだが、32bit ListではFR2に置く第2のID。
+        filter.FilterMaskIdHigh=word.second >> 16u;
+        filter.FilterMaskIdLow=word.second & 0xffffu;
+        if (HAL_CAN_ConfigFilter(&handle,&filter)!=HAL_OK) return false;
     }
     return true;
 }
