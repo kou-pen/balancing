@@ -175,3 +175,7 @@ ApplicationはMotorObservationSnapshotとImuAttitudeを同じ周期時刻で固�
 ## 診断・設定読み出しコーデック（実機未接続）
 
 `DiagnosticsCodec` は19種類のDTOに対する `encodeDiagnostic()` と、IDに対応する型を `DiagnosticPayload` として返す `decodeDiagnostic()` を提供する。観測鮮度・配信許可・FAULT再構成・設定番号の意味は別責務。未定義フラグと設定値は生ビット。 [検証記録](../verification/f446-diagnostics-codec-host.md)。
+
+## CAN2受信分類（HALフィルタ未接続）
+
+`CanRouter::dispatch()` は自作CAN2の12受信IDを6分類へ振り分け、従来の `CanEventSink` に採取時刻付きで渡す。 `MotorCanLink` は既存軸だけを担当。内容検査、サービス接続、実際のフィルタ変更は後続工程。 [検証記録](../verification/f446-can2-rx-routing-host.md)。

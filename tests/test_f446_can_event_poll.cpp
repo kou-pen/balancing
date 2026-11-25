@@ -220,6 +220,87 @@ void testRoutingUsesBusIdentifierFormatAndDlc()
     }
 }
 
+void testCan2ProtocolReceiveDirections()
+{
+    // 仕様表から独立に転記した35個の具体ID。F446の入力12個だけを分類する。
+    struct Case { std::uint32_t id; std::uint8_t dlc; CanRxTarget target; };
+    const Case cases[]{
+        {0x47c01u,0,CanRxTarget::Unmatched},
+        {0x4bc01u,0,CanRxTarget::EmergencyStop},
+        {0x4fc01u,0,CanRxTarget::EmergencyStop},
+        {0x8404801u,2,CanRxTarget::Unmatched},
+        {0x840c801u,2,CanRxTarget::Unmatched},
+        {0x4404802u,2,CanRxTarget::Unmatched},
+        {0x440c802u,2,CanRxTarget::Unmatched},
+        {0x840bc03u,8,CanRxTarget::PowerStatus},
+        {0x8408404u,8,CanRxTarget::PowerResult},
+        {0x8408c04u,8,CanRxTarget::Unmatched},
+        {0x880c401u,8,CanRxTarget::RemoteMotion},
+        {0x880c402u,2,CanRxTarget::RemoteRequest},
+        {0x480c403u,2,CanRxTarget::RemoteRequest},
+        {0x880c404u,2,CanRxTarget::RemoteRequest},
+        {0x880c405u,3,CanRxTarget::RemoteRequest},
+        {0x8804c06u,8,CanRxTarget::Unmatched},
+        {0xcc04c01u,8,CanRxTarget::Unmatched},
+        {0xcc04c02u,8,CanRxTarget::Unmatched},
+        {0xcc04c03u,8,CanRxTarget::Unmatched},
+        {0xcc04c04u,4,CanRxTarget::Unmatched},
+        {0xcc04c05u,8,CanRxTarget::Unmatched},
+        {0xcc04c06u,8,CanRxTarget::Unmatched},
+        {0xcc04c07u,8,CanRxTarget::Unmatched},
+        {0xcc04c08u,8,CanRxTarget::Unmatched},
+        {0xcc04c09u,8,CanRxTarget::Unmatched},
+        {0xcc04c0au,8,CanRxTarget::Unmatched},
+        {0x4c04c20u,8,CanRxTarget::Unmatched},
+        {0x4c04c21u,8,CanRxTarget::Unmatched},
+        {0x4c04c22u,8,CanRxTarget::Unmatched},
+        {0xcc0c480u,8,CanRxTarget::DiagnosticRequest},
+        {0xcc0c481u,4,CanRxTarget::DiagnosticRequest},
+        {0xcc04c82u,8,CanRxTarget::Unmatched},
+        {0xd00c401u,4,CanRxTarget::DiagnosticRequest},
+        {0xd004c02u,8,CanRxTarget::Unmatched},
+        {0xd004c03u,6,CanRxTarget::Unmatched},
+    };
+    unsigned accepted=0;
+    for (const auto& c:cases) {
+        Recorder sink;
+        CanRouter router{sink};
+        const auto check=[&](CanBus bus,CanFrame frame,CanRxTarget expected) {
+            const auto n=sink.count;
+            CanEvent event{CanEventKind::Rx,1000u+n};
+            event.frame=frame;
+            router.dispatch(bus,event);
+            assert(sink.count==n+1);
+            const auto& e=sink.entries[n];
+            assert(e.bus==bus && e.id==frame.id && e.atUs==event.atUs && e.target==expected);
+        };
+        const CanFrame frame{c.id,{0x45},c.dlc,true};
+        check(CanBus::Can2,frame,c.target);
+        if (c.target!=CanRxTarget::Unmatched) ++accepted;
+        // CAN1は独立したRS06バス。自作CAN2の定義を流用しない。
+        check(CanBus::Can1,frame,CanRxTarget::Unmatched);
+        auto bad=frame;bad.extended=false;
+        check(CanBus::Can2,bad,CanRxTarget::Unmatched);
+        for (unsigned dlc=0;dlc<=9;++dlc) {
+            if (dlc==c.dlc) continue;
+            bad=frame;bad.dlc=static_cast<std::uint8_t>(dlc);
+            check(CanBus::Can2,bad,CanRxTarget::Unmatched);
+        }
+        for (auto id:{0x700u,0x1c000001u,c.id|0x20000000u,c.id^0x100u}) {
+            bad=frame;bad.id=id;check(CanBus::Can2,bad,CanRxTarget::Unmatched);
+        }
+    }
+    assert(accepted==12);
+    Recorder sink;CanRouter router{sink};
+    // IRQ由来のDLC0データは未使用バイトに意味がない。
+    for (auto id:{0x1ffu,0x200u,0x203u,0x208u,0x700u}) {
+        CanEvent event{CanEventKind::Rx,99};
+        event.frame={id,{0x45},8,false};
+        router.dispatch(CanBus::Can2,event);
+        assert(sink.entries[sink.count-1].target==CanRxTarget::Unmatched);
+    }
+}
+
 void testRoutingFromBothPortQueues()
 {
     Fixture can1, can2;
@@ -891,6 +972,37 @@ void testMotorCanLinkCollectsSixAxesForOneCycle()
     assert(snapshot.c620[0].fresh && snapshot.rs06[0].fresh);
 }
 
+void testCan2ProtocolDoesNotChangeWheelObservations()
+{
+    MotorLinkFixture f;
+    f.can2.pushRx(0x201,1000,false,8,0x00000010u,0);
+    f.can2.pushRx(0x202,1001,false,8,0x00000010u,0);
+    f.poll();
+    const auto before=f.motors.feedback(2000);
+    for (const auto& w:before.c620) assert(w.latest && w.fresh);
+    // 自作IDを実際のポート模擬FIFOから流す。車輪観測・鮮度を更新しない。
+    const CanFrame frames[]{
+        {0x0004bc01u,{},0,true},{0x0004fc01u,{},0,true},
+        {0x0840bc03u,{},8,true},{0x08408404u,{},8,true},
+        {0x0880c401u,{},8,true},{0x0880c402u,{},2,true},
+        {0x0480c403u,{},2,true},{0x0880c404u,{},2,true},
+        {0x0880c405u,{},3,true},{0x0cc0c480u,{},8,true},
+        {0x0cc0c481u,{},4,true},{0x0d00c401u,{},4,true}
+    };
+    for (const auto& frame:frames) {
+        f.can2.pushRx(frame.id,2100,true,frame.dlc);
+        f.poll();
+    }
+    const auto after=f.motors.feedback(2200);
+    for (unsigned i=0;i<2;++i) {
+        assert(after.c620[i].latest && after.c620[i].fresh);
+        assert(after.c620[i].latest->receivedAtUs==before.c620[i].latest->receivedAtUs);
+        assert(after.c620[i].latest->sequence==before.c620[i].latest->sequence);
+        assert(after.c620[i].continuity==before.c620[i].continuity);
+    }
+    // 既知車輪の短いDLC通知は既存の連続性試験で別途検証する。
+}
+
 void testWheelContinuityThroughCanFifo()
 {
     // 人工間隔・半径・減速比。実機の校正値ではない。
@@ -1388,6 +1500,7 @@ int main()
     testBusAndEventTypeRemainPaired();
     testBothPortsReturnAtLimitAndResumeLater();
     testRoutingUsesBusIdentifierFormatAndDlc();
+    testCan2ProtocolReceiveDirections();
     testRoutingFromBothPortQueues();
     testTerminalOnlyReleasesTheOriginatingBus();
     testSchedulerIgnoresUnacceptedAndStaleEvents();
@@ -1402,6 +1515,7 @@ int main()
     testFailedStopsRequireNewTokensAndAreIndependentBetweenBuses();
     testStopWaitSurvivesNotReadyAndBusOff();
     testMotorCanLinkCollectsSixAxesForOneCycle();
+    testCan2ProtocolDoesNotChangeWheelObservations();
     testWheelContinuityThroughCanFifo();
     testMotorCanLinkArmRequiresNewCan1ReportsAfterTransmission();
     testMotorCanLinkDisarmDropsUnacceptedEnableAndWaitsForSameAxis();

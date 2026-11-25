@@ -14,9 +14,15 @@ enum class CanBus : std::uint8_t { Can1, Can2 };
 /** @brief フレーム外形から決まる受信先。Unmatchedは診断用に通知する。
  *  @note RS06の軸・主機IDとペイロードの妥当性はCodecと機器サービスが照合する。
  *  @spec{PROTO-RS06-001}
+ *  @note 自作CAN2は受信方向と固定DLCのみ分類する。内容・操作許可は別責務。
  *  @spec{PROTO-C620-001}
+ *  @spec{PROTO-PWR-001}
+ *  @spec{PROTO-REMOTE-001}
  */
-enum class CanRxTarget : std::uint8_t { Unmatched, Rs06Status, C620LeftFeedback, C620RightFeedback };
+enum class CanRxTarget : std::uint8_t {
+    Unmatched, Rs06Status, C620LeftFeedback, C620RightFeedback,
+    PowerStatus, EmergencyStop, RemoteMotion, RemoteRequest, DiagnosticRequest, PowerResult
+};
 
 /** @brief 主ループから受信・送信終端・ポート状態を受け取る境界。
  *  @note 各処理は非ブロッキングで、渡されたフレームの参照を保持しない。
