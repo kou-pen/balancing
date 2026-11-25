@@ -22,7 +22,7 @@ F446の個別機能は多くがホスト検証済み。次の中心は通常運�
 | 自作CAN2 | 35 IDコーデック、受信分類、Listフィルタ計画、電源状態受信境界（#68） | 本番配送、送信、フィルタ有効化、F303/Piとの互換性 |
 | F303・Pi | F446側の通信仕様・コーデック | 対向FW/ソフトと実機検証（このリポジトリのF303 FWは未収録） |
 
-根拠: [検証記録一覧](../verification/index.md)、[公開API](../design/public-api.md)。PR #68のホスト試験はCTest 33/33、通常/UBSan全件合格。最新全体のARMクロスビルド・実機運転は未検証。
+根拠: [検証記録一覧](../verification/index.md)、[公開API](../design/public-api.md)。PR #68のホスト試験はCTest 33/33、通常/UBSan全件合格。最新master（0692c4e）のCubeIDE Debug/Release・全44 AppソースのARMビルド検証も合格。実機運転は未検証。[クロスビルド記録](../verification/f446-crossbuild-20261126.md)。
 
 ## P0の残りの開発順序
 
