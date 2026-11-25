@@ -20,7 +20,7 @@ struct WheelOdometryConfig {
 };
 
 struct WheelMotion {
-    float positionM;             // 初回有効報告を原点とする変位 [m]
+    float positionM;             // C620Motorの原点世代に対する変位 [m]
     float velocityMps;           // ロータRPMからの車輪周速度 [m/s]
     std::uint16_t encoderRaw;    // 最後に受理した0..8191の生カウント
     std::uint64_t receivedAtUs;  // 元のCAN受信時刻（制御周期時刻ではない）
@@ -46,12 +46,14 @@ enum class WheelUpdateResult : std::uint8_t {
     InvalidConfiguration,
     InvalidTimestamp,
     InvalidValue,
-    AmbiguousDelta
+    ContinuityUnavailable,
+    ReferenceMismatch,
+    InvalidSequence
 };
 
 /** @brief C620生フィードバックを左右車輪の相対位置・周速度へ換算する。
  *  @note MotorServiceが検査するCAN鮮度は再計算しない。
- *        同じ受信時刻を複数の500 Hz周期で読んでも積算は一度だけ。
+ *        積算はC620Motorのみ。受信番号・原点世代を照合する。
  *  @spec{CTRL-EST-001}
  *  @spec{PROTO-C620-001}
  */
@@ -64,7 +66,7 @@ public:
      */
     explicit WheelOdometry(const std::array<WheelOdometryConfig, 2>& config) noexcept;
 
-    /** @brief 同じ周期のMotorServiceフィードバックから新規受信分だけ積算する。
+    /** @brief 同じ周期のMotorServiceフィードバックから累積位置を物理量へ換算する。
      *  @param[in] motors CANイベント回収後の6軸の読み取り専用コピー。
      *  @return 軸別の更新結果。片側の不正値で他方の観測は捨てない。
      *  @pre 呼出し元が同じ周期の単調時刻でMotorService::feedback()を取得する。
@@ -79,20 +81,26 @@ public:
      */
     WheelOdometrySnapshot snapshot() const noexcept;
 
-    /** @brief 原点と積算履歴だけを消す。構築時の設定は変更しない。
+    /** @brief 次の原点世代を待つ。MotorServiceの原点再設定と同期して呼ぶ。
+     *  @pre DISARMEDかつ旧受信キューを排除し、MotorService::resetWheelReference()が成功済み。
      *  @spec{CTRL-EST-001}
      */
     void reset() noexcept;
 
 private:
     static bool validConfig(const WheelOdometryConfig& config) noexcept;
-    WheelUpdateResult accept(std::size_t axis, const C620FeedbackSample& sample,
+    WheelUpdateResult accept(std::size_t axis, const C620AxisFeedback& report,
                              std::uint64_t sampledAtUs) noexcept;
 
     std::array<WheelOdometryConfig, 2> config_;
     std::array<bool, 2> configValid_;
     std::array<std::optional<WheelMotion>, 2> last_{};
     std::array<bool, 2> fresh_{};
+    std::array<std::uint64_t, 2> lastSequence_{};
+    std::array<std::int64_t, 2> lastCounts_{};
+    std::array<bool, 2> continuityLost_{};
+    std::uint64_t generation_{1};
+    bool generationExhausted_{false};
     std::uint64_t sampledAtUs_{0};
 };
 

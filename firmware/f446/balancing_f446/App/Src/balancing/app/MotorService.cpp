@@ -14,10 +14,12 @@ bool validMotorIds(const std::array<std::uint8_t, 4>& ids) noexcept
 
 } // namespace
 
-MotorService::MotorService(const Rs06BusConfig& config) noexcept
+MotorService::MotorService(const Rs06BusConfig& config,
+                           const std::array<C620ContinuityConfig, 2>& wheelContinuity) noexcept
     : config_{config},
       rs06_{{{config.motorIds[0], config.hostId}, {config.motorIds[1], config.hostId},
              {config.motorIds[2], config.hostId}, {config.motorIds[3], config.hostId}}},
+      c620_{{C620Motor{wheelContinuity[0]}, C620Motor{wheelContinuity[1]}}},
       configured_{validMotorIds(config.motorIds)}
 {
 }
@@ -85,8 +87,15 @@ void MotorService::onC620Frame(const BMotorCanFrame& frame, std::uint64_t receiv
 {
     BC620Feedback report{};
     // 共通C11デコーダはID1〜4を扱う。本機の観測対象は先頭の2車輪だけ。
-    if (b_c620_parse_feedback(&frame, &report) && report.motor_id <= c620_.size()) {
-        c620_[report.motor_id - 1u].onFeedback(report, receivedAtUs);
+    if (frame.extended || frame.id < 0x201u || frame.id > 0x202u) {
+        return;
+    }
+    auto& motor = c620_[frame.id - 0x201u];
+    if (b_c620_parse_feedback(&frame, &report)) {
+        motor.onFeedback(report, receivedAtUs);
+    } else {
+        // 既知の軸の壊れた報告は無かったことにしない。欠落した角度は復元不能。
+        motor.invalidateContinuity();
     }
 }
 
@@ -113,6 +122,36 @@ void MotorService::reportCan1RxLost() noexcept
 {
     // 次の受信が正常でも、欠落した報告の内容は分からない。制御周期まで異常を保持する。
     pendingFaults_ = pendingFaults_ | FaultFlags::ExternalFault;
+}
+
+void MotorService::setCan2BusOff(bool busOff) noexcept
+{
+    can2BusOff_ = busOff;
+    if (busOff) {
+        reportCan2RxLost();
+    }
+}
+
+void MotorService::reportCan2RxLost() noexcept
+{
+    // ポート側の欠落通知はどの車輪の報告が失われたか特定できない。
+    // 後から古いキューのRXが届いても、両輪とも自動再基準化しない。
+    for (auto& motor : c620_) {
+        motor.invalidateContinuity();
+    }
+}
+
+bool MotorService::resetWheelReference() noexcept
+{
+    if (can2BusOff_) return false;
+    const bool left = c620_[0].resetReference();
+    const bool right = c620_[1].resetReference();
+    if (!left || !right) {
+        // 片側だけ原点が更新された場合も通常観測を成立させない。
+        reportCan2RxLost();
+        return false;
+    }
+    return true;
 }
 
 std::array<Rs06MotorStatus, 4> MotorService::rs06Status(std::uint64_t nowUs) const noexcept

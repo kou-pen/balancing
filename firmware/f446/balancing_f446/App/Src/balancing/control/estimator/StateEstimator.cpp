@@ -96,7 +96,8 @@ std::variant<ControlSnapshot, StateEstimateError> StateEstimator::update(
 
 void StateEstimator::reset() noexcept
 {
-    // 観測基準を明示的に変更したときだけ相対車輪位置の原点を再設定する。
+    // MotorServiceが原点世代を更新した明示操作と同期する。
+    // 旧世代のコピーだけで新しい原点を作らない。
     odometry_.reset();
 }
 

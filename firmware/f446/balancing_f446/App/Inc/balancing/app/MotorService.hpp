@@ -31,10 +31,12 @@ class MotorService final {
 public:
     /** @brief RS06を4軸分所有し、バス設定を初期化する。
      *  @param[in] config 同一バス上の重複しないモータ番号と主機ID。
+     *  @param[in] wheelContinuity 左右独立の検証済み取得間隔。未指定では位置無効。
      *  @note 重複またはゼロのモータ番号では送信を禁止する。
      *  @spec{PROTO-RS06-001}
      */
-    explicit MotorService(const Rs06BusConfig& config) noexcept;
+    explicit MotorService(const Rs06BusConfig& config,
+                          const std::array<C620ContinuityConfig, 2>& wheelContinuity = {}) noexcept;
 
     /** @brief RobotSequenceが確定した当該周期の操作要求を反映する。
      *  @param[in] sequence 駆動状態とARMセッション番号。
@@ -92,6 +94,25 @@ public:
      */
     void reportCan1RxLost() noexcept;
 
+    /** @brief CAN2のbus-off/復旧を通知する。復旧だけでは位置を復元しない。
+     *  @param[in] busOff 現在のバス状態。
+     *  @spec{BOARD-F446-001}
+     */
+    void setCan2BusOff(bool busOff) noexcept;
+
+    /** @brief CAN2の受信喪失で両車輪の連続性を無効にする。
+     *  @spec{CTRL-EST-001}
+     */
+    void reportCan2RxLost() noexcept;
+
+    /** @brief 両車輪の原点世代を明示的に更新する。
+     *  @return bus-off中または世代更新失敗ならfalse。
+     *  @pre DISARMED、旧受信キュー排除済み、StateEstimator::reset()と同期。
+     *  @warning 本番呼出はまだ接続しない。
+     *  @spec{CTRL-EST-001}
+     */
+    bool resetWheelReference() noexcept;
+
     /** @brief 軸別の安全判断を順序固定のコピーで返す。
      *  @param[in] nowUs 制御周期の単調時刻 [us]。
      *  @spec{PROTO-RS06-001}
@@ -116,9 +137,10 @@ private:
 
     Rs06BusConfig config_;
     std::array<Rs06Motor, 4> rs06_;
-    std::array<C620Motor, 2> c620_{};
+    std::array<C620Motor, 2> c620_;
     bool configured_;
     bool can1BusOff_{false};
+    bool can2BusOff_{false};
     FaultFlags pendingFaults_{FaultFlags::None};
     bool armActive_{false};
     ArmSessionId armSession_{0};

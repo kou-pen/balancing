@@ -107,7 +107,11 @@ void MotorCanLink::onCanReceive(CanBus bus, CanRxTarget target, const CanFrame& 
                               std::uint64_t atUs) noexcept
 {
     // RouterがバスとIDで分類済み。内容の復号と軸への割り当てはMotorServiceに任せる。
-    if (target == CanRxTarget::Unmatched) {
+    // CAN2の既知軸IDはDLC不正でもMotorServiceへ知らせる。
+    // RouterのUnmatchedを無条件に捨てると、その軸の角度欠落を見逃す。
+    const bool knownWheel = bus == CanBus::Can2 && !frame.extended &&
+                            (frame.id == 0x201u || frame.id == 0x202u);
+    if (target == CanRxTarget::Unmatched && !knownWheel) {
         return;
     }
     BMotorCanFrame report{frame.id, {}, frame.dlc, frame.extended};
@@ -130,13 +134,18 @@ void MotorCanLink::onCanTransmit(CanBus bus, TxToken token, CanTxOutcome outcome
 
 void MotorCanLink::onCanPortStatus(CanBus bus, CanEventKind kind, std::uint64_t) noexcept
 {
-    if (bus != CanBus::Can1) {
-        return;
-    }
-    if (kind == CanEventKind::BusOff || kind == CanEventKind::BusRecovered) {
-        motors_.setCan1BusOff(kind == CanEventKind::BusOff);
-    } else if (kind == CanEventKind::RxLost) {
-        motors_.reportCan1RxLost();
+    if (bus == CanBus::Can1) {
+        if (kind == CanEventKind::BusOff || kind == CanEventKind::BusRecovered) {
+            motors_.setCan1BusOff(kind == CanEventKind::BusOff);
+        } else if (kind == CanEventKind::RxLost) {
+            motors_.reportCan1RxLost();
+        }
+    } else if (bus == CanBus::Can2) {
+        if (kind == CanEventKind::BusOff || kind == CanEventKind::BusRecovered) {
+            motors_.setCan2BusOff(kind == CanEventKind::BusOff);
+        } else if (kind == CanEventKind::RxLost) {
+            motors_.reportCan2RxLost();
+        }
     }
 }
 
