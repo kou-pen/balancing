@@ -5,7 +5,7 @@
 
 **状態:** 操作の意味は確定／HIDレポートとUSBホスト初期化は実機確認待ち。
 
-F446の有線USBに接続されたDualSenseから前後速度、Yaw角速度、ARM/DISARMを受け取る。Piは不要。既定操作元USB_DUALSENSE、CAN_REMOTEとの切替はDISARMED中のみ。
+F446の有線USBに接続されたDualSenseから前後速度、Yaw角速度、ARM/DISARMを受け取る。Piは不要。既定操作元USB_DUALSENSE、CAN_REMOTEとの明示切替は双方から要求でき、DISARMED中のみ。ARMは選択された操作元に限定する。
 
 | 操作 | 動作 |
 |---|---|
