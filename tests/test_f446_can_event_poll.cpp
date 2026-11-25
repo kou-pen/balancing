@@ -1,4 +1,5 @@
 #include "balancing/app/CanEventPoll.hpp"
+#include "balancing/app/DiagnosticsService.hpp"
 #include "balancing/app/ControlCycle.hpp"
 #include "balancing/control/filter/ImuAttitudeSource.hpp"
 #include "balancing/app/MotorService.hpp"
@@ -1350,6 +1351,36 @@ void testIntegratedObservationAndFrameScheduling()
     assert(tx2.service(faultAt+2).result==ScheduledTxResult::Idle);
 }
 
+void testDiagnosticPartsWithScheduler()
+{
+    // ここでのCAN ID/DLCは模擬転送の容器にすぎず、PC向け通信仕様ではない。
+    Fixture can2;
+    Recorder sink;
+    CanTxScheduler scheduler{can2.port};
+    CanRouter router{sink,nullptr,&scheduler};
+    std::array<DiagnosticSlot,2> storage{};
+    DiagnosticsService diag{storage.data(),storage.size(),nullptr,0,90};
+    assert(diag.pushFault({FaultFlags::BusOff,FaultFlags::BusOff,FaultFlags::None,1000},1000));
+    std::uint64_t serial=0;
+    for (unsigned attempt=0;attempt<4;++attempt) {
+        auto p=diag.nextPending();
+        assert(p && p->frameIndex==(attempt==0 ? 0 : attempt-1));
+        const TxToken token{++serial,90};
+        const CanFrame opaque{0x7ff,{},0,false};
+        const auto now=1000u+attempt*10u;
+        assert(scheduler.trySubmit(opaque,token,now)==CanTxSubmitResult::Accepted);
+        assert(diag.onAccepted(*p,token));
+        assert(diag.summary().importantPending==1 && !diag.nextPending());
+        can2.occupy(0);
+        can2.complete(0,attempt==0 ? CAN_TSR_TERR0 : CAN_TSR_TXOK0,now+1);
+        pollCanEvents(nullptr,&can2.port,router);
+        const auto& terminal=sink.entries[sink.count-1];
+        assert(terminal.bus==CanBus::Can2 && terminal.token==token);
+        assert(diag.onTerminal(terminal.token,terminal.outcome));
+    }
+    assert(diag.summary().importantPending==0 && !diag.nextPending());
+}
+
 } // namespace
 
 int main()
@@ -1378,5 +1409,6 @@ int main()
     testMotorCanLinkCan1BusOffRecoveryAndRxLoss();
     testMotorFramePlanCan1Can2StopPriority();
     testIntegratedObservationAndFrameScheduling();
+    testDiagnosticPartsWithScheduler();
     std::puts("PASS: F446 CAN dispatch, TX scheduling, six-axis feedback and RS06 arm/stop");
 }

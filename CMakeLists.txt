@@ -115,6 +115,7 @@ add_executable(balancing_cpp_app_tests
     ${F446_APP}/Src/balancing/app/application.cpp
     ${F446_APP}/Src/balancing/app/PowerBoardService.cpp
     ${F446_APP}/Src/balancing/app/RemoteControlService.cpp
+    ${F446_APP}/Src/balancing/app/DiagnosticsService.cpp
 )
 target_include_directories(balancing_cpp_app_tests PRIVATE
     ${F446_APP}/Inc
@@ -175,6 +176,7 @@ add_executable(balancing_f446_can1_runtime_tests
     ${F446_APP}/Src/balancing/app/application.cpp
     ${F446_APP}/Src/balancing/app/PowerBoardService.cpp
     ${F446_APP}/Src/balancing/app/RemoteControlService.cpp
+    ${F446_APP}/Src/balancing/app/DiagnosticsService.cpp
     ${BALANCING_CAN_DISPATCH_SOURCES}
     ${F446_APP}/Src/balancing/communication/can/CanPort.cpp
     ${F446_APP}/Src/balancing/device/f446_can1_runtime.cpp
@@ -192,6 +194,7 @@ add_test(NAME balancing_f446_motor_observation_tests COMMAND balancing_f446_can1
 # A shared main-loop poll with separate bxCAN IRQ sources.
 add_executable(balancing_f446_can_event_poll_tests
     tests/test_f446_can_event_poll.cpp
+    ${F446_APP}/Src/balancing/app/DiagnosticsService.cpp
     ${BALANCING_CONTROL_MATH_SOURCES}
     ${F446_APP}/Src/balancing/control/filter/ImuAttitudeSource.cpp
     ${F446_APP}/Src/balancing/communication/can/MotorFramePlan.cpp
@@ -295,3 +298,9 @@ add_executable(balancing_f446_remote_service_tests tests/test_f446_remote_contro
 target_link_libraries(balancing_f446_remote_service_tests PRIVATE balancing_core m)
 target_compile_options(balancing_f446_remote_service_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_remote_service_tests COMMAND balancing_f446_remote_service_tests)
+
+add_executable(balancing_f446_diagnostics_tests tests/test_f446_diagnostics_service.cpp
+    ${F446_APP}/Src/balancing/app/DiagnosticsService.cpp)
+target_include_directories(balancing_f446_diagnostics_tests PRIVATE ${F446_APP}/Inc)
+target_compile_options(balancing_f446_diagnostics_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME balancing_f446_diagnostics_tests COMMAND balancing_f446_diagnostics_tests)
