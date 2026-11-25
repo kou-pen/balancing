@@ -108,6 +108,24 @@ for label, flags in [
     print(f"[{label}] 実行", flush=True)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
+# Both Application tests now link the actual C++ control cycle and C11 math.
+app_source = F446_APP / "Src" / "balancing"
+app_math_cpp = [str(app_source / name) for name in (
+    "app/ControlCycle.cpp", "control/controller/MotorCommand.cpp",
+    "control/controller/BalanceControl.cpp", "control/estimator/StateEstimator.cpp",
+    "control/estimator/LegKinematics.cpp", "control/estimator/WheelOdometry.cpp")]
+app_math_objects = {}
+for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"])]:
+    app_math_objects[suffix] = []
+    for index, source in enumerate(("control/controller/balancing_core.c",
+        "control/controller/balancing_leg_pd.c", "control/controller/balancing_yaw_pi.c",
+        "control/estimator/balancing_leg_kinematics.c")):
+        obj = OUT / f"app_math_{index}{suffix}.o"
+        subprocess.run(["gcc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
+            "-I", str(F446_APP / "Inc"), "-c", str(app_source / source), *flags,
+            "-o", str(obj)], check=True, cwd=ROOT, timeout=30)
+        app_math_objects[suffix].append(str(obj))
+
 cpp_common = [
     "g++",
     "-std=c++17",
@@ -119,6 +137,8 @@ cpp_common = [
     str(F446_APP / "Inc"),
     str(F446_APP / "Src" / "balancing" / "app" / "application.cpp"),
     str(ROOT / "tests" / "test_cpp_app.cpp"),
+    str(app_source / "app" / "RobotSequence.cpp"),
+    *app_math_cpp,
 ]
 for label, flags in [
     ("C++アプリ通常ビルド", []),
@@ -126,7 +146,7 @@ for label, flags in [
 ]:
     path = OUT / ("test_cpp_app_ubsan" if flags else "test_cpp_app")
     print(f"[{label}] コンパイル", flush=True)
-    subprocess.run(cpp_common + flags + ["-o", str(path)], check=True, cwd=ROOT, timeout=30)
+    subprocess.run(cpp_common + flags + app_math_objects["_ubsan" if flags else ""] + ["-lm", "-o", str(path)], check=True, cwd=ROOT, timeout=30)
     print(f"[{label}] 実行", flush=True)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 # The fixture is not the actual six-bar CAD mechanism. Test only mathematical properties.
@@ -356,8 +376,8 @@ can_dispatch_common = [
     str(rs06_source / "app" / "CanEventPoll.cpp"),
 ]
 for test, extra_sources in [
-    ("test_f446_can1_runtime", rs06_service_sources + [str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "device" / "f446_can1_runtime.cpp"), str(rs06_source / "app" / "application.cpp")]),
-    ("test_f446_can_event_poll", rs06_service_sources + [str(rs06_source / "control" / "estimator" / "WheelOdometry.cpp"), str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "communication" / "can" / "MotorFramePlan.cpp"), str(rs06_source / "control" / "controller" / "MotorCommand.cpp")]),
+    ("test_f446_can1_runtime", rs06_service_sources + app_math_cpp + [str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "device" / "f446_can1_runtime.cpp"), str(rs06_source / "app" / "application.cpp")]),
+    ("test_f446_can_event_poll", rs06_service_sources + app_math_cpp + [str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "communication" / "can" / "MotorFramePlan.cpp"), str(rs06_source / "control" / "filter" / "ImuAttitudeSource.cpp")]),
 ]:
     for suffix, flags in [
         ("", []),
@@ -368,6 +388,11 @@ for test, extra_sources in [
         link_libraries = []
         if test in ("test_f446_can_event_poll", "test_f446_can1_runtime"):
             link_libraries = [str(OUT / f"motor_service_rs06_codec{suffix}.o"), "-lm"]
+        link_libraries += app_math_objects[suffix]
+        if test == "test_f446_can_event_poll":
+            attitude = OUT / f"integrated_attitude{suffix}.o"
+            subprocess.run(["gcc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic", "-I", str(F446_APP / "Inc"), "-c", str(app_source / "control/filter/balancing_attitude_filter.c"), *flags, "-o", str(attitude)], check=True, cwd=ROOT, timeout=30)
+            link_libraries.append(str(attitude))
         print(f"[{test}{suffix}] コンパイル", flush=True)
         subprocess.run(can_dispatch_common + extra_sources + flags +
                        [str(source)] + link_libraries + ["-o", str(path)],

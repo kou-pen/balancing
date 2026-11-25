@@ -1,4 +1,6 @@
 #include "balancing/app/CanEventPoll.hpp"
+#include "balancing/app/ControlCycle.hpp"
+#include "balancing/control/filter/ImuAttitudeSource.hpp"
 #include "balancing/app/MotorService.hpp"
 #include "balancing/app/MotorCanLink.hpp"
 #include "balancing/communication/can/CanPort.hpp"
@@ -1179,6 +1181,175 @@ void testMotorFramePlanCan1Can2StopPriority()
     assert(can2.registers.sTxMailBox[0].TDHR == 0u);
 }
 
+// 実機値ではない。既存SILと同じ閉リンクfixtureをCAN・IMUの実装と結合する。
+// 2/4msの生成周期はこの試験の上位時計が所有し、Schedulerには絶対期限を渡す。
+void testIntegratedObservationAndFrameScheduling()
+{
+    using namespace std::chrono_literals;
+    Fixture can1, can2;
+    constexpr std::uint8_t host=0xa6;
+    MotorService motors{{{11,12,13,14},host}, {{{4000,true},{4000,true}}}};
+    CanTxScheduler tx1{can1.port}, tx2{can2.port};
+    MotorCanLink link{motors,tx1};
+    CanRouter router{link,&tx1,&tx2};
+    auto poll=[&]{pollCanEvents(&can1.port,&can2.port,router);};
+    auto frame=[](const BMotorCanFrame& b) {
+        CanFrame c{b.id,{},b.dlc,b.extended};
+        std::copy_n(b.data,c.data.size(),c.data.begin());return c;
+    };
+    StateEstimatorConfig estConfig{};
+    for(auto& leg:estConfig.legs) {
+        leg.motor={{0,0},{0,0},{1,1},1,1,true};
+        leg.fixture={0.2f,0.15f,0.15f,0.25f,0.25f,0.02f,0.01f,-1};
+    }
+    estConfig.wheels={{{0.1f,10.0f,1.0f,true},{0.1f,10.0f,-1.0f,true}}};
+    BalanceControlConfig controlConfig{};
+    controlConfig.lqr.verified=true;
+    controlConfig.lqr.max_position_error_m=0.2f;
+    controlConfig.lqr.gain[B_OUTPUT_WHEEL_TOTAL][B_STATE_PITCH]=2;
+    controlConfig.lqr.gain[B_OUTPUT_HIP_TOTAL][B_STATE_PITCH]=3;
+    controlConfig.legPd={100,10,2,0.5f,4,true};
+    controlConfig.yawPi={3,4,2,true};
+    controlConfig.wheelTorqueLimitNm={5,5};
+    MotorCommandConfig motorConfig{};
+    for(auto& a:motorConfig.rs06) a={1.5f,1,4,true};
+    for(auto& a:motorConfig.c620) a={0.4f,1,4,true};
+    StateEstimator estimator{estConfig};
+    RobotSequence sequence{{100000,true}};
+    BalanceControl control{controlConfig};
+    MotorCommand converter{motorConfig};
+    ControlCycle cycle{estimator,sequence,control,converter};
+    MotorFramePlan planner{{11,12,13,14}};
+    BAttitudeFilterConfig imuConfig{};
+    imuConfig.mount={{0,1,2},{1,1,1},true};
+    imuConfig.bias_samples_required=2;
+    imuConfig.gravity_min_m_s2=9;
+    imuConfig.gravity_max_m_s2=11;
+    imuConfig.gyro_alpha=0.9f;
+    imuConfig.max_sample_dt_s=0.05f;
+    imuConfig.verified=true;
+    ImuAttitudeSource imu{imuConfig};
+    TimedImuSample sensor{{{-0.98f,0,9.75f},{0,0,0}},0,0,true};
+    assert(imu.accept(sensor,true,0));
+    sensor.earliestUs=sensor.completedAtUs=1000;
+    assert(imu.accept(sensor,true,1000));
+
+    auto feed=[&](std::uint64_t now,unsigned mode) {
+        // 角度は約-π/2、速度・トルクは量子化中央。実デコーダで復号する。
+        for(unsigned axis=0;axis<4;++axis)
+            can1.pushRx((2u<<24)|(mode<<22)|((11u+axis)<<8)|host,
+                        now,true,8,0x0080ff6fu,0xfa000080u);
+        can2.pushRx(0x201,now,false,8,0x0000e803u);
+        can2.pushRx(0x202,now,false,8,0x0000e803u);
+        poll();
+        sensor.earliestUs=sensor.completedAtUs=now;
+        assert(imu.accept(sensor,false,now));
+    };
+    auto step=[&](std::uint64_t now,bool arm,FaultFlags faults=FaultFlags::None) {
+        ControlTickInput in{};
+        in.firstElapsed=2000us;
+        in.observations={imu.attitude(now),motors.feedback(now)};
+        in.interlocks={true,true,true,true,true,true,MechanismSafety::Safe};
+        in.operations.arm=arm;
+        in.armFeedback=motors.rs06ArmFeedback(now);
+        in.observedFaults=motors.takeObservedFaults(now)|faults;
+        auto result=cycle.step(in);
+        motors.applySequence(result.sequence,now);
+        return result;
+    };
+    // 模擬メールボックスの受付を物理送信完了と区別し、終端をRouterへ戻す。
+    auto completeAccepted=[&](Fixture& bus,std::uint64_t now) {
+        unsigned n=0;
+        for(unsigned box=0;box<3;++box) {
+            if ((bus.registers.sTxMailBox[box].TIR&CAN_TI0R_TXRQ)==0) continue;
+            bus.occupy(box);
+            bus.complete(box,CAN_TSR_TXOK0,now);
+            ++n;
+        }
+        poll();return n;
+    };
+    auto drain1=[&](std::uint64_t now) {
+        unsigned count=0;
+        for(unsigned i=0;i<12;++i) {
+            auto progress=tx1.service(now);
+            link.onScheduledTxProgress(progress,now);
+            count+=completeAccepted(can1,now+1);
+            if(progress.result==ScheduledTxResult::Idle) break;
+        }
+        return count;
+    };
+    auto drain2=[&](std::uint64_t now) {
+        const auto p=tx2.service(now);
+        assert(p.result==ScheduledTxResult::Accepted);
+        assert(completeAccepted(can2,now+1)==1);
+    };
+    feed(2000,0);
+    assert(step(2000,false).sequence.state==RobotState::Disarmed);
+    link.submitPending(2000);
+    assert(drain1(2000)==4);
+    feed(4000,0);
+    auto arming=step(4000,true);
+    assert(arming.sequence.state==RobotState::Arming);
+    assert(arming.estimate && !arming.motorCommandPreview);
+    for(unsigned i=0;i<4;++i) {
+        link.submitPending(4000+i*2);
+        completeAccepted(can1,4001+i*2);
+    }
+    feed(6000,2);
+    assert(step(6000,false).sequence.state==RobotState::Balancing);
+
+    unsigned rsFrames=0,wheelFrames=0;
+    std::uint64_t generation1=0,generation2=0,serial=1000;
+    for(unsigned tick=0;tick<100;++tick) {
+        const auto now=8000u+2000u*tick;
+        feed(now,2);
+        const auto result=step(now,false);
+        assert(result.sequence.state==RobotState::Balancing && result.motorCommandPreview);
+        const auto plan=planner.compose(result.sequence,*result.motorCommandPreview);
+        assert(plan.status==MotorFramePreview::Status::Ready && plan.can1Count==4);
+        PeriodicTxBatch wheel{};
+        wheel.generation=++generation2;wheel.expiresAtUs=now+2000;
+        wheel.requests[0]=PeriodicTxRequest{frame(plan.can2Current),{++serial,88}};
+        assert(tx2.replacePeriodic(wheel,now)==PeriodicBatchResult::Queued);
+        if(tick!=99) {drain2(now);++wheelFrames;}
+        // 4msごと。最後の世代は未受付のまま残し、故障時の破棄を検証する。
+        if(tick%2==0) {
+            PeriodicTxBatch legs{};
+            legs.generation=++generation1;legs.expiresAtUs=now+4000;
+            for(unsigned axis=0;axis<4;++axis)
+                legs.requests[axis]=PeriodicTxRequest{frame(plan.can1Type1[axis]),{++serial,77}};
+            assert(tx1.replacePeriodic(legs,now)==PeriodicBatchResult::Queued);
+            if(tick!=98) rsFrames+=drain1(now);
+        }
+    }
+    assert(generation1==50 && generation2==100 && rsFrames==196 && wheelFrames==99);
+    // 次周期のE-STOPで旧非ゼロ待ちを破棄。送信済みのフレームの取り消しは主張しない。
+    constexpr std::uint64_t faultAt=208000;
+    feed(faultAt,2);
+    const auto failed=step(faultAt,false,FaultFlags::EmergencyStop);
+    assert(failed.sequence.state==RobotState::Fault && !failed.motorCommandPreview);
+    link.submitPending(faultAt);
+    const auto stop=planner.compose(failed.sequence,MotorCommandPreview{});
+    assert(stop.status==MotorFramePreview::Status::ZeroCurrentOnly);
+    PeriodicTxBatch zero{};
+    zero.generation=++generation2;zero.expiresAtUs=faultAt+2000;
+    zero.requests[0]=PeriodicTxRequest{frame(stop.can2Current),{++serial,88}};
+    assert(tx2.replacePeriodic(zero,faultAt)==PeriodicBatchResult::Queued);
+    for(unsigned axis=0;axis<4;++axis) {
+        const auto progress=tx1.service(faultAt);
+        assert(progress.result==ScheduledTxResult::Accepted);
+        link.onScheduledTxProgress(progress,faultAt);
+        assert(((can1.registers.sTxMailBox[0].TIR>>27)&0x1f)==4);
+        assert(completeAccepted(can1,faultAt+1)==1);
+    }
+    assert(tx1.service(faultAt+2).result==ScheduledTxResult::Idle);
+    const auto accepted=tx2.service(faultAt);
+    assert(accepted.result==ScheduledTxResult::Accepted);
+    assert(can2.registers.sTxMailBox[0].TDLR==0 && can2.registers.sTxMailBox[0].TDHR==0);
+    assert(completeAccepted(can2,faultAt+1)==1);
+    assert(tx2.service(faultAt+2).result==ScheduledTxResult::Idle);
+}
+
 } // namespace
 
 int main()
@@ -1206,5 +1377,6 @@ int main()
     testMotorCanLinkRetryAndFeedbackIgnoreForeignEvents();
     testMotorCanLinkCan1BusOffRecoveryAndRxLoss();
     testMotorFramePlanCan1Can2StopPriority();
+    testIntegratedObservationAndFrameScheduling();
     std::puts("PASS: F446 CAN dispatch, TX scheduling, six-axis feedback and RS06 arm/stop");
 }

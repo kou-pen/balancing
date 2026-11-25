@@ -100,13 +100,24 @@ target_link_libraries(balancing_motor_hal_port_tests PRIVATE balancing_core m)
 target_compile_options(balancing_motor_hal_port_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_motor_hal_port_tests COMMAND balancing_motor_hal_port_tests)
 # C++ entry bridge is kept outside CubeMX-owned Core/Src. Host test only.
+set(BALANCING_CONTROL_MATH_SOURCES
+    ${F446_APP}/Src/balancing/app/ControlCycle.cpp
+    ${F446_APP}/Src/balancing/control/controller/MotorCommand.cpp
+    ${F446_APP}/Src/balancing/control/controller/BalanceControl.cpp
+    ${F446_APP}/Src/balancing/control/estimator/StateEstimator.cpp
+    ${F446_APP}/Src/balancing/control/estimator/LegKinematics.cpp
+    ${F446_APP}/Src/balancing/control/estimator/WheelOdometry.cpp
+)
 add_executable(balancing_cpp_app_tests
     tests/test_cpp_app.cpp
+    ${BALANCING_CONTROL_MATH_SOURCES}
+    ${F446_APP}/Src/balancing/app/RobotSequence.cpp
     ${F446_APP}/Src/balancing/app/application.cpp
 )
 target_include_directories(balancing_cpp_app_tests PRIVATE
     ${F446_APP}/Inc
 )
+target_link_libraries(balancing_cpp_app_tests PRIVATE balancing_core m)
 target_compile_options(balancing_cpp_app_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_cpp_app_tests COMMAND balancing_cpp_app_tests)
 
@@ -156,6 +167,7 @@ set(BALANCING_CAN_DISPATCH_SOURCES
 # Startup, RX observation and IRQ ownership at both STM32F446 CAN buses.
 add_executable(balancing_f446_can1_runtime_tests
     tests/test_f446_can1_runtime.cpp
+    ${BALANCING_CONTROL_MATH_SOURCES}
     ${BALANCING_RS06_SERVICE_SOURCES}
     ${F446_APP}/Src/balancing/app/MotorCanLink.cpp
     ${F446_APP}/Src/balancing/app/application.cpp
@@ -176,9 +188,9 @@ add_test(NAME balancing_f446_motor_observation_tests COMMAND balancing_f446_can1
 # A shared main-loop poll with separate bxCAN IRQ sources.
 add_executable(balancing_f446_can_event_poll_tests
     tests/test_f446_can_event_poll.cpp
-    ${F446_APP}/Src/balancing/control/estimator/WheelOdometry.cpp
+    ${BALANCING_CONTROL_MATH_SOURCES}
+    ${F446_APP}/Src/balancing/control/filter/ImuAttitudeSource.cpp
     ${F446_APP}/Src/balancing/communication/can/MotorFramePlan.cpp
-    ${F446_APP}/Src/balancing/control/controller/MotorCommand.cpp
     ${BALANCING_CAN_DISPATCH_SOURCES}
     ${BALANCING_RS06_SERVICE_SOURCES}
     ${F446_APP}/Src/balancing/app/MotorCanLink.cpp

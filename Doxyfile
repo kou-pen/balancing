@@ -32,3 +32,6 @@ SOURCE_BROWSER         = YES
 INLINE_SOURCES         = NO
 # @spec{CTRL-LQR-001} をDoxygenの「関連仕様」一覧へ収集する。
 ALIASES               += "spec{1}=\xrefitem spec \"関連仕様\" \"仕様への参照一覧\" \1"
+
+# C ABI bridge headers also declare their C++ observation configuration APIs.
+PREDEFINED             = __cplusplus
