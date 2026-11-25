@@ -312,3 +312,11 @@ add_executable(balancing_f446_status_indicator_tests tests/test_f446_status_indi
 target_include_directories(balancing_f446_status_indicator_tests PRIVATE ${F446_APP}/Inc)
 target_compile_options(balancing_f446_status_indicator_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_status_indicator_tests COMMAND balancing_f446_status_indicator_tests)
+
+# CAN2 v1共通コーデックの独立ホスト試験。HAL/CAN送信経路をリンクしない。
+add_executable(balancing_f446_protocol_codec_tests tests/test_f446_protocol_codec.cpp
+    ${F446_APP}/Src/balancing/communication/can/ProtocolId.cpp
+    ${F446_APP}/Src/balancing/communication/can/ProtocolPayload.cpp)
+target_include_directories(balancing_f446_protocol_codec_tests PRIVATE ${F446_APP}/Inc)
+target_compile_options(balancing_f446_protocol_codec_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME balancing_f446_protocol_codec_tests COMMAND balancing_f446_protocol_codec_tests)

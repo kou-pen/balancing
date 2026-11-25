@@ -14,6 +14,7 @@ POWER_SPEC = "docs/specs/protocols/power_can2.md"
 REMOTE_SPEC = "docs/specs/protocols/remote_can2.md"
 CODEC = "firmware/f446/balancing_f446/App/Src/balancing/communication/balancing_motor_can.c"
 CODEC_TEST = "tests/test_motor_can.c"
+V1_TEST = "tests/test_f446_protocol_codec.cpp"
 
 # In this robot: 0x1FF is unused, 0x200 is a command and 0x201/202
 # are feedback. This is a regression boundary, NOT a firmware config.
@@ -24,23 +25,11 @@ CAN2 = {
     0x202: ("C620→F446", 8),
 }
 RS_TYPES = {(1, "TX"), (2, "RX"), (3, "TX"), (4, "TX"), (24, "TX"), (24, "RX")}
-POWER_MESSAGES = {"POWER_STATUS", "POWER_ON", "POWER_OFF", "EMERGENCY_STOP"}
-REMOTE_MESSAGES = {
-    "運動指令",
-    "ARM要求",
-    "DISARM要求",
-    "CLEAR_FAULT",
-    "EMERGENCY_STOP",
-    "設定変更",
-    "状態通知",
-}
-
-
 def read_sources(root: Path = ROOT) -> dict[str, str]:
     """Return the small set of authoritative sources and code being audited."""
     return {
         name: (root / name).read_text(encoding="utf-8")
-        for name in (CAN_SUMMARY, C620_SPEC, RS_SPEC, POWER_SPEC, REMOTE_SPEC, CODEC, CODEC_TEST)
+        for name in (CAN_SUMMARY, C620_SPEC, RS_SPEC, POWER_SPEC, REMOTE_SPEC, CODEC, CODEC_TEST, V1_TEST)
     }
 
 
@@ -84,21 +73,40 @@ def rs_type_rows(spec: str) -> list[tuple[int, str, int | None]]:
     return result
 
 
-def unknown_rows(spec: str, names: set[str], fields: tuple[int, ...]) -> bool:
-    """Reject guessed IDs, formats and DLC in contracts that remain unresolved."""
-    found = set()
+def v1_rows(spec: str) -> tuple[list[tuple[int, int]], list[str]]:
+    """承認表からID/DLCを抽出し、分類・優先度・方向の整合を確認する。"""
+    rows, errors = [], []
+    service = None
+    nodes = {"F446": 1, "F303": 2, "Pi": 3, "全体": 15}
     for line in spec.splitlines():
-        if not line.startswith("|"):
+        heading = re.search(r"Data type = (0x[0-9a-fA-F]+)", line)
+        if heading:
+            service = int(heading[1], 16)
+        if not re.match(r"^\|\s*0x[0-9a-fA-F]{3}\s*\|", line):
             continue
-        parts = [cell.strip() for cell in line.split("|")]
-        if len(parts) <= max(fields):
-            continue
-        name = parts[1].strip("*\x60 ")
-        if name in names:
-            if any("未確定" not in parts[i] for i in fields):
-                return False
-            found.add(name)
-    return found == names
+        cells = [x.strip() for x in line.strip("|").split("|")]
+        try:
+            reg = int(cells[0], 16)
+            priority = int(cells[2])
+            ids = [int(x.strip(), 16) for x in cells[3].split("/")]
+            dlc = int(cells[4].rsplit("/", 1)[1].strip())
+            src, dst = cells[6].replace("（順）", "").split("→")
+            routes = [(nodes[a], nodes[b]) for a in src.split("/") for b in dst.split("/")]
+            if len(routes) != len(ids) or not 0 <= dlc <= 8:
+                raise ValueError("invalid direction/DLC")
+            for identifier, (a, b) in zip(ids, routes):
+                rows.append((identifier, dlc))
+                prefix = identifier >> 18
+                if any(0x1ff <= n <= 0x208 or n == 0x700 for n in (identifier, prefix)):
+                    errors.append(f"v1 DJI reserved ID: {identifier:#x}")
+                expected = (priority << 26) | (service << 18) | (a << 14) | (b << 10) | reg
+                if not 0 <= identifier <= 0x1fffffff or not 0 <= priority <= 3 or identifier != expected:
+                    errors.append(f"v1 ID fields/direction mismatch: {identifier:#x}")
+            if cells[1] == "POWER_STATUS" and cells[7] != "100 ms":
+                errors.append("F303: POWER_STATUS period changed")
+        except (ValueError, TypeError, KeyError, IndexError):
+            errors.append(f"v1 malformed row: {line}")
+    return rows, errors
 
 
 def audit(sources: dict[str, str]) -> list[str]:
@@ -147,11 +155,19 @@ def audit(sources: dict[str, str]) -> list[str]:
         if required not in rs:
             errors.append(f"RS06 source lacks rate/version difference: {required}")
 
-    power = sources[POWER_SPEC].split("## データ内容")[0]
-    if not unknown_rows(power, POWER_MESSAGES, (3, 4, 5)) or "100 ms" not in power:
-        errors.append("F303: unresolved format/ID/DLC or status period changed")
-    if not unknown_rows(sources[REMOTE_SPEC], REMOTE_MESSAGES, (3, 4)):
-        errors.append("Pi remote CAN: unresolved ID/DLC changed")
+    # v1表と独立したC++ golden fixtureを照合。既存モータ契約の監査は維持する。
+    power_rows, power_errors = v1_rows(sources[POWER_SPEC])
+    remote_rows, remote_errors = v1_rows(sources[REMOTE_SPEC])
+    errors.extend(power_errors + remote_errors)
+    v1 = power_rows + remote_rows
+    golden = [(int(i, 16), int(n)) for i, n in re.findall(
+        r"\{(0x[0-9a-fA-F]{8})u,\s*(\d+)\}", sources[V1_TEST])]
+    if len(v1) != 35 or len({i for i, _ in v1}) != 35:
+        errors.append("v1 duplicate, missing or extra ID")
+    if len(golden) != 35 or len({i for i, _ in golden}) != 35 or sorted(v1) != sorted(golden):
+        errors.append("v1 spec/golden ID/DLC mismatch")
+    if "0x700" not in overview or "0x1FF–0x208" not in overview:
+        errors.append("v1 DJI reservation missing in summary")
 
     # Contract-oriented checks for the existing C11 codec, not a general
     # C parser. Runtime golden-frame tests are run separately, including UBSan.
@@ -200,7 +216,7 @@ def main() -> int:
         print(f"CAN static contract audit failed: {len(errors)} issue(s)")
         return 1
     print(
-        "PASS: CAN contract audit (4 fixed CAN2 IDs; 6 RS06 direction/Type rows; F303/Pi unresolved)"
+        "PASS: CAN contract audit (4 fixed CAN2 IDs; 6 RS06 direction/Type rows; 35 CAN2 v1 IDs)"
     )
     return 0
 
