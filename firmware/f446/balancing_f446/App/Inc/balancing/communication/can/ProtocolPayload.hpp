@@ -6,6 +6,15 @@
 
 namespace balancing::protocol {
 
+/** @brief 共通の要求処理結果。Acceptedは受理のみで実行完了ではない。
+ * @spec{PROTO-PWR-001}
+ * @spec{PROTO-REMOTE-001}
+ */
+enum class ResultCode : std::uint8_t {
+    Accepted=0, AlreadyInState=1, Busy=2, SafetyRejected=3,
+    InvalidRequest=4, Unauthorized=5
+};
+
 /** @brief DLC内の指定位置にuint16をBig endianで格納。
  * @return 領域不足・不正DLCならfalse。失敗時はフレーム不変。
  * @spec{PROTO-REMOTE-001}

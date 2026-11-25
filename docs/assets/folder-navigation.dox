@@ -311,6 +311,7 @@
 | <a href="CanTypes_8hpp_source.html">CanTypes.hpp</a> | フレーム、トークン、送信結果、IRQイベントの共通型 |
 | <a href="ProtocolId_8hpp_source.html">ProtocolId.hpp</a> | CAN2 v1のID構造と固定許可リストの公開API |
 | <a href="ProtocolPayload_8hpp_source.html">ProtocolPayload.hpp</a> | Big endianの整数・float32変換API |
+| <a href="PowerBoardCodec_8hpp_source.html">PowerBoardCodec.hpp</a> | 電源状態・要求・応答と非常停止の公開API |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_control control/
@@ -451,6 +452,7 @@
 | <a href="CanPort_8cpp_source.html">CanPort.cpp</a> | bxCANレジスタ操作、送受信、IRQイベント回収 |
 | <a href="ProtocolId_8cpp_source.html">ProtocolId.cpp</a> | 35件のIDと予約領域の検証 |
 | <a href="ProtocolPayload_8cpp_source.html">ProtocolPayload.cpp</a> | DLC境界・非有限値を検査するデータ変換 |
+| <a href="PowerBoardCodec_8cpp_source.html">PowerBoardCodec.cpp</a> | 電源フレームの符号化・復号と形式検査 |
 | <a href="CanRouter_8cpp_source.html">CanRouter.cpp</a> | 受信、送信終端、バス状態を上位へ振り分ける処理 |
 | <a href="CanTxScheduler_8cpp_source.html">CanTxScheduler.cpp</a> | 停止送信の優先順位と再試行、通常FIFO、周期指令の期限と終端照合 |
 | <a href="MotorFramePlan_8cpp_source.html">MotorFramePlan.cpp</a> | 状態別の通常トルク抑止とC11コーデックによる5フレーム生成 |

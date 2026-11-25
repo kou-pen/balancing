@@ -163,3 +163,7 @@ ApplicationはMotorObservationSnapshotとImuAttitudeを同じ周期時刻で固�
 ## CAN2 v1共通コーデック（実機未接続）
 
 個別Codecから `protocol::encodeId()/decodeId()` と `findMessage()/matchesProtocolFrame()` を使用する。35件の固定IDとDLCを照合し、DJI予約領域を除外する。 `ProtocolPayload` の整数・float32変換はDLC境界と非有限値を検査し、HALや送信経路に依存しない。形式検査と状態機械の操作許可は別責務。 [検証記録](../verification/f446-protocol-codec-host.md)。
+
+## F303電源通信コーデック（実機未接続）
+
+`PowerBoardCodec` は電源状態、投入・遮断要求、処理結果、共通非常停止の形式を検証し、`CanFrame` と論理データを相互変換する。未決定の状態フラグ・故障ビットは生値のまま。鮮度、要求実行、操作許可は別責務。 [検証記録](../verification/f446-power-board-codec-host.md)。
