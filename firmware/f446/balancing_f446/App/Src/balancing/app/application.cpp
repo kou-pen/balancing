@@ -1,5 +1,6 @@
 #include "balancing_app_bridge.h"
-#include "balancing/device/Can1Observation.h"
+#include "balancing/app/ApplicationObservation.hpp"
+#include "balancing/device/ImuObservation.hpp"
 
 #include <cstdint>
 #include <optional>
@@ -11,6 +12,25 @@
  */
 namespace balancing {
 
+// 起動時固定の非駆動プロファイル。CAD・校正・ゲイン・上限・ARM期限の
+// 未検証値を人工fixtureで埋めない。所有者の寿命はControlCycleより長い。
+struct ObservationCycle {
+    StateEstimator estimator{StateEstimatorConfig{}};
+    RobotSequence sequence{ArmTimeoutConfig{}};
+    BalanceControl controller{BalanceControlConfig{}};
+    MotorCommand converter{MotorCommandConfig{}};
+    std::optional<ControlCycle> cycle{std::in_place, estimator, sequence, controller, converter};
+
+    void breakTiming() noexcept
+    {
+        // 観測不能区間をまたぐdtは使わない。状態機械と車輪原点は維持する。
+        // このプロファイルはARM不可能。将来の稼働中停止判断には使わない。
+        if (sequence.state() == RobotState::Disarmed || sequence.state() == RobotState::Fault) {
+            cycle.emplace(estimator, sequence, controller, converter);
+        }
+    }
+};
+
 class Application final {
 public:
     /*
@@ -19,13 +39,14 @@ public:
      */
     void init() noexcept
     {
-        timing_ = {};
+        observation_ = {};
         previousUs_.reset();
+        control_.emplace();
         initialized_ = true;
     }
 
     /*
-     * 既存mainがCAN1イベントを回収した直後の診断周期。
+     * 既存mainが両CANイベントを回収した直後の非駆動周期。
      * 実測時刻を採用し、TIM7の呼出し回数から2msを仮定しない。
      */
     void controlTick() noexcept
@@ -34,19 +55,24 @@ public:
             return;
         }
 
+        auto& timing_ = observation_.timing;
         ++timing_.control_ticks;
+        observation_.motors.reset();
+        observation_.imu = {};
+        observation_.cycle.reset();
         timing_.sample_valid = false;
         timing_.elapsed_valid = false;
         timing_.sampled_at_us = 0;
         timing_.elapsed_us = 0;
 
-        BF446Can1Snapshot observation{};
-        if (!balancing_f446_can1_snapshot(&observation) || !observation.sampled) {
+        const auto motors = motorObservation();
+        if (!motors) {
             // 取得不能区間をまたいだ差分は一周期の実測値として公開しない。
             previousUs_.reset();
+            control_->breakTiming();
             return;
         }
-        const auto nowUs = observation.sampled_at_us;
+        const auto nowUs = motors->motors.sampledAtUs;
         if (previousUs_) {
             if (nowUs == *previousUs_) {
                 ++timing_.duplicate_samples;
@@ -64,7 +90,22 @@ public:
         previousUs_ = nowUs;
         timing_.sampled_at_us = nowUs;
         timing_.sample_valid = true;
-        // TODO(T-F446-11): 実IMU/CAN2/校正を確認してからControlCycleへ接続する。
+        // 同じCAN回収時刻でIMUを評価し、その周期のコピーを固定する。
+        // 受信時刻やIMUの新規性はそれぞれの入力元が所有する。
+        observation_.motors = motors;
+        observation_.imu = imuAttitude(nowUs);
+        ControlTickInput input{};
+        input.observations = {observation_.imu, motors->motors};
+        input.observedFaults = motors->observedFaults;
+        // 電源・PS5・機構・校正・ゲイン・限界が未検証なので、既定の
+        // interlocks=false / mechanism=Unverified / operator空を維持。
+        // 初回・取得不能直後はfirstElapsed=0で推定を拒否する。
+        observation_.cycle = control_->cycle->step(input);
+        observation_.fault = control_->sequence.currentFault();
+        // 最新コピーを周期で消費してからのみ、受信側の異常を解除する。
+        // 受信側のfault消費は実機FAULT解除ではない。
+        (void)acknowledgeMotorObservation(motors->generation);
+        // MotorService::applySequence、MotorFramePlan、送信APIは呼ばない。
     }
 
     /*
@@ -83,7 +124,7 @@ public:
      * 実行時刻の正確性や安全動作の証明にはならない。 */
     std::uint32_t controlTickCount() const noexcept
     {
-        return timing_.control_ticks;
+        return observation_.timing.control_ticks;
     }
 
     bool timingSnapshot(BF446AppTimingSnapshot* snapshot) const noexcept
@@ -91,18 +132,29 @@ public:
         if (!initialized_ || snapshot == nullptr) {
             return false;
         }
-        *snapshot = timing_;
+        *snapshot = observation_.timing;
         return true;
     }
 
+    std::optional<ApplicationObservation> observation() const noexcept
+    {
+        return initialized_ ? std::optional<ApplicationObservation>{observation_} : std::nullopt;
+    }
+
 private:
-    BF446AppTimingSnapshot timing_{};
+    ApplicationObservation observation_{};
+    std::optional<ObservationCycle> control_{};
     std::optional<std::uint64_t> previousUs_{};
     bool initialized_{false};
 };
 
 // 静的に一つだけ保持。malloc/newも静的初期化時のHAL利用も行わない。
 Application application;
+
+std::optional<ApplicationObservation> applicationObservation() noexcept
+{
+    return application.observation();
+}
 
 } // namespace balancing
 
