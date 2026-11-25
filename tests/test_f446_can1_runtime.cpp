@@ -30,17 +30,17 @@ int startFailsBus = -1;
 bool startTimeout{};
 int irqEnableFailsBus = -1;
 
-void pushReceive()
+void pushReceive(unsigned motor = 11, unsigned host = 0x5a)
 {
     // Type 2の運転モード報告。実機確認前のためfixtureのノードIDを使う。
-    constexpr std::uint32_t frameId = (2u << 24u) | (2u << 22u) | (11u << 8u) | 0x5au;
+    const std::uint32_t frameId = (2u << 24u) | (2u << 22u) | (motor << 8u) | host;
     can1.sFIFOMailBox[0] = {(frameId << 3u) | CAN_RI0R_IDE, 8u, 0u, 0u};
     can1.RF0R.count = 1u;
 }
 
-void pushWheel(std::uint32_t id, std::uint32_t dlc = 8u)
+void pushWheel(std::uint32_t id, std::uint32_t dlc = 8u, unsigned raw = 0)
 {
-    can2.sFIFOMailBox[0] = {id << 21u, dlc, 0u, 0u};
+    can2.sFIFOMailBox[0] = {id << 21u, dlc, (raw >> 8u) | ((raw & 0xffu) << 8u), 0u};
     can2.RF0R.count = 1u;
 }
 
@@ -152,6 +152,65 @@ int main(int argc, char** argv)
         return 0;
     }
 
+    if (argc == 2 && std::strcmp(argv[1], "--motor-observation") == 0) {
+        using namespace balancing;
+        MotorObservationConfig config{{{11,12,13,14},0x5a},true,{{{4000,true},{4000,true}}}};
+        assert(!motorObservation() && !observationClockUs());
+        assert(startCanObservation(&handle,&handle2,config));
+        assert(!motorObservation());
+        for (unsigned id = 12; id <= 14; ++id) {
+            DWT->CYCCNT += 168;
+            pushReceive(id);
+            assert(balancing_f446_can1_capture_irq());
+        }
+        pushWheel(0x202);
+        assert(balancing_f446_can2_capture_irq());
+        balancing_f446_can_service();
+        auto snap = motorObservation();
+        assert(snap && snap->rs06MappingVerified && snap->motors.sampledAtUs == 3);
+        for (const auto& axis : snap->motors.rs06) assert(axis.latest && axis.fresh);
+        for (const auto& axis : snap->motors.c620) assert(axis.latest && axis.fresh && axis.position);
+        DWT->CYCCNT += 168000;
+        pushWheel(0x201,8,3000);
+        assert(balancing_f446_can2_capture_irq());
+        pushWheel(0x201,8,6000);
+        assert(balancing_f446_can2_capture_irq());
+        balancing_f446_can_service();
+        snap = motorObservation();
+        assert(snap->motors.c620[0].position->counts == 6000);
+        assert(snap->motors.c620[0].latest->sequence == 3);
+        DWT->CYCCNT += 168;
+        pushReceive(11,0x33); // 異なる主機IDは既存報告を上書きしない
+        assert(balancing_f446_can1_capture_irq());
+        can2.ESR = CAN_ESR_BOFF;
+        assert(balancing_f446_can2_capture_irq());
+        balancing_f446_can_service();
+        const auto failed = motorObservation();
+        assert(failed->can2BusOff && failed->observedFaults == FaultFlags::BusOff);
+        assert(failed->motors.rs06[0].latest->receivedAtUs == 0);
+        assert(!failed->motors.c620[0].position && !failed->motors.c620[1].position);
+        assert(motorObservation()->observedFaults == FaultFlags::BusOff);
+        DWT->CYCCNT += 168;
+        can2.ESR = 0;
+        assert(balancing_f446_can2_capture_irq());
+        balancing_f446_can_service();
+        snap = motorObservation();
+        assert(!snap->can2BusOff && snap->observedFaults == FaultFlags::BusOff);
+        assert(!acknowledgeMotorObservation(failed->generation));
+        assert(acknowledgeMotorObservation(snap->generation));
+        DWT->CYCCNT += 168u*30000u;
+        balancing_f446_can_service();
+        snap = motorObservation();
+        assert(snap->observedFaults == FaultFlags::None);
+        for (const auto& axis : snap->motors.rs06) assert(axis.latest && !axis.fresh);
+        for (const auto& axis : snap->motors.c620) assert(axis.latest && !axis.fresh && !axis.position);
+        for (const auto* bus : {CAN1,CAN2}) {
+            for (const auto& mailbox : bus->sTxMailBox) assert((mailbox.TIR & CAN_TI0R_TXRQ)==0);
+        }
+        std::puts("PASS: real runtime receive-only six-axis observation");
+        return 0;
+    }
+
     assert(!balancing_f446_can_start(nullptr, &handle2));
     assert(!balancing_f446_can_start(&handle2, &handle));
     assert(!balancing_f446_can1_capture_irq());
@@ -211,6 +270,11 @@ int main(int argc, char** argv)
     assert(balancing_f446_can1_snapshot(&snapshot) && snapshot.rx_frames == 1u);
     assert(snapshot.last_rx_us == 0u);
     assert(snapshot.sampled && snapshot.sampled_at_us == 0u);
+    const auto unconfigured = balancing::motorObservation();
+    assert(unconfigured && !unconfigured->rs06MappingVerified);
+    assert(unconfigured->observedFaults == balancing::FaultFlags::None);
+    for (const auto& axis : unconfigured->motors.rs06) assert(!axis.latest);
+    assert(unconfigured->motors.c620[0].latest && !unconfigured->motors.c620[0].position);
     assert(balancing_f446_can2_snapshot(&wheels) && wheels.sampled);
     assert(wheels.left_frames == 1u && wheels.right_frames == 0u);
     assert(wheels.sampled_at_us == snapshot.sampled_at_us);

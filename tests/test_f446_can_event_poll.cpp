@@ -1068,7 +1068,10 @@ void testMotorCanLinkCan1BusOffRecoveryAndRxLoss()
     f.can2.registers.RF0R.flags = CAN_RF0R_FOVR0;
     f.can2.port.captureInterrupt(2);
     f.poll();
-    assert(f.motors.takeObservedFaults(2) == FaultFlags::None);
+    assert(f.motors.takeObservedFaults(2) == FaultFlags::BusOff);
+    f.can2.registers.ESR = 0u;
+    f.can2.port.captureInterrupt(2);
+    f.poll();
     f.can1.registers.ESR = CAN_ESR_BOFF;
     f.can1.port.captureInterrupt(3);
     f.poll();
