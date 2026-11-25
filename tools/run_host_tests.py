@@ -373,6 +373,8 @@ for test, extra_sources in [
                        [str(source)] + link_libraries + ["-o", str(path)],
                        check=True, cwd=ROOT, timeout=30)
         subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
+        if test == "test_f446_can1_runtime":
+            subprocess.run([str(path), "--rollback-failure"], check=True, cwd=ROOT, timeout=30)
 
 
 # C++17 wheel odometry: C11 C620 decode -> MotorService -> wheel positions.
