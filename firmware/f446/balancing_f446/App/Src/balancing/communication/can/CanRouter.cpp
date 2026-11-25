@@ -1,6 +1,7 @@
 #include "balancing/communication/can/CanRouter.hpp"
 
 #include "balancing/communication/can/CanTxScheduler.hpp"
+#include "balancing/communication/can/ProtocolId.hpp"
 
 namespace balancing {
 namespace {
@@ -12,8 +13,45 @@ constexpr std::uint32_t kRs06PeriodicType = 24;
 constexpr std::uint32_t kC620LeftId = 0x201;
 constexpr std::uint32_t kC620RightId = 0x202;
 
+CanRxTarget classifyProtocol(const CanFrame& frame) noexcept
+{
+    using namespace protocol;
+    // 先に固定ID・IDE・DLCを照合する。CAN IDの送信元は認証ではない。
+    // DLC0の非常停止や短い操作要求はモータの8byte条件を適用しない。
+    if (!matchesProtocolFrame(frame)) return CanRxTarget::Unmatched;
+    const auto fields=decodeId(frame.id);
+    if (!fields || fields->source==NodeId::F446 ||
+        (fields->destination!=NodeId::F446 && fields->destination!=NodeId::Broadcast)) {
+        return CanRxTarget::Unmatched;
+    }
+    // 宛先だけでなく機能とRegister IDを限定し、将来追加される定義を暗黙に配送しない。
+    switch (fields->type) {
+    case DataType::Common:
+        if (fields->reg==1) return CanRxTarget::EmergencyStop;
+        break;
+    case DataType::Power:
+        if (fields->reg==3) return CanRxTarget::PowerStatus;
+        if (fields->reg==4) return CanRxTarget::PowerResult;
+        break;
+    case DataType::Remote:
+        if (fields->reg==1) return CanRxTarget::RemoteMotion;
+        if (fields->reg>=2 && fields->reg<=5) return CanRxTarget::RemoteRequest;
+        break;
+    case DataType::Diagnostics:
+        if (fields->reg==0x80 || fields->reg==0x81) return CanRxTarget::DiagnosticRequest;
+        break;
+    case DataType::Parameters:
+        if (fields->reg==1) return CanRxTarget::DiagnosticRequest;
+        break;
+    }
+    return CanRxTarget::Unmatched;
+}
+
 CanRxTarget classifyReceive(CanBus bus, const CanFrame& frame) noexcept
 {
+    // 自作通信はCAN2の拡張データフレームだけを対象にする。
+    if (bus == CanBus::Can2 && frame.extended) return classifyProtocol(frame);
+
     // RS06とC620の状態報告はともに8バイト。短いフレームを機器の正常受信に数えない。
     if (frame.dlc != kFeedbackLength) {
         return CanRxTarget::Unmatched;
@@ -25,7 +63,7 @@ CanRxTarget classifyReceive(CanBus bus, const CanFrame& frame) noexcept
             return CanRxTarget::Rs06Status;
         }
     } else if (bus == CanBus::Can2 && !frame.extended) {
-        // 搭載する2軸の受信IDだけを選ぶ。電流指令や未確定のF303/上位制御は含めない。
+        // 搭載する2軸の受信IDだけを選ぶ。電流指令や自作通信は含めない。
         switch (frame.id) {
         case kC620LeftId:
             return CanRxTarget::C620LeftFeedback;

@@ -111,14 +111,17 @@ void MotorCanLink::onCanReceive(CanBus bus, CanRxTarget target, const CanFrame& 
     // RouterのUnmatchedを無条件に捨てると、その軸の角度欠落を見逃す。
     const bool knownWheel = bus == CanBus::Can2 && !frame.extended &&
                             (frame.id == 0x201u || frame.id == 0x202u);
-    if (target == CanRxTarget::Unmatched && !knownWheel) {
+    const bool rs06 = bus == CanBus::Can1 && target == CanRxTarget::Rs06Status;
+    // 新規の自作CAN2分類を既存C620デコーダへ誤配送しない。
+    // 既知車輪の短いDLCは欠落検出のため、引き続き機器サービスへ通知する。
+    if (!rs06 && !knownWheel) {
         return;
     }
     BMotorCanFrame report{frame.id, {}, frame.dlc, frame.extended};
     std::copy(frame.data.begin(), frame.data.end(), report.data);
-    if (bus == CanBus::Can1 && target == CanRxTarget::Rs06Status) {
+    if (rs06) {
         motors_.onRs06Frame(report, atUs);
-    } else if (bus == CanBus::Can2) {
+    } else if (knownWheel) {
         motors_.onC620Frame(report, atUs);
     }
 }
