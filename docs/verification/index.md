@@ -18,6 +18,7 @@
 | ControlCycleのC++17本体化 | [時刻付き制御周期のホスト検証](f446-control-cycle-core-host.md) | 旧テスト専用実行器の本体移動、実測dt、稼働中更新欠落・故障時演算抑止 |
 | Applicationの周期診断 | [共通DWT時計とApplication](f446-application-timing-host.md) | CAN1受信時刻・実測周期、周回、未採取・重複・逆行 |
 | CAN1/2の共通受信ランタイム | [両CANの起動・共通時計](f446-dual-can-runtime-host.md) | 共有フィルタ、バス別IRQ・異常、復帰不能時の起動拒否 |
+| C620の受信順累積・連続性 | [C620累積処理のホスト検証](f446-c620-continuity-host.md) | 複数報告、同一IRQ時刻、受信喪失、原点世代、SIL回帰 |
 | F446 CAN1の送受信と軸別トークン | [CAN1ポートとRS06の接続検証](f446-can1-rs06-port-host.md) | メールボックス再利用、受信あふれ、バスオフ、4軸ARMの結合 |
 | RS06 4軸の有効化と停止 | [MotorServiceの模擬CAN検証](motor-service-rs06-host.md) | Type 3完了と新規応答の照合、4軸別のType 4再試行、バスオフ・期限の故障注入 |
 | F446の11ソース構成 | [Issue #9脚長・Rollホスト検証](issue9-leg-pd-host.md) | Debug/Releaseで新しい脚長PDソースを含むARMクロスビルドPASS（実機未実施） |

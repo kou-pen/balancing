@@ -150,3 +150,7 @@ App本体の `ControlCycle` は `MotorCommand::hasVerifiedConfiguration()` がfa
 ## CAN1/CAN2の共通受信ランタイム
 
 `balancing_f446_can_start()` は両バスの起動完了後だけ監視コピーを公開する。既存のCAN1監視APIと独立したCAN2監視APIを維持し、DWT時計と主ループの回収後評価時刻は共有する。CAN2の分類件数は機器状態や鮮度の確定ではない。起動失敗・通知解除・停止失敗を扱い、復帰不能時は再起動を禁止する。通常CANモードでACK等は発生し得るがアプリケーション送信要求は追加しない。[検証記録](../verification/f446-dual-can-runtime-host.md)。
+
+## C620受信順の累積位置
+
+`C620Motor` は各報告の最短一周差を積算し、`C620AxisFeedback` に通信鮮度とは独立した累積位置・受理番号・原点世代・連続性を返す。半周未満の外部検証済み取得間隔設定が必須。CAN2のRxLost/BusOff、既知IDの復号失敗、時刻逆行、半回転差などで連続性を無効にし、正常報告で自動復旧しない。`WheelOdometry` は累積位置を距離とRPM速度へ換算する。明示原点再設定には `MotorService::resetWheelReference()` と `StateEstimator::reset()` の同期が必要。実機の上位操作は未接続。[検証記録](../verification/f446-c620-continuity-host.md)。

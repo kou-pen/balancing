@@ -1,3 +1,5 @@
+> **現在の実装:** 車輪の折返し積算は受信側C620Motorに移行済み。[後続の検証](f446-c620-continuity-host.md) を参照。以下は当時の記録。
+
 # F446 6軸・IMU同一周期StateEstimatorのホスト検証
 
 **対象:** CTRL-EST-001、T-CTRL-02/04/05/11、Issue #10/#11/#27。  

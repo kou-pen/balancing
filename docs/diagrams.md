@@ -303,12 +303,12 @@ flowchart TB
 flowchart TB
     CAN["CAN2：C620左右報告"] --> LINK["MotorCanLink：CANイベント配送"]
     LINK --> SERVICE["MotorService：C620生値・受信時刻・鮮度"]
-    SERVICE --> ODOM["WheelOdometry：新しい受信時刻のみ積算"]
+    SERVICE --> ODOM["WheelOdometry：累積カウントを距離へ換算"]
     ODOM --> EST["車輪観測：位置 m・周速度 m/s"]
     SERVICE -.->|"freshを再利用"| EST
 </pre>
 
-位置の積算は一つのC620受信につき一度だけです。20 msの鮮度判定は `MotorService` に残し、旧C11と新C++17の期限境界差分は [ホスト検証記録](verification/f446-wheel-odometry-host.md) に明記します。実CAN2と実機駆動は未検証です。
+位置の積算はC620Motorが受信ごとに一度だけ行い、WheelOdometryは物理換算のみを担当します。20 msの鮮度判定は `MotorService` に残し、旧C11と新C++17の期限境界差分は [ホスト検証記録](verification/f446-wheel-odometry-host.md) に明記します。実CAN2と実機駆動は未検証です。
 
 ## IMUと6軸の同一周期StateEstimator
 
@@ -427,3 +427,18 @@ flowchart TB
 </pre>
 
 共通service回収後の評価時刻は両コピーで同じ。機器への配送・ARM・指令送信は未接続。
+
+## C620の受信順積算と連続性
+
+<pre class="mermaid">
+flowchart LR
+    FIFO["CAN2 FIFO"] --> ROUTE["CanRouter / MotorCanLink"]
+    ROUTE --> MOTOR["MotorService / C620Motor：受信順累積"]
+    MOTOR --> SNAP["周期コピー：原値・受理番号・原点世代・累積"]
+    SNAP --> ODOM["WheelOdometry：距離・RPM速度"]
+    ODOM --> EST["StateEstimator"]
+    LOSS["RxLost / BusOff / 不正報告"] --> MOTOR
+    MOTOR -.->|"連続性喪失"| INVALID["位置無効：正常報告だけで復旧しない"]
+</pre>
+
+通信鮮度と位置連続性は別。原点再設定と推定器のresetは上位の明示操作で同期する。実CANランタイムへの配送は未接続。
