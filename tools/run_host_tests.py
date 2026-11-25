@@ -372,6 +372,7 @@ can_dispatch_common = [
     "-I", str(ROOT / "tests" / "stubs_can1"), "-I", str(F446_APP / "Inc"),
     str(rs06_source / "communication" / "can" / "CanPort.cpp"),
     str(rs06_source / "communication" / "can" / "CanRouter.cpp"),
+    str(rs06_source / "communication" / "can" / "ProtocolId.cpp"),
     str(rs06_source / "communication" / "can" / "CanTxScheduler.cpp"),
     str(rs06_source / "app" / "CanEventPoll.cpp"),
 ]
