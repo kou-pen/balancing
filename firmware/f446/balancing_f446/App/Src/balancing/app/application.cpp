@@ -19,6 +19,7 @@ struct ObservationCycle {
     RemoteControlService remote{};
     // 実機FIFO容量・配信仕様は未確定。ゼロ容量で最新状態と欠落数だけ記録。
     DiagnosticsService diagnostics{};
+    StatusIndicator indicator{};
     StateEstimator estimator{StateEstimatorConfig{}};
     RobotSequence sequence{ArmTimeoutConfig{}};
     BalanceControl controller{BalanceControlConfig{}};
@@ -65,6 +66,7 @@ public:
         observation_.imu = {};
         observation_.power = {};
         observation_.operatorTarget.reset();
+        observation_.indicator.reset();
         observation_.cycle.reset();
         timing_.sample_valid = false;
         timing_.elapsed_valid = false;
@@ -114,6 +116,7 @@ public:
         observation_.operatorTarget = control_->remote.update(control_->sequence.state(), nowUs);
         control_->diagnostics.updateStatus({nowUs,control_->sequence.state(),observation_.fault});
         observation_.diagnostics = control_->diagnostics.summary();
+        observation_.indicator = control_->indicator.update(control_->sequence.state(), observation_.fault, nowUs);
         // 最新コピーを周期で消費してからのみ、受信側の異常を解除する。
         // 受信側のfault消費は実機FAULT解除ではない。
         (void)acknowledgeMotorObservation(motors->generation);
