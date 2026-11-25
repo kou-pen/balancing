@@ -1,4 +1,5 @@
 #include "balancing/app/RemoteControlService.hpp"
+#include "balancing/communication/can/RemoteControlCodec.hpp"
 
 namespace balancing {
 RemoteControlService::RemoteControlService(const BOperatorInputConfig& config) noexcept
@@ -18,6 +19,32 @@ bool RemoteControlService::acceptDecoded(BOperatorSource source, const BOperator
 {
     return sample.valid && b_operator_accept(&input_, source, sample.speed_m_s,
         sample.yaw_rate_rad_s, newSampleProven, sample.stamp_us, nowUs);
+}
+
+bool RemoteControlService::acceptCanMotion(const CanFrame& frame,std::uint64_t receivedAtUs,
+                                           std::uint64_t nowUs) noexcept
+{
+    // 受信キューで期限を超えた入力を中立確認や鮮度更新に利用しない。
+    if (!input_.initialized || receivedAtUs>nowUs ||
+        nowUs-receivedAtUs>input_.config.input_timeout_us) return false;
+    const auto motion=protocol::decodeMotionCommand(frame);
+    return motion && acceptDecoded(B_OPERATOR_CAN_REMOTE,
+        {true,receivedAtUs,motion->forwardVelocityMps,motion->yawRateRadS},true,nowUs);
+}
+
+std::optional<BOperatorSource> RemoteControlService::selectedSource() const noexcept
+{
+    return input_.initialized ? std::optional<BOperatorSource>{input_.selected} : std::nullopt;
+}
+
+void RemoteControlService::invalidateCanInput() noexcept
+{
+    if (!input_.initialized || input_.selected!=B_OPERATOR_CAN_REMOTE) return;
+    // 欠落区間の中立入力は証明できない。目標値を瞬時に書き換えず、既存tickで減速する。
+    input_.last_sample={};
+    input_.waiting_neutral=true;
+    input_.neutral_start_valid=false;
+    input_.neutral_sample_count=0;
 }
 
 std::optional<BOperatorTarget> RemoteControlService::update(RobotState state, std::uint64_t nowUs) noexcept

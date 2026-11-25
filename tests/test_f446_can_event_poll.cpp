@@ -1,4 +1,5 @@
 #include "balancing/app/CanEventPoll.hpp"
+#include "balancing/app/Can2ServiceLink.hpp"
 #include "balancing/app/PowerBoardService.hpp"
 #include "balancing/app/DiagnosticsService.hpp"
 #include "balancing/app/ControlCycle.hpp"
@@ -359,6 +360,230 @@ void testPowerStatusThroughCanQueue()
     sink.nowUs=170;
     pollCanEvents(&can1.port,&can2.port,router);
     assert(sink.power.snapshot(170).latest->receivedAtUs==120);
+}
+
+// 実際のRouter/CanPort/CanTxSchedulerとサービスを組み合わせるホストfixture。
+// 実機設定ではない数値を明示し、終端を意図的に成功・失敗させる。
+struct Can2LinkFixture final : CanEventSink {
+    Fixture can1,can2;
+    PowerBoardService power;
+    RemoteControlService remote{{100000,20000,2.0f,3.0f,0.01f,0.01f,1.0f,1.0f,true}};
+    std::array<DiagnosticSlot,4> faultSlots{};
+    DiagnosticsService diagnostics{faultSlots.data(),faultSlots.size(),nullptr,0,0xCA2u};
+    Can2ServiceLink link{power,remote,diagnostics,{200000,100000,200000,20,1000,2,0xCA2u,true}};
+    CanTxScheduler tx{can2.port};
+    CanRouter router{*this,nullptr,&tx};
+    std::uint64_t nowUs{};
+    void onCanReceive(CanBus b,CanRxTarget t,const CanFrame& f,std::uint64_t at) noexcept override
+    {
+        assert(primask==0u);
+        link.receive(b,t,f,at,nowUs);
+    }
+    void onCanTransmit(CanBus b,TxToken t,CanTxOutcome r,std::uint64_t at) noexcept override
+    { link.onTxTerminal(b,t,r,at); }
+    void onCanPortStatus(CanBus b,CanEventKind k,std::uint64_t at) noexcept override
+    { link.onPortStatus(b,k,at); }
+    void poll(std::uint64_t at)
+    {
+        nowUs=at;
+        pollCanEvents(&can1.port,&can2.port,router);
+    }
+    void rx(const CanFrame& f,std::uint64_t at,CanBus bus=CanBus::Can2)
+    {
+        std::uint32_t low=0,high=0;
+        for (unsigned i=0;i<4;++i) {
+            low|=std::uint32_t{f.data[i]}<<(8*i);
+            high|=std::uint32_t{f.data[i+4]}<<(8*i);
+        }
+        (bus==CanBus::Can1?can1:can2).pushRx(f.id,at,f.extended,f.dlc,low,high);
+        poll(at);
+    }
+    CanFrame pending(unsigned box=0) const
+    {
+        const auto& m=can2.registers.sTxMailBox[box];
+        assert(m.TIR&CAN_TI0R_TXRQ);
+        const bool extended=(m.TIR&CAN_TI0R_IDE)!=0;
+        CanFrame result{extended?m.TIR>>3u:m.TIR>>21u,{},static_cast<std::uint8_t>(m.TDTR),extended};
+        for (unsigned i=0;i<4;++i) {
+            result.data[i]=static_cast<std::uint8_t>(m.TDLR>>(8*i));
+            result.data[i+4]=static_cast<std::uint8_t>(m.TDHR>>(8*i));
+        }
+        return result;
+    }
+    void finish(unsigned box,std::uint32_t flags,std::uint64_t at)
+    {
+        can2.occupy(box);
+        can2.complete(box,flags,at);
+        poll(at);
+    }
+    CanFrame send(std::uint64_t at,std::uint32_t flags=CAN_TSR_TXOK0)
+    {
+        link.submitPending(tx,at);
+        const auto f=pending();
+        finish(0,flags,at+1);
+        return f;
+    }
+};
+
+void testCan2RemoteAndPowerIntegration()
+{
+    using namespace protocol;
+    Can2LinkFixture f;
+    RobotSequence seq{{50000,true}};
+    RobotSequenceInput in{};
+    // 明示した仮想状態だけでARM応答の意味を検証。実機では成立しないfixture。
+    in.interlocks={true,true,true,true,true,true,MechanismSafety::Safe};
+    const auto cycle=[&](std::uint64_t now,bool authorized=false) {
+        const auto op=f.link.takeCycleInput(now,seq.state(),authorized);
+        in.operations=op.operations;
+        in.observedFaults=op.faults;
+        const auto result=seq.update(in,now);
+        f.link.completeCycle(result,now);
+        return result;
+    };
+    f.rx(*encodePowerStatus({WirePowerState::On,0,0,1}),100,CanBus::Can1);
+    assert(!f.power.snapshot(100).latest);
+    f.rx(*encodePowerStatus({WirePowerState::On,0,0,1}),101);
+    assert(f.power.snapshot(101).ready);
+    f.rx(*encodeMotionCommand({0.0f,0.0f}),110);
+    assert(!f.remote.update(RobotState::Disarmed,110)->source_fresh);
+    f.rx(*encodeRemoteRequest({RemoteRequestKind::Arm,1,{}}),120);
+    assert(cycle(121).state==RobotState::Disarmed);
+    assert(decodeRemoteResult(f.send(122))->result==ResultCode::Unauthorized);
+    f.rx(*encodeRemoteRequest({RemoteRequestKind::SelectSource,2,WireInputSource::CanRemote}),130);
+    assert(cycle(131).state==RobotState::Disarmed);
+    assert(decodeRemoteResult(f.send(132))->result==ResultCode::Accepted);
+    // 切替前の時刻や不正値は鮮度を更新しない。
+    f.link.receive(CanBus::Can2,CanRxTarget::RemoteMotion,*encodeMotionCommand({0,0}),130,140);
+    assert(!f.remote.update(RobotState::Disarmed,140)->source_fresh);
+    f.rx(*encodeMotionCommand({0,0}),150);
+    assert(f.remote.update(RobotState::Disarmed,150)->waiting_neutral);
+    f.rx(*encodeMotionCommand({0,0}),20150);
+    assert(f.remote.update(RobotState::Disarmed,20150)->operator_ready);
+    f.rx(*encodeMotionCommand({3,0}),20160);
+    assert(f.remote.update(RobotState::Disarmed,120151)->waiting_neutral);
+    // 期限超過したフレームを後から渡しても受信鮮度は回復しない。
+    f.link.receive(CanBus::Can2,CanRxTarget::RemoteMotion,*encodeMotionCommand({0,0}),20161,120162);
+    assert(!f.remote.update(RobotState::Disarmed,120162)->source_fresh);
+    f.rx(*encodeMotionCommand({0,0}),120170);
+    f.rx(*encodeMotionCommand({0,0}),140170);
+    assert(f.remote.update(RobotState::Disarmed,140170)->operator_ready);
+    f.rx(*encodeRemoteRequest({RemoteRequestKind::Arm,3,{}}),140180);
+    assert(cycle(140181).state==RobotState::Arming);
+    const auto arm=decodeRemoteResult(f.send(140182));
+    assert(arm && arm->result==ResultCode::Accepted && arm->state==WireRobotState::Arming);
+    // 操作元切替の可否は実状態機械から渡す。ARMINGでは拒否。
+    f.rx(*encodeRemoteRequest({RemoteRequestKind::SelectSource,4,WireInputSource::UsbDualSense}),140190);
+    assert(cycle(140191).state==RobotState::Arming);
+    assert(decodeRemoteResult(f.send(140192))->result==ResultCode::SafetyRejected);
+    f.rx(*encodeRemoteRequest({RemoteRequestKind::Disarm,5,{}}),140200);
+    assert(cycle(140201).state==RobotState::Disarmed);
+    assert(decodeRemoteResult(f.send(140202))->result==ResultCode::Accepted);
+
+    // 模擬の電源要求は一回限り、Tx成功と一致した要求ID/種類でだけ照合する。
+    assert(f.link.requestMockPower(PowerRequestKind::Off,9,140210));
+    assert(!f.link.requestMockPower(PowerRequestKind::Off,10,140211));
+    const auto powerReq=decodePowerRequest(f.send(140212));
+    assert(powerReq && powerReq->requestId==9 && powerReq->kind==PowerRequestKind::Off);
+    f.rx(*encodePowerResult({NodeId::F446,PowerRequestKind::Off,10,ResultCode::Accepted,WirePowerState::Off}),140220);
+    assert(!f.link.summary().powerResult);
+    f.rx(*encodePowerResult({NodeId::F446,PowerRequestKind::Off,9,ResultCode::Accepted,WirePowerState::Off}),140221);
+    assert(f.link.summary().powerResult && f.link.summary().powerResult->state==WirePowerState::Off);
+    assert(f.power.snapshot(140221).ready); // 応答だけではPOWER_STATUSを書き換えない。
+    assert(f.link.requestMockPower(PowerRequestKind::On,11,140222));
+    assert(decodePowerRequest(f.send(140223,CAN_TSR_TERR0)));
+    f.link.submitPending(f.tx,140225);
+    assert(!(f.can2.registers.sTxMailBox[0].TIR&CAN_TI0R_TXRQ)); // 自動再送なし
+    // CAN2欠落は電源のON有効性と操作入力を取り消す。旧値は診断に残す。
+    f.link.onPortStatus(CanBus::Can2,CanEventKind::RxLost,140230);
+    assert(!f.power.snapshot(140230).fresh && f.power.snapshot(140230).latest);
+    assert(!f.remote.update(RobotState::Disarmed,140230)->source_fresh);
+    f.link.receive(CanBus::Can2,CanRxTarget::PowerStatus,*encodePowerStatus({WirePowerState::On,0,0,2}),140230,140231);
+    assert(!f.power.snapshot(140231).ready);
+    f.rx(*encodePowerStatus({WirePowerState::On,0,0,3}),140232);
+    assert(f.power.snapshot(140232).ready);
+    // 満杯の応答列・通常ARM要求があっても停止は取りこぼさない。
+    f.rx(*encodeDiagnostic(ParamRead{1,1}),140240);
+    f.rx(*encodeDiagnostic(ParamRead{2,2}),140241);
+    f.rx(*encodeDiagnostic(ParamRead{3,3}),140242);
+    assert(f.link.summary().droppedResponses==1);
+    f.rx(*encodeRemoteRequest({RemoteRequestKind::Arm,6,{}}),140243);
+    f.rx(*encodeRemoteRequest({RemoteRequestKind::Disarm,7,{}}),140244);
+    f.rx(*encodeEmergencyStop(NodeId::F303),140245);
+    assert(cycle(140246).state==RobotState::Fault);
+    assert(seq.currentFault()->primaryCause==FaultFlags::EmergencyStop);
+    f.rx(*encodeRemoteRequest({RemoteRequestKind::ClearFault,8,{}}),140250);
+    assert(cycle(140251,false).state==RobotState::Fault);
+    f.rx(*encodeRemoteRequest({RemoteRequestKind::ClearFault,9,{}}),140252);
+    assert(cycle(140253,true).state==RobotState::Disarmed);
+    assert(cycle(140254,true).state==RobotState::Disarmed); // CLEAR/ARMの持ち越しなし
+}
+
+void testCan2DiagnosticsAndMotorPriority()
+{
+    using namespace protocol;
+    Can2LinkFixture f;
+    // 未確定の設定番号は値を偽造しない。購読は明示設定の範囲内だけ。
+    f.rx(*encodeDiagnostic(ParamRead{42,1}),100);
+    const auto param=decodeDiagnostic(f.send(101));
+    assert(param && std::get<ParamError>(*param).paramId==42);
+    f.rx(*encodeDiagnostic(StreamSubscribe{2,10,100,2}),110);
+    assert(std::get<StreamResult>(*decodeDiagnostic(f.send(111))).result==ResultCode::InvalidRequest);
+    f.rx(*encodeDiagnostic(StreamSubscribe{2,20,100,3}),120);
+    assert(std::get<StreamResult>(*decodeDiagnostic(f.send(121))).result==ResultCode::Accepted);
+    Can2Telemetry frames{};
+    frames[1]=encodeDiagnostic(AttitudeAngle{0.25f,-0.5f});
+    f.link.publishTelemetry(frames,130);
+    assert(std::get<AttitudeAngle>(*decodeDiagnostic(f.send(131))).pitchRad==0.25f);
+    f.link.submitPending(f.tx,20130);
+    assert(!(f.can2.registers.sTxMailBox[0].TIR&CAN_TI0R_TXRQ));
+    frames[1]=encodeDiagnostic(AttitudeAngle{0.5f,-0.5f});
+    f.link.publishTelemetry(frames,20131);
+    assert(std::get<AttitudeAngle>(*decodeDiagnostic(f.send(20131))).pitchRad==0.5f);
+    // 購読期限後は100msの基本周期。古い詳細周期で送らない。
+    f.link.submitPending(f.tx,100121);
+    assert(!(f.can2.registers.sTxMailBox[0].TIR&CAN_TI0R_TXRQ));
+    f.link.publishTelemetry({},120131);
+    f.link.submitPending(f.tx,120131);
+    assert(!(f.can2.registers.sTxMailBox[0].TIR&CAN_TI0R_TXRQ));
+
+    const FaultRecord fault{FaultFlags::EmergencyStop,FaultFlags::EmergencyStop,FaultFlags::BusOff,123000};
+    assert(f.diagnostics.pushFault(fault,124000));
+    f.link.submitPending(f.tx,124001);
+    const auto first=f.pending();
+    const auto decoded1=std::get<FaultPart1>(*decodeDiagnostic(first));
+    assert(decoded1.eventAtMs==124 && decoded1.primaryCause==1);
+    assert(f.diagnostics.summary().importantPending==1 && !f.diagnostics.nextPending());
+    // 背景1枠が終端待ちでもC620の周期送信は別枠で受付可能。
+    f.can2.occupy(0);
+    PeriodicTxBatch batch{1,126000,{}};
+    batch.requests[0]=PeriodicTxRequest{CanFrame{0x200,{},8,false},{1,0xBBu}};
+    assert(f.tx.replacePeriodic(batch,124002)==PeriodicBatchResult::Queued);
+    assert(f.tx.trySubmitBackground(first,{77,0xBBu},124002)==CanTxSubmitResult::Busy);
+    assert(f.tx.service(124002).result==ScheduledTxResult::Accepted);
+    assert(f.pending(1).id==0x200);
+    f.can2.occupy(1);
+    f.can2.complete(1,CAN_TSR_TXOK0,124003);
+    f.poll(124003);
+    // CAN1の同一番号終端でも診断パートは進まない。
+    f.link.onTxTerminal(CanBus::Can1,{6,0xCA2u},CanTxOutcome::Sent,124003);
+    assert(!f.diagnostics.nextPending());
+    f.can2.complete(0,CAN_TSR_TERR0,124004);
+    f.poll(124004);
+    assert(f.diagnostics.nextPending()->frameIndex==0);
+    const auto retry=f.send(124005);
+    assert(retry.id==first.id && retry.data==first.data);
+    const auto part2=std::get<FaultPart2>(*decodeDiagnostic(f.send(124007)));
+    const auto part3=std::get<FaultPart3>(*decodeDiagnostic(f.send(124009)));
+    assert(part2.eventId==decoded1.eventId && part3.eventId==decoded1.eventId);
+    assert(part2.triggerFlags==1 && part2.subsequentFlags==2 && part3.originalAtMs==123);
+    assert(f.diagnostics.summary().importantPending==0);
+    // 停止枠に保留があれば背景は投入しない。
+    assert(f.tx.enqueueStop(0,CanFrame{0x200,{},8,false},{2,0xBBu})==StopEnqueueResult::Queued);
+    f.rx(*encodeDiagnostic(ParamRead{5,7}),124011);
+    f.link.submitPending(f.tx,124012);
+    assert(!(f.can2.registers.sTxMailBox[0].TIR&CAN_TI0R_TXRQ));
+    assert(f.tx.service(124013).result==ScheduledTxResult::Accepted && f.pending().id==0x200);
 }
 
 void testTerminalOnlyReleasesTheOriginatingBus()
@@ -1548,6 +1773,8 @@ int main()
     testCan2ProtocolReceiveDirections();
     testRoutingFromBothPortQueues();
     testPowerStatusThroughCanQueue();
+    testCan2RemoteAndPowerIntegration();
+    testCan2DiagnosticsAndMotorPriority();
     testTerminalOnlyReleasesTheOriginatingBus();
     testSchedulerIgnoresUnacceptedAndStaleEvents();
     testNonSendTerminalEventsReleaseTheEntry();

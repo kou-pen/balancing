@@ -45,6 +45,8 @@
 
 ## 現時点の境界
 
+2026-11-26 CAN2統合レビュー版: [非駆動Application配送・診断/操作応答](f446-can2-service-integration-host.md)でCTest 34/34、通常/UBSan、全46 AppソースのDebug/Release ARMビルドが合格。通常モータ駆動と実機試験は未実施。
+
 2026-11-26、PR #68統合時点の最新ホスト結果はCTest 33/33、通常/UBSan全件合格。CAN2 v1の受信分類・フィルタ計画・電源状態受信、非駆動Application周期、BNO055、6軸観測、SIL制御・指令計画を検証済み。現行master 0692c4eの[全44 AppソースのARMクロスビルド](f446-crossbuild-20261126.md)はDebug/Releaseとも合格。本番操作・送信経路の統合と実機試験は未確認。進行順は [P0ロードマップ](../todo/roadmap.md) を参照。
 
 制御コア・CAN通信・送信要求モデル、運動学fixture、脚長PD/Roll PDの**ホスト試験**、F446の**11ソースCubeIDE Debug/Release管理ビルド**は2026-11-11にPASSしました。一方、実機書込み、CAN実通信、トルク出力、実時間性能、独立非常停止、実機での倒立は未検証です。
@@ -78,3 +80,5 @@
 - [CAN2受信フィルタ](f446-can2-filter-plan-host.md)
 
 - [F303電源状態の受信境界](f446-power-status-receive-host.md)
+
+- [CAN2通信の非駆動統合](f446-can2-service-integration-host.md)

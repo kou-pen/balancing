@@ -176,15 +176,33 @@ ApplicationはMotorObservationSnapshotとImuAttitudeを同じ周期時刻で固�
 
 `DiagnosticsCodec` は19種類のDTOに対する `encodeDiagnostic()` と、IDに対応する型を `DiagnosticPayload` として返す `decodeDiagnostic()` を提供する。観測鮮度・配信許可・FAULT再構成・設定番号の意味は別責務。未定義フラグと設定値は生ビット。 [検証記録](../verification/f446-diagnostics-codec-host.md)。
 
-## CAN2受信分類（HALフィルタ未接続）
+## CAN2受信分類
 
-`CanRouter::dispatch()` は自作CAN2の12受信IDを6分類へ振り分け、従来の `CanEventSink` に採取時刻付きで渡す。 `MotorCanLink` は既存軸だけを担当。内容検査、サービス接続、実際のフィルタ変更は後続工程。 [検証記録](../verification/f446-can2-rx-routing-host.md)。
+`CanRouter::dispatch()` は自作CAN2の12受信IDを6分類へ振り分け、従来の `CanEventSink` に採取時刻付きで渡す。 `MotorCanLink` は既存軸だけを担当。内容検査とサービス接続は下記の非駆動CAN2統合で行う。 [検証記録](../verification/f446-can2-rx-routing-host.md)。
 
 ## CAN2受信フィルタ
 
-`makeCan2FilterPlan(false)` はC620標準2 IDを1バンクに、trueは自作12 IDを追加し計7バンクに配置する。32bit Listを使用し、CAN1のMaskは維持する。現行起動はfalse固定で未使用バンクを明示無効化する。 [検証記録](../verification/f446-can2-filter-plan-host.md)。
+`makeCan2FilterPlan(false)` はC620標準2 IDを1バンクに、trueは自作12 IDを追加し計7バンクに配置する。32bit Listを使用し、CAN1のMaskは維持する。C ABIの既定起動はfalse。明示的な非駆動試験設定とC++起動指定が揃った場合だけtrueを使用し、未使用バンクは明示無効化する。 [検証記録](../verification/f446-can2-filter-plan-host.md)。
 
 
 ## 電源状態の受信境界（模擬CAN接続）
 
-`PowerBoardService::acceptCanStatus(bus, target, frame, receivedAtUs, nowUs)` はCAN2のPOWER_STATUSだけを復号し、既存の `acceptDecoded()` に委譲する。ポート採取時刻を保持し、評価時刻を受信時刻に置換しない。 `PowerStatusReport::wire` は状態フラグ・故障ビット・報告連番の生値を持つ（従来の模擬入力は空）。500 msの鮮度と保留FAULTの既存規則を維持する。連番の重複・周回・送信側再起動の契約は未確定。実機フィルタ・Applicationへの配送・電源操作は未接続。 [検証記録](../verification/f446-power-status-receive-host.md)。
+`PowerBoardService::acceptCanStatus(bus, target, frame, receivedAtUs, nowUs)` はCAN2のPOWER_STATUSだけを復号し、既存の `acceptDecoded()` に委譲する。ポート採取時刻を保持し、評価時刻を受信時刻に置換しない。 `PowerStatusReport::wire` は状態フラグ・故障ビット・報告連番の生値を持つ（従来の模擬入力は空）。500 msの鮮度と保留FAULTの既存規則を維持する。連番の重複・周回・送信側再起動の契約は未確定。この受信境界を下記の非駆動CAN2統合から利用する。実機電源操作は未接続。 [検証記録](../verification/f446-power-status-receive-host.md)。
+
+
+## CAN2通信統合（非駆動プロファイル）
+
+| API | 責務 |
+|---|---|
+| `Can2ServiceLink::receive(bus, target, frame, receivedAtUs, nowUs)` | CAN2自作通信を既存codec/サービスへ配送。E-STOPとDISARMは通常要求・応答容量から分離 |
+| `takeCycleInput(nowUs, state, clearFaultAuthorized)` / `completeCycle(result, nowUs)` | 一周期の操作・異常入力と状態機械結果に基づくREMOTE_RESULT。操作元・ARM条件・解除の最終権限は既存サービスとRobotSequence |
+| `publishTelemetry(frames, nowUs)` | 10種類の通常診断フレームを有効な最新値で置換。未成立の値は空 |
+| `submitPending(scheduler, nowUs)` / `onTxTerminal(bus, token, outcome, atUs)` | 背景送信を1件だけ試行し、FAULTの3部分は送信終端で進める。通常応答は失敗・満杯・期限切れで欠落計数 |
+| `CanTxScheduler::trySubmitBackground(frame, token, nowUs)` | 停止・通常・周期待ちがあれば拒否。背景1枠のみ、背景終端で周期送信を待たせない |
+| `initializeCan2Observation(profile)` / `startCanObservation(..., true)` | 起動前の明示設定とフィルタ指定が両方必要。既定C ABIは車輪受信のみ、実機電源・駆動禁止を維持 |
+
+`Can2ObservationProfile` は人工の入力設定、通信期限・配信周期・応答上限、外部固定FAULT領域を受け取る。値を実機の確定値とみなさない。通常運転での使用は別途設計・検証が必要。
+
+購読はRegister 2〜9について設定された周期・期限内のみ。未知のPARAM_READにはPARAM_ERRORを返す。F446からの電源要求は独立した模擬リンクでだけ許可し、Applicationでは無効。POWER_RESULTは要求番号・種別と送信終端を照合して保持するがPOWER_STATUSの代用にはしない。同一IRQでTX終端とRXを観測し先後が不明な応答は保守的に採用しない。
+
+[検証記録](../verification/f446-can2-service-integration-host.md)。

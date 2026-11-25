@@ -21,6 +21,21 @@ CanTxSubmitResult CanTxScheduler::trySubmit(const CanFrame& frame, TxToken token
     return submit(frame, {token, nowUs});
 }
 
+CanTxSubmitResult CanTxScheduler::trySubmitBackground(const CanFrame& frame, TxToken token,
+                                                      std::uint64_t nowUs) noexcept
+{
+    // 診断で3枠を埋めたり周期要求より先に新しいフレームを投入したりしない。
+    // 背景送信は通常FIFOに入れないので、その終端待ちで周期処理を塞がない。
+    if (!token.serial || !frame.validForTransmit()) return CanTxSubmitResult::Invalid;
+    if (hasStop() || eventCount_!=0 || hasEventInFlight() || isKnownToken(token) ||
+        std::any_of(periodic_.requests.begin(),periodic_.requests.end(),
+                    [](const auto& request){ return request.has_value(); }) ||
+        std::any_of(accepted_.begin(),accepted_.end(),[](const AcceptedTx& tx){ return tx.background; })) {
+        return CanTxSubmitResult::Busy;
+    }
+    return submit(frame,{token,nowUs,0,false,true});
+}
+
 bool CanTxScheduler::isAccepted(TxToken token) const noexcept
 {
     const auto sameToken = [token](const AcceptedTx& entry) { return entry.token == token; };

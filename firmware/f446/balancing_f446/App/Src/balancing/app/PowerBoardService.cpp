@@ -15,6 +15,7 @@ bool PowerBoardService::acceptDecoded(PowerStatusReport report, std::uint64_t no
     default: return false;
     }
     latest_ = report;
+    statusInvalidated_ = false;
     return true;
 }
 
@@ -44,9 +45,15 @@ bool PowerBoardService::acceptCanStatus(CanBus bus, CanRxTarget target, const Ca
                           PowerWireMetadata{payload->flags, payload->faultBits, payload->sequence}}, nowUs);
 }
 
+void PowerBoardService::invalidateCanStatus() noexcept
+{
+    // 最新値は診断に残すが、欠落前のONから電源readyを作らない。
+    statusInvalidated_=true;
+}
+
 PowerBoardSnapshot PowerBoardService::snapshot(std::uint64_t nowUs) const noexcept
 {
-    const bool fresh = latest_ && latest_->receivedAtUs <= nowUs &&
+    const bool fresh = !statusInvalidated_ && latest_ && latest_->receivedAtUs <= nowUs &&
                        nowUs - latest_->receivedAtUs < timeoutUs;
     // 次の周期までにONへ戻っても、途中で受理したFAULT通知を失わない。
     const bool fault = faultPending_ || (latest_ && latest_->state == PowerState::Fault);
