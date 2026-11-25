@@ -50,3 +50,5 @@
 次の試験を計画するときは [実機検証TODO](../todo/verification.md) の受入条件を参照し、作業上の最新状態はGitHub Issue/PRで確認します。
 
 - [CANランタイムの6軸観測接続](f446-runtime-motor-observation-host.md)
+
+- [BNO055非同期取得と姿勢フィルタ](f446-bno055-observation-host.md)
