@@ -70,3 +70,5 @@
 - [Raspberry Pi操作通信コーデック](f446-remote-control-codec-host.md)
 
 - [診断・設定読み出しコーデック](f446-diagnostics-codec-host.md)
+
+- [CAN2自作通信の受信分類](f446-can2-rx-routing-host.md)

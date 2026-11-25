@@ -519,4 +519,17 @@ flowchart TD
     B --> F
 ```
 
-共通処理・電源・操作・診断Codecは実装済み。CAN2送受信・各Serviceへの接続は未実施。
+共通処理・電源・操作・診断Codecと受信分類は実装済み。HAL受信フィルタ・各Service・送信経路の接続は未実施。
+
+## CAN2受信分類
+
+```mermaid
+flowchart TD
+    P["CanPort：受信イベント"] --> R["CanRouter：バス・IDE・ID・DLC"]
+    R --> M["MotorCanLink：既存軸だけ"]
+    R --> S["CanEventSink：自作12 ID・6分類"]
+    S -.-> C["個別Codec・Service接続（後続）"]
+    R --> U["Unmatched"]
+```
+
+実機フィルタの拡張は未実施。分類はフレーム外形のみであり、操作許可を意味しない。
