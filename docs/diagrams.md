@@ -545,3 +545,19 @@ flowchart TD
 ```
 
 自作フィルタはサービス結合前のため有効化しない。将来の全構成でも7バンクが空く。
+
+
+## 電源状態受信（模擬CAN）
+
+```mermaid
+flowchart TD
+    PORT["CAN2 CanPort：採取時刻付き受信"] --> POLL["pollCanEvents"]
+    POLL --> ROUTER["CanRouter：PowerStatus分類"]
+    ROUTER --> SINK["模擬CanEventSink"]
+    SINK --> SERVICE["PowerBoardService::acceptCanStatus"]
+    SERVICE --> CODEC["PowerBoardCodec：固定ID/DLC/内容検査"]
+    CODEC --> ACCEPT["acceptDecoded：時刻・鮮度検査"]
+    ACCEPT --> SNAPSHOT["snapshot：論理状態・受信時刻・生メタデータ"]
+```
+
+実機の配送先、フィルタ有効化、送信・ARM条件は変更しない。検証記録は [電源状態の受信境界](verification/f446-power-status-receive-host.md)。

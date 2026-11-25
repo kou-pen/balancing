@@ -183,3 +183,8 @@ ApplicationはMotorObservationSnapshotとImuAttitudeを同じ周期時刻で固�
 ## CAN2受信フィルタ
 
 `makeCan2FilterPlan(false)` はC620標準2 IDを1バンクに、trueは自作12 IDを追加し計7バンクに配置する。32bit Listを使用し、CAN1のMaskは維持する。現行起動はfalse固定で未使用バンクを明示無効化する。 [検証記録](../verification/f446-can2-filter-plan-host.md)。
+
+
+## 電源状態の受信境界（模擬CAN接続）
+
+`PowerBoardService::acceptCanStatus(bus, target, frame, receivedAtUs, nowUs)` はCAN2のPOWER_STATUSだけを復号し、既存の `acceptDecoded()` に委譲する。ポート採取時刻を保持し、評価時刻を受信時刻に置換しない。 `PowerStatusReport::wire` は状態フラグ・故障ビット・報告連番の生値を持つ（従来の模擬入力は空）。500 msの鮮度と保留FAULTの既存規則を維持する。連番の重複・周回・送信側再起動の契約は未確定。実機フィルタ・Applicationへの配送・電源操作は未接続。 [検証記録](../verification/f446-power-status-receive-host.md)。
