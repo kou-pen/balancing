@@ -306,6 +306,7 @@
 |---|---|
 | <a href="CanPort_8hpp_source.html">CanPort.hpp</a> | 1バスの送受信、IRQ、メールボックスを扱うAPI |
 | <a href="CanRouter_8hpp_source.html">CanRouter.hpp</a> | CANイベントの配送API・CAN2自作通信6分類 |
+| <a href="Can2FilterPlan_8hpp_source.html">Can2FilterPlan.hpp</a> | CAN2の32bit Listフィルタ構成と生成API |
 | <a href="CanTxScheduler_8hpp_source.html">CanTxScheduler.hpp</a> | 対象別の停止要求、通常FIFO、周期送信、受付と終端の照合API |
 | <a href="MotorFramePlan_8hpp_source.html">MotorFramePlan.hpp</a> | SIL専用Type1×4＋C620共通0x200の符号化計画 |
 | <a href="CanTypes_8hpp_source.html">CanTypes.hpp</a> | フレーム、トークン、送信結果、IRQイベントの共通型 |
@@ -458,6 +459,7 @@
 | <a href="RemoteControlCodec_8cpp_source.html">RemoteControlCodec.cpp</a> | 操作フレームの符号化・復号と形式検査 |
 | <a href="DiagnosticsCodec_8cpp_source.html">DiagnosticsCodec.cpp</a> | 診断フレームの符号化・型付き復号・値の検査 |
 | <a href="CanRouter_8cpp_source.html">CanRouter.cpp</a> | バス・IDE・固定ID・DLC・宛先で受信分類、送信終端・状態配送 |
+| <a href="Can2FilterPlan_8cpp_source.html">Can2FilterPlan.cpp</a> | C620と自作受信IDの照合ワード生成 |
 | <a href="CanTxScheduler_8cpp_source.html">CanTxScheduler.cpp</a> | 停止送信の優先順位と再試行、通常FIFO、周期指令の期限と終端照合 |
 | <a href="MotorFramePlan_8cpp_source.html">MotorFramePlan.cpp</a> | 状態別の通常トルク抑止とC11コーデックによる5フレーム生成 |
 */

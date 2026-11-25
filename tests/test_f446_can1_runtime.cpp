@@ -1,4 +1,5 @@
 #include "balancing_f446_can1_bridge.h"
+#include "balancing/communication/can/Can2FilterPlan.hpp"
 #include "balancing_app_bridge.h"
 #include "balancing/app/ApplicationObservation.hpp"
 #include "balancing/device/ImuObservation.hpp"
@@ -27,7 +28,7 @@ std::array<CAN_FilterTypeDef, 28> installedFilters{};
 std::size_t filterCount{};
 std::size_t startCount{};
 std::size_t stopCount{};
-bool filterFails{};
+int filterFailsBank=-1;
 int startFailsBus = -1;
 bool startTimeout{};
 int irqEnableFailsBus = -1;
@@ -52,6 +53,86 @@ std::size_t busIndex(const CAN_HandleTypeDef* handle)
     return handle->Instance == &can1 ? 0u : 1u;
 }
 
+// bxCAN 32bit Listは二つの照合ワードを完全一致で比較する。
+// このホスト模型はHALレジスタ書込みの検査とは独立し、実機フィルタの代用ではない。
+bool listAccepts(const balancing::Can2FilterPlan& plan,std::uint32_t word)
+{
+    for (std::size_t i=0;i<plan.count;++i) {
+        const auto& pair=plan.entries[i];
+        if (pair.first==word || pair.second==word) return true;
+    }
+    return false;
+}
+
+void testCan2FilterPlan()
+{
+    const auto motor=balancing::makeCan2FilterPlan(false);
+    const auto full=balancing::makeCan2FilterPlan(true);
+    assert(motor.count==1 && full.count==7 && full.entries.size()==7);
+    assert(full.entries[0].first==0x40200000u && full.entries[0].second==0x40400000u);
+    assert(motor.entries[0].first==full.entries[0].first &&
+           motor.entries[0].second==full.entries[0].second);
+    for (std::size_t i=1;i<motor.entries.size();++i)
+        assert(motor.entries[i].first==0 && motor.entries[i].second==0);
+
+    // 全標準ID・RTRを走査。拡張IDの同じ数値や同じ上位11bitも別物。
+    for (std::uint32_t id=0;id<=0x7ffu;++id) {
+        const bool expected=id==0x201u || id==0x202u;
+        for (const auto& plan : {motor,full}) {
+            assert(listAccepts(plan,id<<21u)==expected);
+            assert(!listAccepts(plan,(id<<21u)|2u));
+            assert(!listAccepts(plan,(id<<3u)|4u));
+            assert(!listAccepts(plan,(id<<21u)|4u));
+        }
+    }
+
+    struct Case { std::uint32_t id; bool receive; };
+    // 独立した仕様表の35個から、F446の12受信IDだけを選択する。
+    const Case cases[]{
+        {0x00047c01u,false},{0x0004bc01u,true},{0x0004fc01u,true},
+        {0x08404801u,false},{0x0840c801u,false},{0x04404802u,false},{0x0440c802u,false},
+        {0x0840bc03u,true},{0x08408404u,true},{0x08408c04u,false},
+        {0x0880c401u,true},{0x0880c402u,true},{0x0480c403u,true},{0x0880c404u,true},
+        {0x0880c405u,true},{0x08804c06u,false},
+        {0x0cc04c01u,false},{0x0cc04c02u,false},{0x0cc04c03u,false},{0x0cc04c04u,false},
+        {0x0cc04c05u,false},{0x0cc04c06u,false},{0x0cc04c07u,false},{0x0cc04c08u,false},
+        {0x0cc04c09u,false},{0x0cc04c0au,false},
+        {0x04c04c20u,false},{0x04c04c21u,false},{0x04c04c22u,false},
+        {0x0cc0c480u,true},{0x0cc0c481u,true},{0x0cc04c82u,false},
+        {0x0d00c401u,true},{0x0d004c02u,false},{0x0d004c03u,false}
+    };
+    unsigned expectedCount=0;
+    for (const auto& c:cases) {
+        const auto word=(c.id<<3u)|4u;
+        assert(!listAccepts(motor,word));
+        assert(listAccepts(full,word)==c.receive);
+        assert(!listAccepts(full,word|2u));
+        if (c.receive) {
+            ++expectedCount;
+            // 一ビット変異が別の正規受信IDになる場合だけ通過を許す。
+            for (unsigned bit=0;bit<29;++bit) {
+                const auto altered=c.id^(1u<<bit);
+                bool expected=false;
+                for (const auto& other:cases)
+                    if (other.receive && other.id==altered) expected=true;
+                assert(listAccepts(full,(altered<<3u)|4u)==expected);
+            }
+        }
+    }
+    assert(expectedCount==12);
+    // 全フィルタワードを逆引きし、余計なID・重複がないことも確認する。
+    for (std::size_t i=1;i<full.count;++i) {
+        for (auto word:{full.entries[i].first,full.entries[i].second}) {
+            assert((word&7u)==4u);
+            unsigned matches=0,duplicates=0;
+            for (const auto& c:cases) if (c.receive && c.id==(word>>3u)) ++matches;
+            for (const auto& bank:full.entries)
+                duplicates+=(bank.first==word)+(bank.second==word);
+            assert(matches==1 && duplicates==1);
+        }
+    }
+}
+
 } // namespace
 
 TestDwtRegisters* DWT = &dwt;
@@ -72,13 +153,14 @@ HAL_StatusTypeDef HAL_CAN_ConfigFilter(CAN_HandleTypeDef* handle, const CAN_Filt
     assert(filter->FilterBank < installedFilters.size());
     installedFilters[filter->FilterBank] = *filter;
     ++filterCount;
-    return filterFails && filter->FilterBank == 15u ? HAL_ERROR : HAL_OK;
+    return static_cast<int>(filter->FilterBank)==filterFailsBank ? HAL_ERROR : HAL_OK;
 }
 
 HAL_StatusTypeDef HAL_CAN_Start(CAN_HandleTypeDef* handle)
 {
     assert(handle->State == HAL_CAN_STATE_READY && enabledNotifications[busIndex(handle)] == 0u);
-    assert(installedFilters[15].FilterActivation == ENABLE);
+    assert(installedFilters[14].FilterActivation == ENABLE);
+    for (unsigned i=15;i<28;++i) assert(installedFilters[i].FilterActivation == DISABLE);
     ++startCount;
     if (static_cast<int>(busIndex(handle)) == startFailsBus) {
         if (startTimeout) handle->State = HAL_CAN_STATE_ERROR;
@@ -129,6 +211,7 @@ balancing::ImuAttitude balancing::imuAttitude(std::uint64_t) noexcept { return {
 
 int main(int argc, char** argv)
 {
+    testCan2FilterPlan();
     CAN_HandleTypeDef handle{CAN1, HAL_CAN_STATE_READY};
     CAN_HandleTypeDef handle2{CAN2, HAL_CAN_STATE_READY};
     BF446Can1Snapshot snapshot{};
@@ -227,9 +310,14 @@ int main(int argc, char** argv)
     assert(!balancing_f446_can_start(&handle, &handle2));
     DWT->CTRL = 0u;
     assert(filterCount == 0u && startCount == 0u);
-    filterFails = true;
-    assert(!balancing_f446_can_start(&handle, &handle2) && startCount == 0u);
-    filterFails = false;
+    for (int bank : {14,15,27}) {
+        filterFailsBank=bank;
+        assert(!balancing_f446_can_start(&handle,&handle2) && startCount==0u);
+        assert(!balancing_f446_can1_snapshot(&snapshot) && !balancing_f446_can2_snapshot(&wheels));
+    }
+    filterFailsBank=-1;
+    // 古い有効設定が残っていてもCAN2所有バンクを明示的に無効化する。
+    for (unsigned bank=15;bank<28;++bank) installedFilters[bank].FilterActivation=ENABLE;
     // CAN2の起動が失敗したら、先に成功したCAN1も停止する。
     startFailsBus = 1;
     assert(!balancing_f446_can_start(&handle, &handle2));
@@ -251,19 +339,24 @@ int main(int argc, char** argv)
     assert(!balancing_f446_can_start(&handle2, &handle));
     assert(!balancing_f446_can1_snapshot(nullptr));
     assert(!balancing_f446_can2_snapshot(nullptr));
-    for (std::size_t bank : {0u, 1u, 14u, 15u}) {
-        const auto& f = installedFilters[bank];
-        assert(f.FilterBank == bank && f.SlaveStartFilterBank == 14u);
-        assert(f.FilterMode == CAN_FILTERMODE_IDMASK && f.FilterScale == CAN_FILTERSCALE_32BIT);
-        assert(f.FilterActivation == ENABLE && f.FilterFIFOAssignment == CAN_FILTER_FIFO0);
-        if (bank < 14u) {
-            assert(f.FilterIdHigh == ((bank == 0 ? 2u : 24u) << 11u));
-            assert(f.FilterIdLow == CAN_RI0R_IDE && f.FilterMaskIdHigh == 0xf800u);
-        } else {
-            assert(f.FilterIdHigh == ((bank == 14u ? 0x201u : 0x202u) << 5u));
-            assert(f.FilterIdLow == 0u && f.FilterMaskIdHigh == 0xffe0u);
-        }
-        assert(f.FilterMaskIdLow == (CAN_RI0R_IDE | CAN_RI0R_RTR));
+    for (std::size_t bank : {0u,1u}) {
+        const auto& f=installedFilters[bank];
+        assert(f.FilterBank==bank && f.SlaveStartFilterBank==14u);
+        assert(f.FilterMode==CAN_FILTERMODE_IDMASK && f.FilterScale==CAN_FILTERSCALE_32BIT);
+        assert(f.FilterActivation==ENABLE && f.FilterFIFOAssignment==CAN_FILTER_FIFO0);
+        assert(f.FilterIdHigh==((bank==0?2u:24u)<<11u));
+        assert(f.FilterIdLow==CAN_RI0R_IDE && f.FilterMaskIdHigh==0xf800u);
+        assert(f.FilterMaskIdLow==(CAN_RI0R_IDE|CAN_RI0R_RTR));
+    }
+    for (std::size_t bank=14;bank<28;++bank) {
+        const auto& f=installedFilters[bank];
+        assert(f.FilterBank==bank && f.SlaveStartFilterBank==14u);
+        assert(f.FilterMode==CAN_FILTERMODE_IDLIST && f.FilterScale==CAN_FILTERSCALE_32BIT);
+        assert(f.FilterFIFOAssignment==CAN_FILTER_FIFO0);
+        assert(f.FilterActivation==(bank==14?ENABLE:DISABLE));
+        assert(f.FilterIdHigh==(bank==14?0x4020u:0u));
+        assert(f.FilterMaskIdHigh==(bank==14?0x4040u:0u));
+        assert(f.FilterIdLow==0u && f.FilterMaskIdLow==0u);
     }
 
     assert(balancing_f446_can1_snapshot(&snapshot) && snapshot.rx_frames == 0u);
