@@ -1,6 +1,7 @@
 #pragma once
 #include "balancing_app_bridge.h"
 #include "balancing/app/ControlCycle.hpp"
+#include "balancing/app/DriveCycle.hpp"
 #include "balancing/app/PowerBoardService.hpp"
 #include "balancing/app/Can2ServiceLink.hpp"
 #include "balancing/app/RemoteControlService.hpp"
@@ -24,6 +25,9 @@ struct ApplicationObservation {
     DiagnosticSummary diagnostics{};
     Can2ServiceSummary can2{};
     std::optional<IndicatorState> indicator{};
+#if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
+    std::optional<DriveSilResult> driveSil{};
+#endif
 };
 
 /** @brief 主ループで最後の周期診断を取得。初期化前は空。
@@ -53,4 +57,30 @@ Can2ServiceLink* applicationCan2Link() noexcept;
  * @spec{BOARD-F446-001}
  */
 void serviceCan2ApplicationTx() noexcept;
+#if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
+/** @brief 人工の制御・通信設定。ホスト試験専用で実機バイナリには存在しない。
+ * @spec{BOARD-F446-001}
+ */
+struct DriveSilProfile {
+    Can2ObservationProfile communication{};
+    StateEstimatorConfig estimator{};
+    BalanceControlConfig controller{};
+    MotorCommandConfig converter{};
+    ArmTimeoutConfig arm{};
+    SequenceInterlocks interlocks{};
+    DriveSilConfig tx{};
+};
+/** @brief 模擬CAN起動前の一回限りのSIL設定。
+ * @spec{BOARD-F446-001}
+ */
+bool initializeDriveSil(const DriveSilProfile&) noexcept;
+/** @brief 起動済み模擬ランタイムの所有者をApplicationへ貸す。
+ * @spec{BOARD-F446-001}
+ */
+bool bindDriveSilRuntime(MotorService&,MotorCanLink&,CanTxScheduler&,CanTxScheduler&) noexcept;
+/** @brief 模擬CANの照合済み終端を周期統合に配送。
+ * @spec{BOARD-F446-001}
+ */
+void driveSilTerminal(CanBus,TxToken,CanTxOutcome,std::uint64_t atUs) noexcept;
+#endif
 }

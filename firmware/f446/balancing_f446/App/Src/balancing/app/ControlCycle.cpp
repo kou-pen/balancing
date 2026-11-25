@@ -88,7 +88,20 @@ ControlTickResult ControlCycle::step(const ControlTickInput& input) noexcept
         observed == FaultFlags::None && !input.operations.disarm) {
         // RobotSequenceを一周期に2回更新しないよう、数値計算の成否を
         // 先に得て同周期のobservedFaultsに合成する。MotorCommandは送信しない。
-        torques = control_.compute(*result.estimate, input.target);
+        auto reference=input.target;
+        if (input.movingTarget) {
+            const auto& target=*input.movingTarget;
+            reference.forwardVelocityMps=target.speed_m_s;
+            reference.yawRateRadS=target.yaw_rate_rad_s;
+            const auto measured=result.estimate->chassis.positionM;
+            // 停止時に旧位置への帰還を要求しない。走行時は今周期の実測dtで
+            // 基準を移動させる。係数や更新則の実機妥当性はSILとは別。
+            if (!movingPositionM_ || target.speed_m_s==0.0f) movingPositionM_=measured;
+            else *movingPositionM_+=target.speed_m_s*static_cast<float>(elapsed.count())*1e-6f;
+            reference.positionM=*movingPositionM_;
+        } else movingPositionM_.reset();
+        result.appliedReference=reference;
+        torques = control_.compute(*result.estimate, reference);
         if (torques) {
             const auto candidate = converter_.evaluate(*torques);
             if (candidate.status == CommandStatus::Ready ||
@@ -111,6 +124,8 @@ ControlTickResult ControlCycle::step(const ControlTickInput& input) noexcept
                result.sequence.state == RobotState::Fault) {
         // 非駆動状態の古いYaw積分・前回ARMの脚長目標を残さない。
         control_.reset();
+        movingPositionM_.reset();
+        result.appliedReference.reset();
     }
     return result;
 }

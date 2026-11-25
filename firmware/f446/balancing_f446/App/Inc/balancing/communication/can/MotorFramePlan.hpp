@@ -12,7 +12,7 @@ namespace balancing {
 
 /** @brief SILでのみ評価するCAN1 Type1×4・CAN2 0x200×1のフレーム集合。
  *  @note 停止用Type4は既存MotorCanLinkが所有し、この集合に入れない。
- *  @warning fixtureOnly=true固定。HAL/送信スケジューラへの登録APIはない。
+ *  @warning fixtureOnly=true固定。自身はHAL/送信スケジューラを持たない。模擬CANへの配送はホスト専用DriveCycle。
  *  @spec{PROTO-RS06-001}
  *  @spec{PROTO-C620-001}
  */

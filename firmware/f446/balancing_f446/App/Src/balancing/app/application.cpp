@@ -34,6 +34,15 @@ struct ObservationCycle {
           can2{power,remote,diagnostics,profile.communication}
     {}
 
+#if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
+    explicit ObservationCycle(const DriveSilProfile& p) noexcept
+        : remote{p.communication.operatorConfig},
+          diagnostics{p.communication.faultSlots,p.communication.faultCapacity,nullptr,0,
+                      p.communication.communication.tokenOrigin},
+          can2{power,remote,diagnostics,p.communication.communication},
+          estimator{p.estimator},sequence{p.arm},controller{p.controller},converter{p.converter}
+    {}
+#endif
     void breakTiming() noexcept
     {
         // 観測不能区間をまたぐdtは使わない。状態機械と車輪原点は維持する。
@@ -58,6 +67,29 @@ public:
         initialized_ = true;
     }
 
+#if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
+    bool initSil(const DriveSilProfile& profile) noexcept
+    {
+        if (initialized_ || observationClockUs() || profile.communication.communication.allowMockPowerRequests ||
+            profile.communication.communication.tokenOrigin==0xD000u ||
+            (profile.communication.faultCapacity && !profile.communication.faultSlots)) return false;
+        control_.emplace(profile);
+        if (!control_->can2.enabled()) { control_.reset(); return false; }
+        silProfile_=profile;
+        initialized_=true;
+        return true;
+    }
+    bool bindSil(MotorService& motors,MotorCanLink& link,CanTxScheduler& tx1,CanTxScheduler& tx2) noexcept
+    {
+        if (!silProfile_ || drive_) return false;
+        drive_.emplace(*control_->cycle,control_->sequence,motors,link,tx1,tx2,silProfile_->tx);
+        return true;
+    }
+    void silTerminal(CanBus b,TxToken t,CanTxOutcome r,std::uint64_t at) noexcept
+    {
+        if (drive_) drive_->onTxTerminal(b,t,r,at);
+    }
+#endif
     Can2ServiceLink* can2Link() noexcept
     {
         return control_ && control_->can2.enabled() ? &control_->can2 : nullptr;
@@ -81,6 +113,9 @@ public:
         observation_.operatorTarget.reset();
         observation_.indicator.reset();
         observation_.cycle.reset();
+#if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
+        observation_.driveSil.reset();
+#endif
         timing_.sample_valid = false;
         timing_.elapsed_valid = false;
         timing_.sampled_at_us = 0;
@@ -91,7 +126,10 @@ public:
             if (can2Link() && previousUs_) control_->can2.publishTelemetry({},*previousUs_);
             // 取得不能区間をまたいだ差分は一周期の実測値として公開しない。
             previousUs_.reset();
-            control_->breakTiming();
+#if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
+            if (!drive_)
+#endif
+                control_->breakTiming();
             return;
         }
         const auto nowUs = motors->motors.sampledAtUs;
@@ -99,19 +137,29 @@ public:
             if (nowUs == *previousUs_) {
                 control_->can2.publishTelemetry({},nowUs);
                 ++timing_.duplicate_samples;
+#if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
+                if (!drive_) return;
+#else
                 return;
+#endif
             }
             if (nowUs < *previousUs_) {
                 // 逆行した時計で正常な基準を巻き戻さない。
                 control_->can2.publishTelemetry({},*previousUs_);
                 ++timing_.clock_regressions;
+#if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
+                if (!drive_) return;
+#else
                 return;
+#endif
             }
-            timing_.elapsed_us = nowUs - *previousUs_;
-            timing_.elapsed_valid = true;
+            if (nowUs>*previousUs_) {
+                timing_.elapsed_us = nowUs - *previousUs_;
+                timing_.elapsed_valid = true;
+            }
         }
         // 初回は採取時刻だけ有効。次の異なる時刻が来て初めて差分を得る。
-        previousUs_ = nowUs;
+        if (!previousUs_ || nowUs>*previousUs_) previousUs_ = nowUs;
         timing_.sampled_at_us = nowUs;
         timing_.sample_valid = true;
         // 同じCAN回収時刻でIMUを評価し、その周期のコピーを固定する。
@@ -129,11 +177,31 @@ public:
         // 電源・PS5・機構・校正・ゲイン・限界が未検証なので、既定の
         // interlocks=false / mechanism=Unverified / operator空を維持。
         // 初回・取得不能直後はfirstElapsed=0で推定を拒否する。
-        observation_.cycle = control_->cycle->step(input);
+#if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
+        if (drive_) {
+            input.interlocks=silProfile_->interlocks;
+            input.interlocks.powerReady &= observation_.power.ready;
+            input.interlocks.motorsReady &= motors->rs06MappingVerified;
+            // profile側の一括readyだけで、未検証の個別ゲインを有効とみなさない。
+            const auto& cfg=silProfile_->controller;
+            input.interlocks.modelVerified &= cfg.lqr.verified && cfg.legPd.verified && cfg.yawPi.verified;
+            observation_.operatorTarget=control_->remote.update(control_->sequence.state(),nowUs);
+            input.movingTarget=observation_.operatorTarget.value_or(BOperatorTarget{});
+            observation_.driveSil=drive_->step(input);
+            observation_.cycle=observation_.driveSil->control;
+            // 同一時刻のモード切替でのみゼロを確定。C11は同時刻でslewを進めない。
+            if (control_->sequence.state()!=RobotState::Balancing)
+                observation_.operatorTarget=control_->remote.update(control_->sequence.state(),nowUs);
+        } else
+#endif
+            observation_.cycle = control_->cycle->step(input);
         control_->can2.completeCycle(observation_.cycle->sequence,nowUs);
         observation_.fault = control_->sequence.currentFault();
         // 現在状態で操作目標を評価するが、位置基準やARMは未接続。
-        observation_.operatorTarget = control_->remote.update(control_->sequence.state(), nowUs);
+#if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
+        if (!drive_)
+#endif
+            observation_.operatorTarget = control_->remote.update(control_->sequence.state(), nowUs);
         control_->diagnostics.updateStatus({nowUs,control_->sequence.state(),observation_.fault});
         observation_.diagnostics = control_->diagnostics.summary();
         observation_.can2 = control_->can2.summary();
@@ -155,6 +223,9 @@ public:
             return;
         }
         // 受信・状態機械の更新後に背景送信を1件だけ試行する。
+#if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
+        if (drive_) if (const auto now=observationClockUs()) drive_->poll(*now);
+#endif
         if (can2Link()) serviceCan2ApplicationTx();
     }
 
@@ -218,6 +289,10 @@ private:
         control_->can2.publishTelemetry(frames,nowUs);
     }
 
+#if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
+    std::optional<DriveSilProfile> silProfile_{};
+    std::optional<DriveCycle> drive_{};
+#endif
     ApplicationObservation observation_{};
     std::optional<ObservationCycle> control_{};
     std::optional<std::uint64_t> previousUs_{};
@@ -226,6 +301,14 @@ private:
 
 // 静的に一つだけ保持。malloc/newも静的初期化時のHAL利用も行わない。
 Application application;
+
+#if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
+bool initializeDriveSil(const DriveSilProfile& p) noexcept { return application.initSil(p); }
+bool bindDriveSilRuntime(MotorService& m,MotorCanLink& l,CanTxScheduler& a,CanTxScheduler& b) noexcept
+{ return application.bindSil(m,l,a,b); }
+void driveSilTerminal(CanBus b,TxToken t,CanTxOutcome r,std::uint64_t at) noexcept
+{ application.silTerminal(b,t,r,at); }
+#endif
 
 bool initializeCan2Observation(const Can2ObservationProfile& profile) noexcept
 {
