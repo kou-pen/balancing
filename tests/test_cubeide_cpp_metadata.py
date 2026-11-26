@@ -12,7 +12,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from tools.sync_cubeide_cpp import PROJECT, cxx_metadata
-from tools.verify_f446_build import SOURCES, verify_configuration
+from tools.verify_f446_build import (SOURCES, verify_configuration, verify_mode_symbols,
+                                     NORMAL_SYMBOLS, BENCH_SYMBOLS, FORBIDDEN_SYMBOLS)
 
 
 class CubeIdeMetadataTests(unittest.TestCase):
@@ -27,7 +28,7 @@ class CubeIdeMetadataTests(unittest.TestCase):
                 "com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler."
                 "option.languagestandard.value.gnupp17"
             ),
-            2,
+            3,
         )
         self.assertEqual(cxx_metadata(self.project, self.cproject)[1], self.cproject)
 
@@ -37,7 +38,7 @@ class CubeIdeMetadataTests(unittest.TestCase):
         for language in ("c", "cpp"):
             compiler = prefix + language + ".compiler"
             tools = root.findall(f'.//tool[@superClass="{compiler}"]')
-            self.assertEqual(len(tools), 2)
+            self.assertEqual(len(tools), 3)
             for tool in tools:
                 with self.subTest(tool=tool.get("id")):
                     option = tool.find(f'./option[@superClass="{compiler}.option.includepaths"]')
@@ -64,7 +65,7 @@ class CubeIdeMetadataTests(unittest.TestCase):
             r'[^>]*>.*?</option>'
         )
         stale, count = re.subn(option, "", self.cproject, flags=re.DOTALL)
-        self.assertEqual(count, 2)
+        self.assertEqual(count, 3)
         repaired = cxx_metadata(self.project, stale)[1]
         self.assert_app_includes(repaired)
         self.assert_cpp_hal_options(repaired)
@@ -74,7 +75,7 @@ class CubeIdeMetadataTests(unittest.TestCase):
         root = ET.fromstring(cproject)
         compiler = "com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler"
         tools = root.findall(f'.//tool[@superClass="{compiler}"]')
-        self.assertEqual(len(tools), 2)
+        self.assertEqual(len(tools), 3)
         expected = {
             "includepaths": {
                 "../Core/Inc",
@@ -100,7 +101,7 @@ class CubeIdeMetadataTests(unittest.TestCase):
             r'[^>]*>.*?</option>'
         )
         stale, count = re.subn(option, "", self.cproject, flags=re.DOTALL)
-        self.assertEqual(count, 2)
+        self.assertEqual(count, 3)
         repaired = cxx_metadata(self.project, stale)[1]
         self.assert_cpp_hal_options(repaired)
         self.assertEqual(cxx_metadata(self.project, repaired)[1], repaired)
@@ -139,13 +140,13 @@ class CubeIdeMetadataTests(unittest.TestCase):
                 self.assertFalse((inc / Path(relative).name).exists())
 
     def test_both_cpp_linkers_explicitly_link_math_library(self) -> None:
-        self.assertEqual(self.cproject.count('<listOptionValue builtIn="false" value="m"/>'), 2)
+        self.assertEqual(self.cproject.count('<listOptionValue builtIn="false" value="m"/>'), 3)
         self.assertEqual(cxx_metadata(self.project, self.cproject)[1], self.cproject)
 
     def test_regeneration_loss_of_math_library_is_repaired(self) -> None:
         stale = self.cproject.replace('<listOptionValue builtIn="false" value="m"/>', "")
         repaired = cxx_metadata(self.project, stale)[1]
-        self.assertEqual(repaired.count('value="m"'), 2)
+        self.assertEqual(repaired.count('value="m"'), 3)
         self.assertEqual(cxx_metadata(self.project, repaired)[1], repaired)
 
     def test_regeneration_loss_is_repaired(self) -> None:
@@ -155,9 +156,9 @@ class CubeIdeMetadataTests(unittest.TestCase):
             r"compiler\.option\.languagestandard\")[^>]*/>"
         )
         regenerated, count = re.subn(option_pattern, "", self.cproject)
-        self.assertEqual(count, 2)
+        self.assertEqual(count, 3)
         repaired = cxx_metadata(self.project, regenerated)[1]
-        self.assertEqual(repaired.count("value.gnupp17"), 2)
+        self.assertEqual(repaired.count("value.gnupp17"), 3)
         self.assertEqual(cxx_metadata(self.project, repaired)[1], repaired)
 
     def test_previous_gnupp14_setting_is_repaired(self) -> None:
@@ -165,6 +166,44 @@ class CubeIdeMetadataTests(unittest.TestCase):
         self.assertNotEqual(stale, self.cproject)
         repaired = cxx_metadata(self.project, stale)[1]
         self.assertEqual(repaired, self.cproject)
+
+
+    def test_bench_mode_is_exclusive_and_restorable(self) -> None:
+        blocks = ET.fromstring(self.cproject).findall(".//cconfiguration")
+        for block in blocks:
+            cfg=block.find(".//configuration")
+            name=cfg.get("name")
+            symbols=[v.get("value") for v in block.findall(".//listOptionValue")]
+            self.assertEqual(symbols.count("BALANCING_BENCH_BUILD"),2 if name=="BenchDebug" else 0)
+            if name=="BenchDebug":
+                self.assertEqual(cfg.get("artifactName"),"balancing_f446_bench")
+        missing=self.cproject.replace('<listOptionValue builtIn="false" value="BALANCING_BENCH_BUILD"/>',"")
+        repaired=cxx_metadata(self.project,missing)[1]
+        self.assertEqual(repaired.count('value="BALANCING_BENCH_BUILD"'),2)
+        blocks=re.findall(r'<cconfiguration\b[^>]*>.*?</cconfiguration>',self.cproject,re.S)
+        bench=next(b for b in blocks if 'name="BenchDebug"' in b)
+        restored=cxx_metadata(self.project,self.cproject.replace(bench,""))[1]
+        self.assertEqual(restored.count('name="BenchDebug"'),2)
+        self.assertIn('version="4.0.0"',restored)
+        normal=next(b for b in blocks if 'name="Release"' in b)
+        bad=normal.replace('value="USE_HAL_DRIVER"','value="BALANCING_BENCH_BUILD"',1)
+        with self.assertRaises(ValueError):
+            cxx_metadata(self.project,self.cproject.replace(normal,bad))
+
+
+class CubeIdeModeSymbolTests(unittest.TestCase):
+    def test_symbol_isolation(self) -> None:
+        normal="\n".join("08000000 T "+x for x in NORMAL_SYMBOLS)+"\n"
+        bench="\n".join("08000000 T "+x for x in BENCH_SYMBOLS)+"\n"
+        self.assertEqual(verify_mode_symbols(normal,"Debug"),[])
+        self.assertEqual(verify_mode_symbols(normal,"Release"),[])
+        self.assertEqual(verify_mode_symbols(bench,"BenchDebug"),[])
+        self.assertTrue(verify_mode_symbols(normal+bench,"BenchDebug"))
+        self.assertTrue(verify_mode_symbols(normal+bench,"Debug"))
+        for x in FORBIDDEN_SYMBOLS:
+            self.assertTrue(verify_mode_symbols(bench+"08000000 T "+x,"BenchDebug"))
+        self.assertTrue(verify_mode_symbols("","BenchDebug"))
+        self.assertTrue(verify_mode_symbols(bench.replace(" T balancing_f446_bench_start"," T _GLOBAL__sub_I_balancing_f446_bench_start"),"BenchDebug"))
 
 
 class CubeIdeBuildArtifactTests(unittest.TestCase):
@@ -299,6 +338,7 @@ class CubeIdeManagedRegenerationTests(unittest.TestCase):
             )
             self.assertIn("-cleanBuild balancing_f446/Debug", result.stdout)
             self.assertIn("-cleanBuild balancing_f446/Release", result.stdout)
+            self.assertIn("-cleanBuild balancing_f446/BenchDebug", result.stdout)
             self.assertIn("DRY RUN: CubeIDE not started", result.stdout)
             self.assertFalse(workspace.exists())
 
