@@ -32,7 +32,7 @@ CAN2通信と通常運転の周期経路をホストで結合済み。次はDual
 |---:|---|---|---|
 | 1 | CAN2通信統合 | 電源・Pi操作・診断の配送と応答、フィルタ・背景送信の接続を模擬CANで確認済み（[検証](../verification/f446-can2-service-integration-host.md)）。実機設定は未確定 | T-PROTO-05/06/09/11、T-F446-05/06 |
 | 2 | Applicationと通常モータ駆動統合 | 一周期の入力から制御・6軸指令・送信終端、無効化・ゼロ・異常停止のSILを確認済み（[検証](../verification/f446-drive-cycle-sil.md)）。実機は未実施 | T-F446-03/04/08〜11、T-CTRL-11 |
-| 3 | DualSense操作 | USB報告から操作目標、切断・復帰・ニュートラルと手動ARM条件 | T-F446-06、T-PROTO-07 |
+| 3 | DualSense操作 | 完了済みUSB報告から操作目標・切断復帰・ARM/DISARMのホストSILを確認（[検証](../verification/f446-dualsense-input-host.md)）。実USB Host列挙は未接続 | T-F446-06、T-PROTO-07 |
 | 4 | 表示・診断 | LED/Buzzerの物理I/O境界、非ブロッキングログ、診断CAN | T-F446-05、T-PROTO-11 |
 | 5 | 安全保護・IWDG | 周期停止・通信異常・非常停止を故障注入で検証。実機安全閾値は推測しない | T-F446-07/12、T-CTRL-10、T-VERIFY-07〜10 |
 | 6 | 実機モデル・LQR計算 | CAD定数を入力できるモデル、再現可能なゲイン計算・制限付きシミュレーション | T-CTRL-01〜10、T-VERIFY-02/03/16 |

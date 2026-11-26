@@ -613,3 +613,20 @@ flowchart TD
 ```
 
 ホスト専用。ARMバイナリの通常駆動経路にはしない。未受付の旧周期は破棄、受付済みは中止を要求し終端を照合する。
+
+
+## DualSense USB操作
+
+```mermaid
+flowchart LR
+    H["完了済みUSB報告（模擬）"] --> U["UsbHidInput：世代・連番"]
+    U --> C["DualSenseHidCodec"]
+    C --> D["DualSenseService"]
+    D --> R["RemoteControlService：速度・中立復帰"]
+    D --> A["Application：ARM/DISARM"]
+    CAN["CAN2操作・非常停止"] --> A
+    R --> A
+    A --> S["RobotSequence"]
+```
+
+実USB Hostは未接続。既定設定では入力無効。CAN2操作元選択を先に確定し、非常停止・DISARMをARMより優先する。

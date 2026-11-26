@@ -226,3 +226,16 @@ ApplicationはMotorObservationSnapshotとImuAttitudeを同じ周期時刻で固�
 `BALANCING_HOST_SIL` かつ非ARM/ThumbビルドでのみDriveCycleとApplication結合入口が存在する。C ABIの既定起動は非駆動のまま。実機にfixtureを昇格させない。送信中止は終端が来るまで物理的な取消を意味しない。
 
 [検証記録](../verification/f446-drive-cycle-sil.md)。
+
+
+## DualSense USB入力境界
+
+| API | 責務 |
+|---|---|
+| `DualSenseHidCodec::decode(data, length)` | 明示したID・長さ・軸・ボタン配置を検査、SI操作量に復号 |
+| `UsbHidInput::connect/disconnect/receive` | 主ループで転送完了を世代・連番・採取時刻で確認。欠落時は連続性無効 |
+| `DualSenseService::takeEvents(nowUs)` | 新規報告で成立した長押しを一度だけ回収。ARMは選択元に限定、DISARM優先 |
+| `applicationDualSense()` | 明示設定済みの入力入口、既定は空 |
+| `selectApplicationUsbSource(target, nowUs)` | USB側からの明示選択要求を現在のRobotSequenceで評価。割当は未確定 |
+
+USB受信完了通知は主ループに配送し、再読出し時刻で鮮度を更新しない。既存RemoteControlServiceに速度目標・中立復帰・変化率を委ねる。実USB Host列挙・HIDドライバは未接続。[検証記録](../verification/f446-dualsense-input-host.md)。
