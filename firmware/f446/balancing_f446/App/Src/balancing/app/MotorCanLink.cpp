@@ -23,13 +23,6 @@ Rs06TxToken decodeToken(TxToken token) noexcept
     return {static_cast<std::uint8_t>(token.origin & kMotorIdMask), token.serial};
 }
 
-CanFrame toCanFrame(const BMotorCanFrame& source) noexcept
-{
-    CanFrame frame{source.id, {}, source.dlc, source.extended};
-    std::copy_n(source.data, frame.data.size(), frame.data.begin());
-    return frame;
-}
-
 Rs06TxResult toRs06Outcome(CanTxOutcome outcome) noexcept
 {
     switch (outcome) {
@@ -60,7 +53,7 @@ void MotorCanLink::submitPending(std::uint64_t nowUs) noexcept
         }
         const auto& request = *requests[axis];
         const auto token = encodeToken(request.token);
-        const auto frame = toCanFrame(request.frame);
+        const auto& frame = request.frame;
 
         if (request.command == Rs06Command::Stop) {
             // 専用枠に入れてからハード受付まで、MotorServiceは同じ候補を返す。
@@ -117,12 +110,10 @@ void MotorCanLink::onCanReceive(CanBus bus, CanRxTarget target, const CanFrame& 
     if (!rs06 && !knownWheel) {
         return;
     }
-    BMotorCanFrame report{frame.id, {}, frame.dlc, frame.extended};
-    std::copy(frame.data.begin(), frame.data.end(), report.data);
     if (rs06) {
-        motors_.onRs06Frame(report, atUs);
+        motors_.onRs06Frame(frame, atUs);
     } else if (knownWheel) {
-        motors_.onC620Frame(report, atUs);
+        motors_.onC620Frame(frame, atUs);
     }
 }
 

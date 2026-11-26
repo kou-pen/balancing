@@ -11,18 +11,6 @@ constexpr std::uint64_t kEnableTimeoutUs=150000u,kControlGapUs=6000u;
 constexpr std::uint32_t kBenchOrigin=0xB000u;
 bool elapsed(std::uint64_t now,std::uint64_t at,std::uint64_t duration) noexcept
 { return now>=at && now-at>=duration; }
-CanFrame convert(const BMotorCanFrame& raw) noexcept
-{
-    CanFrame frame{raw.id,{},raw.dlc,raw.extended};
-    std::copy_n(raw.data,8,frame.data.begin());
-    return frame;
-}
-BMotorCanFrame convert(const CanFrame& frame) noexcept
-{
-    BMotorCanFrame raw{frame.id,{},frame.dlc,frame.extended};
-    std::copy(frame.data.begin(),frame.data.end(),raw.data);
-    return raw;
-}
 Rs06TxResult outcome(CanTxOutcome result) noexcept
 {
     if (result==CanTxOutcome::Sent) return Rs06TxResult::Completed;
@@ -89,26 +77,27 @@ void MotorBench::cancel() noexcept { stop(false); }
 void MotorBench::submitStop(std::uint64_t now) noexcept
 {
     if (pending_) return;
-    BMotorCanFrame raw{};
+    CanFrame raw{};
     std::optional<Rs06TxToken> rsToken;
     if (bus()==CanBus::Can1) {
         const auto request=rs06_.nextRequest();
         if (!request || request->command!=Rs06Command::Stop) return;
         raw=request->frame; rsToken=request->token;
     } else {
-        const float zero[4]{};
-        if (!b_c620_current_frame(zero,config_.limit,&raw)) { stop(true); return; }
+        const auto zero=C620Codec::encodeCurrent({},config_.limit);
+        if (!zero) { stop(true); return; }
+        raw=*zero;
     }
     if (serial_==std::numeric_limits<std::uint64_t>::max()) { stop(true); return; }
     const TxToken token{++serial_,kBenchOrigin};
     // 停止は通常送信と独立した優先枠。失敗後は新トークンで再登録する。
-    if (scheduler_.enqueueStop(0,convert(raw),token)==StopEnqueueResult::Queued)
+    if (scheduler_.enqueueStop(0,raw,token)==StopEnqueueResult::Queued)
         pending_=Pending{token,TxKind::Stop,rsToken,now,false,false};
     else stop(true);
     if (pending_ && bus()==CanBus::Can2) lastDue_=now;
 }
 
-void MotorBench::submitDrive(const BMotorCanFrame& raw,TxKind kind,
+void MotorBench::submitDrive(const CanFrame& raw,TxKind kind,
     std::optional<Rs06TxToken> rsToken,std::uint64_t now) noexcept
 {
     if (pending_ || serial_==std::numeric_limits<std::uint64_t>::max()) {
@@ -117,7 +106,7 @@ void MotorBench::submitDrive(const BMotorCanFrame& raw,TxKind kind,
     }
     const TxToken token{++serial_,kBenchOrigin};
     // 未受付の非ゼロは保存しない。次の周期に現在状態から作り直す。
-    const auto result=scheduler_.trySubmit(convert(raw),token,now);
+    const auto result=scheduler_.trySubmit(raw,token,now);
     if (result==CanTxSubmitResult::Accepted) {
         pending_=Pending{token,kind,rsToken,now,true,false};
         if (rsToken) rs06_.onTxResult(*rsToken,Rs06TxResult::Accepted,now);
@@ -175,13 +164,12 @@ void MotorBench::poll(std::uint64_t now) noexcept
                 if (r->command==Rs06Command::Enable) submitDrive(r->frame,TxKind::Enable,r->token,now);
         } else if (state_==BenchState::Pulsing && due) {
             lastDue_=now;
-            BMotorCanFrame raw{};
-            float current[4]{};
+            std::array<float,4> current{};
             if (bus()==CanBus::Can2) current[config_.motorId-1u]=output_;
-            const bool encoded=bus()==CanBus::Can1?
-                b_rs06_torque_frame(config_.motorId,output_,&raw):
-                b_c620_current_frame(current,config_.limit,&raw);
-            if (encoded) submitDrive(raw,TxKind::Pulse,{},now);
+            const auto encoded=bus()==CanBus::Can1?
+                Rs06Codec::encodeTorque(config_.motorId,output_):
+                C620Codec::encodeCurrent(current,config_.limit);
+            if (encoded) submitDrive(*encoded,TxKind::Pulse,{},now);
             else stop(true);
         } else if (bus()==CanBus::Can2 && due &&
                    (state_==BenchState::Idle || (state_==BenchState::Fault && stopSent_))) {
@@ -203,22 +191,21 @@ void MotorBench::poll(std::uint64_t now) noexcept
 void MotorBench::onCanReceive(CanBus b,CanRxTarget,const CanFrame& frame,std::uint64_t at) noexcept
 {
     if (b!=bus()) return;
-    const auto raw=convert(frame);
     if (b==CanBus::Can1) {
         // IDの軸/主機とType2/24を照合。他軸を試運転に混ぜない。
         if (!frame.extended || ((frame.id>>8u)&0xffu)!=config_.motorId ||
             (frame.id&0xffu)!=config_.hostId ||
             (frame.id>>24u!=2u && frame.id>>24u!=24u)) return;
-        const auto feedback=Rs06Codec::decodeFeedback(raw);
+        const auto feedback=Rs06Codec::decodeFeedback(frame);
         if (!feedback || !rs06_.onFeedback(*feedback,at) || feedback->faultBits) stop(true);
     } else if (!frame.extended && frame.id==0x200u+config_.motorId) {
         // 3/4番の試運転も可能。通常ロボットの2軸分類に依存しない。
-        BC620Feedback feedback{};
-        if (!b_c620_parse_feedback(&raw,&feedback)) stop(true);
+        const auto feedback=C620Codec::decodeFeedback(frame);
+        if (!feedback) stop(true);
         else {
             const auto previous=c620_.feedback(at).latest;
             if (previous && at<previous->receivedAtUs) stop(true);
-            else c620_.onFeedback(feedback,at);
+            else c620_.onFeedback(*feedback,at);
         }
     }
 }

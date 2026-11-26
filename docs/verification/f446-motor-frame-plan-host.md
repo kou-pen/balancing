@@ -1,5 +1,7 @@
 # 6軸CANフレーム構築・2バス優先順位（SIL）
 
+> 旧実装の記録を含む。現在のモータ通信型とCodecは [C++統合検証](../verification/f446-motor-codecs-cpp.md) を参照。
+
 **対象:** PROTO-RS06-001 / PROTO-C620-001 / BOARD-F446-001 / BEHAV-001、Issue #5/#11/#27。  
 **ベース:** PR #48統合後の `master` `d176de3`。ハードウェアには接続しない。
 

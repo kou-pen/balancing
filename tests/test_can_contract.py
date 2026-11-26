@@ -103,8 +103,8 @@ class CanContractTests(unittest.TestCase):
     def test_codec_quantization_drift(self) -> None:
         errors = self.changed(
             CODEC,
-            "#define C620_PROTOCOL_CURRENT_RAW 16384.0f",
-            "#define C620_PROTOCOL_CURRENT_RAW 8192.0f",
+            "constexpr float kProtocolCurrentRaw = 16384.0f",
+            "constexpr float kProtocolCurrentRaw = 8192.0f",
         )
         self.assertTrue(any("current raw scale" in err for err in errors))
 

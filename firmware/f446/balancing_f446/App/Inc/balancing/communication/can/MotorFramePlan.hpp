@@ -1,7 +1,8 @@
 #pragma once
 
 #include "balancing/app/RobotSequence.hpp"
-#include "balancing/communication/balancing_motor_can.h"
+#include "balancing/communication/Rs06Codec.hpp"
+#include "balancing/communication/C620Codec.hpp"
 #include "balancing/control/controller/MotorCommand.hpp"
 
 #include <array>
@@ -26,9 +27,9 @@ struct MotorFramePreview {
     };
 
     Status status{Status::NotDriveAllowed};
-    std::array<BMotorCanFrame, 4> can1Type1{};
+    std::array<CanFrame, 4> can1Type1{};
     std::size_t can1Count{0};
-    BMotorCanFrame can2Current{};
+    CanFrame can2Current{};
     bool fixtureOnly{true};
 };
 

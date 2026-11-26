@@ -19,7 +19,7 @@ enum class Rs06TxResult : std::uint8_t {
 struct Rs06TxRequest {
     Rs06TxToken token;
     Rs06Command command;
-    BMotorCanFrame frame;
+    CanFrame frame;
 };
 
 enum class Rs06EnableStatus : std::uint8_t { Pending, Confirmed, Failed };

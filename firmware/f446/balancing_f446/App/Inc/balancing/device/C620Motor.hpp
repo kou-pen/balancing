@@ -1,6 +1,6 @@
 #pragma once
 
-#include "balancing/communication/balancing_motor_can.h"
+#include "balancing/communication/C620Codec.hpp"
 
 #include <cstdint>
 #include <optional>
@@ -21,7 +21,7 @@ enum class C620ContinuityStatus : std::uint8_t {
 };
 
 struct C620FeedbackSample {
-    BC620Feedback report;
+    C620Feedback report;
     std::uint64_t receivedAtUs;
     std::uint64_t sequence{0}; // 受理順。同一IRQ時刻でも別報告を識別する
 };
@@ -59,7 +59,7 @@ public:
      *  @pre 主ループから軸別の到着順に呼ぶ。
      *  @spec{PROTO-C620-001}
      */
-    void onFeedback(const BC620Feedback& report, std::uint64_t receivedAtUs) noexcept;
+    void onFeedback(const C620Feedback& report, std::uint64_t receivedAtUs) noexcept;
 
     /** @brief 最新報告、通信鮮度、連続性が成立した累積位置をコピーする。
      *  @param[in] nowUs 周期の評価時刻 [us]。

@@ -44,9 +44,9 @@ void C620Motor::invalidateContinuity() noexcept
     lose(C620ContinuityStatus::TransportLost);
 }
 
-void C620Motor::onFeedback(const BC620Feedback& report, std::uint64_t receivedAtUs) noexcept
+void C620Motor::onFeedback(const C620Feedback& report, std::uint64_t receivedAtUs) noexcept
 {
-    if (report.encoder_raw >= encoderCounts) {
+    if (report.encoderRaw >= encoderCounts) {
         lose(C620ContinuityStatus::InvalidValue);
         return;
     }
@@ -74,7 +74,7 @@ void C620Motor::onFeedback(const BC620Feedback& report, std::uint64_t receivedAt
         if (receivedAtUs - latest_->receivedAtUs >= config_.maxCaptureGapUs) {
             lose(C620ContinuityStatus::GapExceeded);
         } else {
-            int delta = static_cast<int>(report.encoder_raw) - latest_->report.encoder_raw;
+            int delta = static_cast<int>(report.encoderRaw) - latest_->report.encoderRaw;
             if (delta > halfTurn) delta -= encoderCounts;
             else if (delta < -halfTurn) delta += encoderCounts;
             if (delta == halfTurn || delta == -halfTurn) {

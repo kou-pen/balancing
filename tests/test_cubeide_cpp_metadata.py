@@ -126,7 +126,8 @@ class CubeIdeMetadataTests(unittest.TestCase):
     def test_public_headers_mirror_source_modules(self) -> None:
         expected = (
             "balancing/bench/MotorBench.hpp",
-            "balancing/communication/balancing_motor_can.h",
+            "balancing/communication/Rs06Codec.hpp",
+            "balancing/communication/C620Codec.hpp",
             "balancing/communication/can/CanTxScheduler.hpp",
             "balancing/control/controller/balancing_core.h",
         )

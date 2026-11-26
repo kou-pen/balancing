@@ -34,19 +34,13 @@ for label, flags in [
     print(f"[{label}] 実行", flush=True)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
-motor_common = [
-    "gcc",
-    "-std=c11",
-    "-Wall",
-    "-Wextra",
-    "-Werror",
-    "-pedantic",
-    "-I",
-    str(F446_APP / "Inc"),
-    str(F446_APP / "Src" / "balancing" / "communication" / "balancing_motor_can.c"),
-    str(ROOT / "tests" / "test_motor_can.c"),
-    "-lm",
+motor_codec_sources = [
+    str(F446_APP / "Src/balancing/communication/Rs06Codec.cpp"),
+    str(F446_APP / "Src/balancing/communication/C620Codec.cpp"),
 ]
+motor_common = ["g++","-std=c++17","-Wall","-Wextra","-Werror","-pedantic",
+    "-I",str(F446_APP / "Inc"), *motor_codec_sources,
+    str(ROOT / "tests/test_motor_can.cpp"), "-lm"]
 for label, flags in [
     ("CAN通常ビルド", []),
     ("CAN未定義動作検査", ["-fsanitize=undefined", "-fno-sanitize-recover=all"]),
@@ -228,19 +222,14 @@ for label, flags in [
     print(f"[{label}] 実行", flush=True)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
-# C11のcodecをgccでコンパイルし、C++17の4軸ハンドシェイクとリンクする。
-rs06_source = F446_APP / "Src" / "balancing"
-rs06_codec_common = [
-    "gcc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
-    "-I", str(F446_APP / "Inc"), "-c",
-    str(rs06_source / "communication" / "balancing_motor_can.c"),
-]
+# C++モータcodecを共通利用する4軸ハンドシェイク。
+rs06_source = F446_APP / "Src/balancing"
 rs06_service_sources = [
     str(rs06_source / "app" / "RobotSequence.cpp"),
     str(rs06_source / "app" / "MotorService.cpp"),
     str(rs06_source / "device" / "Rs06Motor.cpp"),
     str(rs06_source / "device" / "C620Motor.cpp"),
-    str(rs06_source / "communication" / "Rs06Codec.cpp"),
+    *motor_codec_sources,
 ]
 rs06_service_common = [
     "g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
@@ -254,16 +243,13 @@ for suffix, flags in [
     ("", []),
     ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"]),
 ]:
-    codec = OUT / f"motor_service_rs06_codec{suffix}.o"
-    subprocess.run(rs06_codec_common + flags + ["-o", str(codec)],
-                   check=True, cwd=ROOT, timeout=30)
     for test, extra_sources in (("test_motor_service_rs06", []),
                                 ("test_f446_can_port", can1_sources)):
         path = OUT / f"{test}{suffix}"
         print(f"[{test}{suffix}] コンパイル", flush=True)
         source = ROOT / "tests" / f"{test}.cpp"
         subprocess.run(rs06_service_common + extra_sources + flags +
-                       [str(source), str(codec), "-lm", "-o", str(path)],
+                       [str(source), "-lm", "-o", str(path)],
                        check=True, cwd=ROOT, timeout=30)
         subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
@@ -283,12 +269,12 @@ for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-saniti
         str(rs06_source / "communication/can/CanRouter.cpp"),
         str(rs06_source / "communication/can/ProtocolId.cpp"),
         str(rs06_source / "communication/can/CanTxScheduler.cpp"),
-        str(rs06_source / "communication/Rs06Codec.cpp"),
+        *motor_codec_sources,
         str(rs06_source / "device/Rs06Motor.cpp"),
         str(rs06_source / "device/C620Motor.cpp"),
         str(rs06_source / "bench/MotorBench.cpp"),
         str(ROOT / "tests/test_motor_bench.cpp"),
-        str(OUT / f"motor_service_rs06_codec{suffix}.o"), "-lm",
+        "-lm",
     ] + flags + ["-o", str(executable)], check=True, cwd=ROOT, timeout=30)
     subprocess.run([str(executable)], check=True, cwd=ROOT, timeout=30)
 
@@ -304,7 +290,7 @@ for test, extra_sources in [
         source = ROOT / "tests" / f"{test}.cpp"
         link_libraries = []
         if test in ("test_f446_can_event_poll", "test_f446_can1_runtime"):
-            link_libraries = [str(OUT / f"motor_service_rs06_codec{suffix}.o"), "-lm"]
+            link_libraries = ["-lm"]
         link_libraries += app_math_objects[suffix]
         if test == "test_f446_can_event_poll":
             attitude = OUT / f"integrated_attitude{suffix}.o"
@@ -328,8 +314,7 @@ for test, extra_sources in [
                 subprocess.run([str(path), mode], check=True, cwd=ROOT, timeout=30)
 
 
-# C++17 wheel odometry: C11 C620 decode -> MotorService -> wheel positions.
-# Link the same C11 codec object as the RS06 host test rather than compiling C as C++.
+# C++17 wheel odometry: C620Codec -> MotorService -> wheel positions.
 for suffix, flags in [
     ("", []),
     ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"]),
@@ -337,10 +322,9 @@ for suffix, flags in [
     path = OUT / f"test_f446_wheel_odometry{suffix}"
     source = ROOT / "tests" / "test_f446_wheel_odometry.cpp"
     wheel_source = rs06_source / "control" / "estimator" / "WheelOdometry.cpp"
-    codec = OUT / f"motor_service_rs06_codec{suffix}.o"
     print(f"[test_f446_wheel_odometry{suffix}] コンパイル", flush=True)
     subprocess.run(rs06_service_common + [str(wheel_source)] + flags +
-                   [str(source), str(codec), "-lm", "-o", str(path)],
+                   [str(source), "-lm", "-o", str(path)],
                    check=True, cwd=ROOT, timeout=30)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
@@ -358,7 +342,6 @@ for suffix, flags in [
         str(rs06_source / "control" / "estimator" / "WheelOdometry.cpp"),
         str(ROOT / "tests" / "test_f446_state_estimator.cpp"),
     ]
-    codec = OUT / f"motor_service_rs06_codec{suffix}.o"
     # Use the same C11 math and attitude implementations already in the repo;
     # compile C11 with gcc instead of attempting to compile C as C++17.
     c_math = OUT / f"estimator_c_math{suffix}.o"
@@ -376,7 +359,7 @@ for suffix, flags in [
     print(f"[test_f446_state_estimator{suffix}] コンパイル", flush=True)
     subprocess.run(
         rs06_service_common + sources + flags +
-        [str(codec), str(c_math), str(c_attitude), "-lm", "-o", str(path)],
+        [str(c_math), str(c_attitude), "-lm", "-o", str(path)],
         check=True, cwd=ROOT, timeout=30,
     )
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
@@ -397,7 +380,6 @@ for suffix, flags in [
         str(rs06_source / "control" / "estimator" / "WheelOdometry.cpp"),
         str(ROOT / "tests" / "test_f446_sil_control_cycle.cpp"),
     ]
-    codec = OUT / f"motor_service_rs06_codec{suffix}.o"
     c_math = OUT / f"estimator_c_math{suffix}.o"
     c_attitude = OUT / f"estimator_c_attitude{suffix}.o"
     c_ctrl = OUT / f"sil_control_core{suffix}.o"
@@ -417,7 +399,7 @@ for suffix, flags in [
     print(f"[test_f446_sil_control_cycle{suffix}] コンパイル", flush=True)
     subprocess.run(
         rs06_service_common + sources + flags +
-        [str(codec), str(c_math), str(c_attitude), str(c_ctrl),
+        [str(c_math), str(c_attitude), str(c_ctrl),
          str(c_pd), str(c_yaw), "-lm", "-o", str(path)],
         check=True, cwd=ROOT, timeout=30,
     )
@@ -451,12 +433,11 @@ for suffix, flags in [
         str(rs06_source / "control" / "controller" / "MotorCommand.cpp"),
         str(ROOT / "tests" / "test_f446_motor_frame_plan.cpp"),
     ]
-    codec = OUT / f"motor_service_rs06_codec{suffix}.o"
     print(f"[test_f446_motor_frame_plan{suffix}] コンパイル", flush=True)
     subprocess.run(
         ["g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
-         "-I", str(F446_APP / "Inc")] + sources + flags +
-        [str(codec), "-lm", "-o", str(path)], check=True, cwd=ROOT, timeout=30,
+         "-I", str(F446_APP / "Inc")] + sources + motor_codec_sources + flags +
+        ["-lm", "-o", str(path)], check=True, cwd=ROOT, timeout=30,
     )
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 

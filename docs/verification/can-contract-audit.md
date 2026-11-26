@@ -1,5 +1,7 @@
 # CAN通信契約の静的照合（Issue #6）
 
+> 旧実装の記録を含む。現在のモータ通信型とCodecは [C++統合検証](../verification/f446-motor-codecs-cpp.md) を参照。
+
 **記録日:** 2026-11-10  
 **対象:** PROTO-RS06-001 / PROTO-C620-001 / PROTO-PWR-001 / PROTO-REMOTE-001  
 **判定:** ホストの静的照合と既知フレーム試験。実機との一致や物理停止は未検証。

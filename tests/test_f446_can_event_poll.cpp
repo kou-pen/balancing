@@ -1217,8 +1217,8 @@ void testMotorCanLinkCollectsSixAxesForOneCycle()
         const auto& axis = snapshot.c620[i];
         assert(axis.fresh && axis.latest && axis.latest->receivedAtUs == receivedAt + i);
         const auto& report = axis.latest->report;
-        assert(report.motor_id == 1u + i && report.encoder_raw == 4096u + i);
-        assert(report.rpm == -100 && report.current_raw == 123 && report.temperature_c == 42);
+        assert(report.motorId == 1u + i && report.encoderRaw == 4096u + i);
+        assert(report.rpm == -100 && report.currentRaw == 123 && report.temperatureC == 42);
     }
 
     // バス違い・宛先違い・復号不能な報告は、過去の値や鮮度を更新しない。
@@ -1313,7 +1313,7 @@ void testWheelContinuityThroughCanFifo()
     can2.port.captureInterrupt(2300);
     poll();
     const auto lost = motors.feedback(2300);
-    assert(lost.c620[1].latest->report.encoder_raw == 2);
+    assert(lost.c620[1].latest->report.encoderRaw == 2);
     assert(lost.c620[1].continuity == C620ContinuityStatus::TransportLost);
     assert(!lost.c620[1].position);
     assert(odom.update(lost)[1] == WheelUpdateResult::ContinuityUnavailable);
@@ -1498,11 +1498,6 @@ void testMotorFramePlanCan1Can2StopPriority()
     const auto planned = planner.compose(driving, converted);
     assert(planned.status == MotorFramePreview::Status::Ready);
 
-    auto frame = [](const BMotorCanFrame& c) {
-        CanFrame copy{c.id, {}, c.dlc, c.extended};
-        std::copy_n(c.data, copy.data.size(), copy.data.begin());
-        return copy;
-    };
 
     Fixture can1, can2;
     Recorder sink;
@@ -1513,12 +1508,12 @@ void testMotorFramePlanCan1Can2StopPriority()
     rsRequests.expiresAtUs = 2000;
     for (std::size_t axis = 0; axis < 4; ++axis) {
         rsRequests.requests[axis] =
-            PeriodicTxRequest{frame(planned.can1Type1[axis]), {axis + 1u, 77}};
+            PeriodicTxRequest{planned.can1Type1[axis], {axis + 1u, 77}};
     }
     PeriodicTxBatch c620Requests{};
     c620Requests.generation = 1;
     c620Requests.expiresAtUs = 2000;
-    c620Requests.requests[0] = PeriodicTxRequest{frame(planned.can2Current), {1, 88}};
+    c620Requests.requests[0] = PeriodicTxRequest{planned.can2Current, {1, 88}};
     assert(tx1.replacePeriodic(rsRequests, 1000) == PeriodicBatchResult::Queued);
     assert(tx2.replacePeriodic(c620Requests, 1000) == PeriodicBatchResult::Queued);
     assert(tx1.service(1000).result == ScheduledTxResult::Accepted);
@@ -1531,9 +1526,9 @@ void testMotorFramePlanCan1Can2StopPriority()
 
     // 今周期の停止要求が入ったら未受付の残り3軸は消え、
     // Type4が次の空き枠で通常Type1より先に受付される。
-    BMotorCanFrame stop{};
-    assert(b_rs06_control_frame(11, 0x5a, false, &stop));
-    assert(tx1.enqueueStop(0, frame(stop), {20, 99}) == StopEnqueueResult::Queued);
+    const auto stop=Rs06Codec::encodeControl(Rs06Command::Stop,11,0x5a);
+    assert(stop);
+    assert(tx1.enqueueStop(0, *stop, {20, 99}) == StopEnqueueResult::Queued);
     const auto acceptedStop = tx1.service(1001);
     assert(acceptedStop.result == ScheduledTxResult::Accepted);
     assert(((can1.registers.sTxMailBox[1].TIR >> 27u) & 0x1fu) == 4u);
@@ -1554,7 +1549,7 @@ void testMotorFramePlanCan1Can2StopPriority()
     assert(disarmed.status == MotorFramePreview::Status::ZeroCurrentOnly);
     c620Requests.generation = 2;
     c620Requests.expiresAtUs = 3000;
-    c620Requests.requests[0] = PeriodicTxRequest{frame(disarmed.can2Current), {2, 88}};
+    c620Requests.requests[0] = PeriodicTxRequest{disarmed.can2Current, {2, 88}};
     assert(tx2.replacePeriodic(c620Requests, 1004) == PeriodicBatchResult::Queued);
     can2.complete(0, CAN_TSR_TXOK0, 1005);
     pollCanEvents(&can1.port, &can2.port, router);
@@ -1575,10 +1570,6 @@ void testIntegratedObservationAndFrameScheduling()
     MotorCanLink link{motors,tx1};
     CanRouter router{link,&tx1,&tx2};
     auto poll=[&]{pollCanEvents(&can1.port,&can2.port,router);};
-    auto frame=[](const BMotorCanFrame& b) {
-        CanFrame c{b.id,{},b.dlc,b.extended};
-        std::copy_n(b.data,c.data.size(),c.data.begin());return c;
-    };
     StateEstimatorConfig estConfig{};
     for(auto& leg:estConfig.legs) {
         leg.motor={{0,0},{0,0},{1,1},1,1,true};
@@ -1691,7 +1682,7 @@ void testIntegratedObservationAndFrameScheduling()
         assert(plan.status==MotorFramePreview::Status::Ready && plan.can1Count==4);
         PeriodicTxBatch wheel{};
         wheel.generation=++generation2;wheel.expiresAtUs=now+2000;
-        wheel.requests[0]=PeriodicTxRequest{frame(plan.can2Current),{++serial,88}};
+        wheel.requests[0]=PeriodicTxRequest{plan.can2Current,{++serial,88}};
         assert(tx2.replacePeriodic(wheel,now)==PeriodicBatchResult::Queued);
         if(tick!=99) {drain2(now);++wheelFrames;}
         // 4msごと。最後の世代は未受付のまま残し、故障時の破棄を検証する。
@@ -1699,7 +1690,7 @@ void testIntegratedObservationAndFrameScheduling()
             PeriodicTxBatch legs{};
             legs.generation=++generation1;legs.expiresAtUs=now+4000;
             for(unsigned axis=0;axis<4;++axis)
-                legs.requests[axis]=PeriodicTxRequest{frame(plan.can1Type1[axis]),{++serial,77}};
+                legs.requests[axis]=PeriodicTxRequest{plan.can1Type1[axis],{++serial,77}};
             assert(tx1.replacePeriodic(legs,now)==PeriodicBatchResult::Queued);
             if(tick!=98) rsFrames+=drain1(now);
         }
@@ -1715,7 +1706,7 @@ void testIntegratedObservationAndFrameScheduling()
     assert(stop.status==MotorFramePreview::Status::ZeroCurrentOnly);
     PeriodicTxBatch zero{};
     zero.generation=++generation2;zero.expiresAtUs=faultAt+2000;
-    zero.requests[0]=PeriodicTxRequest{frame(stop.can2Current),{++serial,88}};
+    zero.requests[0]=PeriodicTxRequest{stop.can2Current,{++serial,88}};
     assert(tx2.replacePeriodic(zero,faultAt)==PeriodicBatchResult::Queued);
     for(unsigned axis=0;axis<4;++axis) {
         const auto progress=tx1.service(faultAt);

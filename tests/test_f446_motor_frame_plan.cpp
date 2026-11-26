@@ -48,7 +48,7 @@ bool empty(const MotorFramePreview& preview)
     return true;
 }
 
-void testRegularFramePlanMatchesExistingC11Codec()
+void testRegularFramePlanMatchesGoldenFrames()
 {
     // 実機のモータ番号・伝達比ではない。ホスト上の4軸マッピングを明示する。
     MotorCommand motor{fixture()};
@@ -61,26 +61,21 @@ void testRegularFramePlanMatchesExistingC11Codec()
     assert(preview.fixtureOnly && preview.can1Count == 4);
 
     for (std::size_t i = 0; i < 4; ++i) {
-        BMotorCanFrame expected{};
-        assert(b_rs06_torque_frame(
-            static_cast<std::uint8_t>(11 + i),
-            torque.rs06[i].limitedMotorTorqueNm, &expected));
+        // 変換結果は+2,-2,-2,+2 Nm。旧Cの量子化と同じ独立期待値。
+        constexpr std::array<std::uint32_t,4> ids{0x01871c0bu,0x0178e30cu,0x0178e30du,0x01871c0eu};
         const auto& actual = preview.can1Type1[i];
-        assert(actual.id == expected.id);
+        assert(actual.id == ids[i]);
         assert(actual.extended && actual.dlc == 8);
-        assert(std::memcmp(actual.data, expected.data, 8) == 0);
+        assert((actual.data==std::array<std::uint8_t,8>{0x80,0,0x80,0,0,0,0,0}));
         // Type1だけ。stop/enableのType3/4をフレームプランへ混ぜない。
         assert(((actual.id >> 24u) & 0x1fu) == 1u);
         assert((actual.id & 0xffu) == i + 11u);
         assert(actual.data[4] == 0 && actual.data[5] == 0 &&
                actual.data[6] == 0 && actual.data[7] == 0); // Kp=Kd=0
     }
-    const float current[4]{1.0f, -1.0f, 0.0f, 0.0f};
-    BMotorCanFrame expected{};
-    assert(b_c620_current_frame(current, 20.0f, &expected));
     assert(preview.can2Current.id == 0x200u && !preview.can2Current.extended);
     assert(preview.can2Current.dlc == 8);
-    assert(std::memcmp(preview.can2Current.data, expected.data, 8) == 0);
+    assert((preview.can2Current.data==std::array<std::uint8_t,8>{0x03,0x33,0xfc,0xcd,0,0,0,0}));
     for (std::size_t i = 4; i < 8; ++i) {
         assert(preview.can2Current.data[i] == 0); // 未搭載C620 ID3/4は常に0
     }
@@ -151,7 +146,7 @@ void testMisconfigurationOrCodecErrorGivesNoPartialFrames()
 
 int main()
 {
-    testRegularFramePlanMatchesExistingC11Codec();
+    testRegularFramePlanMatchesGoldenFrames();
     testDisarmAndArmingNeverReissueTorque();
     testMisconfigurationOrCodecErrorGivesNoPartialFrames();
     std::puts("PASS: six-motor CAN frame plan and stop/arming zero output");

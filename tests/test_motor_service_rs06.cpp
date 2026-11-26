@@ -20,10 +20,10 @@ bool hasFlag(FaultFlags mask, FaultFlags flag)
     return (static_cast<unsigned>(mask) & static_cast<unsigned>(flag)) != 0;
 }
 
-BMotorCanFrame report(std::uint8_t motorId, unsigned mode = 2, unsigned type = 2,
+CanFrame report(std::uint8_t motorId, unsigned mode = 2, unsigned type = 2,
                       unsigned faults = 0, std::uint8_t host = hostId)
 {
-    BMotorCanFrame frame{};
+    CanFrame frame{};
     frame.extended = true;
     frame.dlc = 8;
     frame.id = (type << 24) | (mode << 22) | (faults << 16) |

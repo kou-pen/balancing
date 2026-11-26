@@ -72,7 +72,7 @@ void MotorService::onRs06TxResult(
     }
 }
 
-void MotorService::onRs06Frame(const BMotorCanFrame& frame, std::uint64_t receivedAtUs) noexcept
+void MotorService::onRs06Frame(const CanFrame& frame, std::uint64_t receivedAtUs) noexcept
 {
     if (const auto report = Rs06Codec::decodeFeedback(frame)) {
         if (auto* motor = findMotor(report->motorId)) {
@@ -83,16 +83,15 @@ void MotorService::onRs06Frame(const BMotorCanFrame& frame, std::uint64_t receiv
     }
 }
 
-void MotorService::onC620Frame(const BMotorCanFrame& frame, std::uint64_t receivedAtUs) noexcept
+void MotorService::onC620Frame(const CanFrame& frame, std::uint64_t receivedAtUs) noexcept
 {
-    BC620Feedback report{};
-    // 共通C11デコーダはID1〜4を扱う。本機の観測対象は先頭の2車輪だけ。
+    // C620CodecはID1〜4を扱う。本機の観測対象は先頭の2車輪だけ。
     if (frame.extended || frame.id < 0x201u || frame.id > 0x202u) {
         return;
     }
     auto& motor = c620_[frame.id - 0x201u];
-    if (b_c620_parse_feedback(&frame, &report)) {
-        motor.onFeedback(report, receivedAtUs);
+    if (const auto report=C620Codec::decodeFeedback(frame)) {
+        motor.onFeedback(*report, receivedAtUs);
     } else {
         // 既知の軸の壊れた報告は無かったことにしない。欠落した角度は復元不能。
         motor.invalidateContinuity();
