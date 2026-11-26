@@ -227,6 +227,7 @@ add_test(NAME balancing_f446_can1_runtime_tests COMMAND balancing_f446_can1_runt
 add_test(NAME balancing_f446_can_rollback_failure_tests COMMAND balancing_f446_can1_runtime_tests --rollback-failure)
 add_test(NAME balancing_f446_motor_observation_tests COMMAND balancing_f446_can1_runtime_tests --motor-observation)
 add_test(NAME balancing_f446_can2_services_tests COMMAND balancing_f446_can1_runtime_tests --can2-services)
+add_test(NAME balancing_f446_watchdog_tests COMMAND balancing_f446_can1_runtime_tests --watchdog)
 add_test(NAME balancing_f446_drive_sil_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil)
 add_test(NAME balancing_f446_usb_input_tests COMMAND balancing_f446_can1_runtime_tests --usb-input)
 add_test(NAME balancing_f446_drive_sil_usb_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-usb)

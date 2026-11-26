@@ -412,6 +412,7 @@ for test, extra_sources in [
             subprocess.run([str(path), "--rollback-failure"], check=True, cwd=ROOT, timeout=30)
             subprocess.run([str(path), "--motor-observation"], check=True, cwd=ROOT, timeout=30)
             subprocess.run([str(path), "--can2-services"], check=True, cwd=ROOT, timeout=30)
+            subprocess.run([str(path), "--watchdog"], check=True, cwd=ROOT, timeout=30)
             for mode in ("--usb-input", "--drive-sil-usb", "--drive-sil", "--drive-sil-timeout", "--drive-sil-invalid",
                          "--drive-sil-stale", "--drive-sil-rs-timeout", "--drive-sil-tx-error", "--drive-sil-estop",
                          "--drive-sil-invalid-model", "--drive-sil-rx-loss", "--drive-sil-gap"):
