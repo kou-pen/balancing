@@ -111,7 +111,7 @@ for label, flags in [
 # Both Application tests now link the actual C++ control cycle and C11 math.
 app_source = F446_APP / "Src" / "balancing"
 app_math_cpp = [str(app_source / name) for name in (
-    "app/ControlCycle.cpp", "app/PowerBoardService.cpp", "app/RemoteControlService.cpp", "app/DiagnosticsService.cpp", "app/StatusIndicator.cpp", "control/controller/MotorCommand.cpp",
+    "app/ControlCycle.cpp", "app/PowerBoardService.cpp", "app/DualSenseService.cpp", "device/UsbHidInput.cpp", "communication/usb/DualSenseHidCodec.cpp", "app/RemoteControlService.cpp", "app/DiagnosticsService.cpp", "app/StatusIndicator.cpp", "control/controller/MotorCommand.cpp",
     "control/controller/BalanceControl.cpp", "control/estimator/StateEstimator.cpp",
     "control/estimator/LegKinematics.cpp", "control/estimator/WheelOdometry.cpp")]
 power_codec_sources = [str(app_source / ("communication/can/" + name)) for name in
@@ -412,7 +412,7 @@ for test, extra_sources in [
             subprocess.run([str(path), "--rollback-failure"], check=True, cwd=ROOT, timeout=30)
             subprocess.run([str(path), "--motor-observation"], check=True, cwd=ROOT, timeout=30)
             subprocess.run([str(path), "--can2-services"], check=True, cwd=ROOT, timeout=30)
-            for mode in ("--drive-sil", "--drive-sil-timeout", "--drive-sil-invalid",
+            for mode in ("--usb-input", "--drive-sil-usb", "--drive-sil", "--drive-sil-timeout", "--drive-sil-invalid",
                          "--drive-sil-stale", "--drive-sil-rs-timeout", "--drive-sil-tx-error", "--drive-sil-estop",
                          "--drive-sil-invalid-model", "--drive-sil-rx-loss", "--drive-sil-gap"):
                 subprocess.run([str(path), mode], check=True, cwd=ROOT, timeout=30)
