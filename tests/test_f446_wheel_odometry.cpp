@@ -26,7 +26,7 @@ float distance(int counts)
 {
     return kTau * 0.1f * static_cast<float>(counts) / (10.0f * 8192.0f);
 }
-BMotorCanFrame frame(unsigned axis, unsigned raw, std::int16_t rpm = 60)
+CanFrame frame(unsigned axis, unsigned raw, std::int16_t rpm = 60)
 {
     const auto speed = static_cast<std::uint16_t>(rpm);
     return {0x201u + axis, {static_cast<std::uint8_t>(raw >> 8),
@@ -139,7 +139,7 @@ void testLossAndExplicitReference()
 void testConfigurationGapAndInvalidInput()
 {
     C620Motor absent{};
-    BC620Feedback raw{1, 100, 0, 0, 30};
+    C620Feedback raw{1, 100, 0, 0, 30};
     absent.onFeedback(raw, 1000);
     assert(absent.feedback(1000).fresh && !absent.feedback(1000).position);
     for (const auto bad : {C620ContinuityConfig{0,true}, C620ContinuityConfig{20001,true}}) {
@@ -160,7 +160,7 @@ void testConfigurationGapAndInvalidInput()
     assert(regression.feedback(1000).latest->receivedAtUs == 1000);
     C620Motor badRaw{{4000,true}};
     badRaw.onFeedback(raw, 1000);
-    raw.encoder_raw = 8192;
+    raw.encoderRaw = 8192;
     badRaw.onFeedback(raw, 2000);
     assert(badRaw.feedback(2000).continuity == C620ContinuityStatus::InvalidValue);
 

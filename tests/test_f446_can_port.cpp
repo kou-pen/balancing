@@ -65,7 +65,7 @@ CanTxSubmitResult submitRs06(CanPort& port, const Rs06TxRequest& request, std::u
     frame.id = request.frame.id;
     frame.dlc = request.frame.dlc;
     frame.extended = request.frame.extended;
-    std::copy_n(request.frame.data, frame.data.size(), frame.data.begin());
+    frame.data=request.frame.data;
     return port.trySend(frame, encodeToken(request.token), nowUs);
 }
 
@@ -101,12 +101,7 @@ struct Fixture : PortFixture {
         for (std::size_t i = 0; i < CanPort::kMaxEventsPerPoll && port.popEvent(event); ++i) {
             switch (event.kind) {
             case CanEventKind::Rx: {
-                BMotorCanFrame frame{};
-                frame.id = event.frame.id;
-                frame.dlc = event.frame.dlc;
-                frame.extended = event.frame.extended;
-                std::copy(event.frame.data.begin(), event.frame.data.end(), frame.data);
-                motors.onRs06Frame(frame, event.atUs);
+                motors.onRs06Frame(event.frame, event.atUs);
                 break;
             }
             case CanEventKind::Tx:

@@ -6,12 +6,7 @@ namespace balancing {
 namespace {
 constexpr std::uint32_t origin=0xD000u; // MotorCanLink(0x100|軸ID)と診断とは別
 constexpr std::uint64_t rsPeriod=4000, wheelPeriod=2000;
-CanFrame toFrame(const BMotorCanFrame& f) noexcept
-{
-    CanFrame result{f.id,{},f.dlc,f.extended};
-    std::copy_n(f.data,8,result.data.begin());
-    return result;
-}
+
 }
 DriveCycle::DriveCycle(ControlCycle& control,RobotSequence& sequence,MotorService& motors,
                        MotorCanLink& link,CanTxScheduler& can1,CanTxScheduler& can2,
@@ -60,7 +55,7 @@ bool DriveCycle::queue(CanBus bus,const MotorFramePreview& preview,std::uint64_t
     // 未受付分は常に最新世代で全面置換。古い世代をFIFOへ蓄積しない。
     for (std::size_t i=0;i<n;++i) {
         const auto& raw=rs?preview.can1Type1[i]:preview.can2Current;
-        batch.requests[i]=PeriodicTxRequest{toFrame(raw),{++serial_,origin}};
+        batch.requests[i]=PeriodicTxRequest{raw,{++serial_,origin}};
     }
     auto& scheduler=rs?can1_:can2_;
     const auto status=scheduler.replacePeriodic(batch,nowUs);

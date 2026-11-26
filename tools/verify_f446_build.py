@@ -18,7 +18,8 @@ PROJECT = Path(__file__).resolve().parents[1] / "firmware" / "f446" / "balancing
 SOURCES = (
     "balancing/app/application.cpp",
     "balancing/bench/MotorBench.cpp",
-    "balancing/communication/balancing_motor_can.c",
+    "balancing/communication/Rs06Codec.cpp",
+    "balancing/communication/C620Codec.cpp",
     "balancing/communication/can/CanTxScheduler.cpp",
     "balancing/control/controller/balancing_core.c",
 )

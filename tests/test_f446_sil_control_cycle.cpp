@@ -77,7 +77,7 @@ struct ObservationFixture {
         }
         auto feed = [&](std::uint64_t stamp) {
             for (std::size_t i = 0; i < 2; ++i) {
-                wheels[i].onFeedback(BC620Feedback{static_cast<std::uint8_t>(i + 1), 1000, 0, 0, 30}, stamp);
+                wheels[i].onFeedback(C620Feedback{static_cast<std::uint8_t>(i + 1), 1000, 0, 0, 30}, stamp);
             }
         };
         if (last && atUs > *last) {

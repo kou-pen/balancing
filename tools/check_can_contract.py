@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Host-only CAN contract checks against canonical protocol specs and C11 codec."""
+"""Host-only CAN contract checks against canonical protocol specs and C++ codecs."""
 
 from __future__ import annotations
 
@@ -12,8 +12,9 @@ C620_SPEC = "docs/specs/protocols/c620_can2.md"
 RS_SPEC = "docs/specs/protocols/rs06_can1.md"
 POWER_SPEC = "docs/specs/protocols/power_can2.md"
 REMOTE_SPEC = "docs/specs/protocols/remote_can2.md"
-CODEC = "firmware/f446/balancing_f446/App/Src/balancing/communication/balancing_motor_can.c"
-CODEC_TEST = "tests/test_motor_can.c"
+CODEC = "firmware/f446/balancing_f446/App/Src/balancing/communication/C620Codec.cpp"
+RS_CODEC = "firmware/f446/balancing_f446/App/Src/balancing/communication/Rs06Codec.cpp"
+CODEC_TEST = "tests/test_motor_can.cpp"
 V1_TEST = "tests/test_f446_protocol_codec.cpp"
 
 # In this robot: 0x1FF is unused, 0x200 is a command and 0x201/202
@@ -29,7 +30,7 @@ def read_sources(root: Path = ROOT) -> dict[str, str]:
     """Return the small set of authoritative sources and code being audited."""
     return {
         name: (root / name).read_text(encoding="utf-8")
-        for name in (CAN_SUMMARY, C620_SPEC, RS_SPEC, POWER_SPEC, REMOTE_SPEC, CODEC, CODEC_TEST, V1_TEST)
+        for name in (CAN_SUMMARY, C620_SPEC, RS_SPEC, POWER_SPEC, REMOTE_SPEC, CODEC, RS_CODEC, CODEC_TEST, V1_TEST)
     }
 
 
@@ -169,28 +170,28 @@ def audit(sources: dict[str, str]) -> list[str]:
     if "0x700" not in overview or "0x1FF–0x208" not in overview:
         errors.append("v1 DJI reservation missing in summary")
 
-    # Contract-oriented checks for the existing C11 codec, not a general
-    # C parser. Runtime golden-frame tests are run separately, including UBSan.
-    code = sources[CODEC]
+    # Contract-oriented checks for the existing C++ codecs, not a general
+    # C++ parser. Runtime golden-frame tests are run separately, including UBSan.
+    code = sources[CODEC] + "\n" + sources[RS_CODEC]
     patterns = {
         "C620 cmd standard ID": r"parsed\.id\s*=\s*0x200u\s*;",
         "C620 cmd DLC": r"parsed\.dlc\s*=\s*8u\s*;",
         "C620 cmd standard flag": r"parsed\.extended\s*=\s*false\s*;",
-        "C620 feedback IDs": r"frame->id\s*<\s*0x201u\s*\|\|\s*frame->id\s*>\s*0x204u",
-        "C620 current raw scale": r"#define C620_PROTOCOL_CURRENT_RAW 16384\.0f",
-        "C620 current A scale": r"#define C620_PROTOCOL_CURRENT_A 20\.0f",
+        "C620 feedback IDs": r"frame\.id\s*<\s*0x201u\s*\|\|\s*frame\.id\s*>\s*0x204u",
+        "C620 current raw scale": r"constexpr float kProtocolCurrentRaw = 16384\.0f",
+        "C620 current A scale": r"constexpr float kProtocolCurrentA = 20\.0f",
         "RS06 type1": r"\(1u\s*<<\s*24\)",
         "RS06 type3/4": r"enable\s*\?\s*\(3u\s*<<\s*24\)\s*:\s*\(4u\s*<<\s*24\)",
         "RS06 type2/24 RX": r"type\s*!=\s*2u\s*&&\s*type\s*!=\s*24u",
-        "RS06 ext flag": r"out->extended\s*=\s*true\s*;",
-        "RS06 DLC": r"out->dlc\s*=\s*8u\s*;",
-        "RS06 torque range": r"#define RS_TORQUE_RANGE_NM 36\.0f",
-        "RS06 speed range": r"#define RS_SPEED_RANGE_RAD_S 50\.0f",
-        "RX frame DLC": r"frame->dlc\s*!=\s*8u",
+        "RS06 ext flag": r"frame\.extended\s*=\s*true\s*;",
+        "RS06 DLC": r"frame\.dlc\s*=\s*8u\s*;",
+        "RS06 torque range": r"constexpr float kTorqueRangeNm = 36\.0f",
+        "RS06 speed range": r"constexpr float kSpeedRangeRadS = 50\.0f",
+        "RX frame DLC": r"frame\.dlc\s*!=\s*8u",
     }
     for name, pattern in patterns.items():
         if re.search(pattern, code) is None:
-            errors.append(f"C11 codec: {name} differs from known contract")
+            errors.append(f"C++ codecs: {name} differs from known contract")
 
     tests = sources[CODEC_TEST]
     for name, token in {
@@ -204,7 +205,7 @@ def audit(sources: dict[str, str]) -> list[str]:
         "C620 packed currents": "0x03u,0x33u,0xfcu,0xcdu",
     }.items():
         if token not in tests:
-            errors.append(f"C11 golden test absent: {name}")
+            errors.append(f"C++ golden test absent: {name}")
     return errors
 
 
