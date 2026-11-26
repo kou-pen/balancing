@@ -7,6 +7,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstdio>
+#include <limits>
 
 using namespace balancing;
 extern "C" void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef*);
@@ -127,6 +128,44 @@ void testTransport()
     I2cPort disabled{h,{}};
     assert(disabled.requestRead(0,1,0)==I2cState::Unverified);
 }
+void testAttitudeSourceFreshness()
+{
+    ImuAttitudeSource source{filterConfig()};
+    assert(!source.attitude(0).valid);
+    TimedImuSample sample{{{0,0,9.81f},{0,0.125f,0}},1000,1001,true};
+    auto unproven=sample;unproven.newMeasurementProven=false;
+    assert(!source.accept(unproven,true,1001));
+    assert(!source.accept(sample,true,999)); // 未来完了は受理しない
+    assert(source.accept(sample,true,1001));
+    assert(!source.accept(sample,true,1002));
+    sample.earliestUs=2000;sample.completedAtUs=2001;
+    assert(source.accept(sample,true,2001));
+    assert(!source.attitude(2001).valid);
+    sample.earliestUs=3000;sample.completedAtUs=3001;
+    sample.value.gyro_rad_s[1]=0.2f;
+    assert(source.accept(sample,false,3001));
+    const auto frozen=source.attitude(3001);
+    assert(frozen.valid && frozen.fresh && frozen.receivedAtUs==3000);
+    near(frozen.pitchRateRadS,0.075f);
+    // 何度コピーしても元の測定時刻を進めない。現行期限は50ms未満。
+    assert(source.attitude(52999).receivedAtUs==3000 && source.attitude(52999).fresh);
+    assert(!source.attitude(53000).fresh);
+    assert(!source.attitude(2999).valid);
+    assert(!source.accept(sample,false,4000));
+    sample.earliestUs=4000;sample.completedAtUs=4001;
+    sample.value.gyro_rad_s[1]=-0.075f;
+    assert(source.accept(sample,false,4001));
+    near(source.attitude(4001).pitchRateRadS,-0.2f);
+    near(frozen.pitchRateRadS,0.075f);
+    assert(frozen.receivedAtUs==3000);
+    sample.earliestUs=5000;sample.completedAtUs=5001;
+    sample.value.gyro_rad_s[2]=std::numeric_limits<float>::quiet_NaN();
+    assert(!source.accept(sample,false,5001));
+    // 現行の姿勢境界は異常測定でラッチ無効。古い有効値で制御を続けない。
+    assert(!source.attitude(5001).valid);
+    assert(source.attitude(5001).receivedAtUs==4000);
+}
+
 void testBno()
 {
     setup();
@@ -201,6 +240,7 @@ std::optional<std::uint64_t> balancing::observationClockUs() noexcept {return cl
 int main()
 {
     testTransport();
+    testAttitudeSourceFreshness();
     testBno();
     setup();
     I2C_HandleTypeDef h{I2C1,HAL_I2C_STATE_READY};

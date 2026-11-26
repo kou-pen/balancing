@@ -67,6 +67,35 @@ void testMultipleReportsAndSameTimestamp()
     assert(!odom.snapshot().wheel[0].fresh);
 }
 
+void testSingleAxisAndSymmetricWrap()
+{
+    MotorService motors{{{11,12,13,14},0xa6},continuity};
+    WheelOdometry odom{config()};
+    motors.onC620Frame(frame(0,8190),1000);
+    auto one=motors.feedback(1500);
+    assert(one.c620[0].fresh && !one.c620[1].latest && !one.c620[1].fresh);
+    assert(odom.update(one)[1]==WheelUpdateResult::NoSample);
+    motors.onC620Frame(frame(1,2),1000);
+    motors.onC620Frame(frame(0,2),2000);
+    motors.onC620Frame(frame(1,8190),2000);
+    const auto snapshot=motors.feedback(2100);
+    assert(odom.update(snapshot)[0]==WheelUpdateResult::Updated);
+    const auto frozen=odom.snapshot();
+    near(frozen.wheel[0].latest->positionM,distance(4));
+    near(frozen.wheel[1].latest->positionM,distance(4));
+    near(frozen.wheel[0].latest->velocityMps,kTau*0.1f/10);
+    near(frozen.wheel[1].latest->velocityMps,-kTau*0.1f/10);
+    assert(frozen.wheel[0].latest->receivedAtUs==2000);
+    for (const auto invalid:{WheelOdometryConfig{0,10,1,true},
+                            WheelOdometryConfig{0.1f,0,1,true},
+                            WheelOdometryConfig{0.1f,10,0,true}}) {
+        auto cfg=config();cfg[0]=invalid;
+        WheelOdometry rejected{cfg};
+        assert(rejected.update(snapshot)[0]==WheelUpdateResult::InvalidConfiguration);
+        assert(!rejected.snapshot().wheel[0].fresh);
+    }
+}
+
 void testLossAndExplicitReference()
 {
     MotorService motors{{{11, 12, 13, 14}, 0xa6}, continuity};
@@ -166,6 +195,7 @@ int main()
 {
     testMultipleReportsAndSameTimestamp();
     testLossAndExplicitReference();
+    testSingleAxisAndSymmetricWrap();
     testConfigurationGapAndInvalidInput();
     std::puts("PASS: C620 receive-order accumulation, continuity, generations and wheel conversion");
 }

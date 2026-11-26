@@ -90,6 +90,30 @@ void testArmPreconditions()
     expect(interlocks.update(input, kStartUs + 2), RobotState::Disarmed, DesiredMotorState::StopAll);
 }
 
+void testEachInterlockAndRunningLoss()
+{
+    // 旧全系統鮮度モデルを廃止する代わりに、現行の各インターロックが単独で
+    // ARMを拒否し、運転中に失われたらFAULTを要求することを確認する。
+    constexpr bool SequenceInterlocks::* checks[]={
+        &SequenceInterlocks::imuReady, &SequenceInterlocks::motorsReady,
+        &SequenceInterlocks::powerReady, &SequenceInterlocks::calibrationVerified,
+        &SequenceInterlocks::modelVerified, &SequenceInterlocks::driveLimitsVerified};
+    for (auto check:checks) {
+        RobotSequence sequence{kVerifiedTimeout};
+        auto input=readyInput();
+        input.interlocks.*check=false;
+        input.operations.arm=true;
+        expect(sequence.update(input,kStartUs),RobotState::Disarmed,DesiredMotorState::StopAll);
+        input.interlocks.*check=true;
+        const auto session=arm(sequence,input,kStartUs+1);
+        confirmAll(input,session);
+        expect(sequence.update(input,kStartUs+2),RobotState::Balancing,DesiredMotorState::DriveAllowed);
+        input.interlocks.*check=false;
+        expect(sequence.update(input,kStartUs+3),RobotState::Fault,DesiredMotorState::StopAll);
+        expectCause(sequence,FaultFlags::InterlockLost);
+    }
+}
+
 void testMechanismProofBeforeDrive()
 {
     // 初期姿勢範囲の診断とは独立して、現在の機構安全判断が到着するまで駆動を保留する。
@@ -275,6 +299,7 @@ int main()
 {
     testArmPreconditions();
     testMechanismProofBeforeDrive();
+    testEachInterlockAndRunningLoss();
     testSessionAndFourAxisConfirmation();
     testAbsoluteDeadline();
     testDisarmAndFaultPriority();
