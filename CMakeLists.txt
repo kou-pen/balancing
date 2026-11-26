@@ -16,7 +16,6 @@ add_library(balancing_core STATIC
     ${F446_APP}/Src/balancing/control/controller/balancing_yaw_pi.c
     ${F446_APP}/Src/balancing/communication/balancing_motor_can.c
     ${F446_APP}/Src/balancing/app/balancing_motor_bench.c
-    ${F446_APP}/Src/balancing/communication/balancing_tx_scheduler.c
     ${F446_APP}/Src/balancing/control/estimator/balancing_leg_kinematics.c
     ${F446_APP}/Src/balancing/control/estimator/balancing_observation.c
     ${F446_APP}/Src/balancing/app/balancing_operator_input.c
@@ -37,12 +36,6 @@ add_executable(balancing_motor_can_tests tests/test_motor_can.c)
 target_link_libraries(balancing_motor_can_tests PRIVATE balancing_core m)
 target_compile_options(balancing_motor_can_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_motor_can_tests COMMAND balancing_motor_can_tests)
-
-# HAL-independent issue #5 scheduler: 3 simulated CAN1 mailboxes + virtual time.
-add_executable(balancing_tx_scheduler_tests tests/test_tx_scheduler.c)
-target_link_libraries(balancing_tx_scheduler_tests PRIVATE balancing_core m)
-target_compile_options(balancing_tx_scheduler_tests PRIVATE -Wall -Wextra -Wpedantic)
-add_test(NAME balancing_tx_scheduler_tests COMMAND balancing_tx_scheduler_tests)
 
 # Yaw rate PI with conditional integration; no physical motor output (Issue #9).
 add_executable(balancing_yaw_pi_tests tests/test_yaw_pi.c)
@@ -232,6 +225,8 @@ add_test(NAME balancing_f446_drive_sil_tests COMMAND balancing_f446_can1_runtime
 add_test(NAME balancing_f446_usb_input_tests COMMAND balancing_f446_can1_runtime_tests --usb-input)
 add_test(NAME balancing_f446_drive_sil_usb_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-usb)
 add_test(NAME balancing_f446_drive_sil_timeout_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-timeout)
+add_test(NAME balancing_f446_drive_sil_short_deadline_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-short-deadline)
+add_test(NAME balancing_f446_drive_sil_long_deadline_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-long-deadline)
 add_test(NAME balancing_f446_drive_sil_invalid_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-invalid)
 add_test(NAME balancing_f446_drive_sil_gap_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-gap)
 add_test(NAME balancing_f446_drive_sil_rx_loss_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-rx-loss)
