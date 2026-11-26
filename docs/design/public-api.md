@@ -301,3 +301,7 @@ RS06とC620は共通の `CanFrame` を直接使用する。旧C言語の `BMotor
 ## 試運転専用起動
 
 BenchDebugだけが `balancing_f446_bench_start` / `balancing_f446_bench_service(sequence)` / `balancing_f446_bench_capture_irq(bus)` を呼び出す。内部の `startCanBench` は起動時固定のMotorBenchConfigを受け取り、選択したCAN1またはCAN2を排他的に所有する。既定設定は無効、非ゼロ入力経路は未接続。 `CanClock` を通常CAN観測と共用するがインスタンスの所有権は別。詳細は[検証](../verification/f446-bench-startup.md)。
+
+## F446 IWDGの実機用境界
+
+`F446Watchdog.hpp/.cpp` がHALハンドル、起動判断、RCC CSRのコピーを所有する。起動時固定設定は既定無効。通常起動は `bindApplicationWatchdog`、BenchDebugは `bindBenchWatchdog` に一度だけ結合し、最初の周期開始後は再結合しない。既存 `CycleHealthMonitor` と `WatchdogPort` を経由する完了証跡だけで更新する。HAL初期化は開始キー発行を含む不可逆操作。失敗後は再試行せず、HAL更新異常後も更新を停止する。診断は `f446WatchdogSummary` で取得するが、起動間のFAULT保持や物理停止の証明ではない。[検証](../verification/f446-iwdg-adapter.md)。

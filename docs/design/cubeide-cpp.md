@@ -36,3 +36,7 @@ python3 tools/regenerate_cubeide_f446.py
 最後のコマンドはVM上で3構成の独立CubeIDEワークスペースを使用し、管理ビルドによるARM ELFの生成・モード別シンボルを検証する。書込みや通電は行わない。
 
 実装構造：[モータ制御レイヤーと単軸試運転](motor-layer.md)。検証：[BenchDebug起動・IRQ分離](../verification/f446-bench-startup.md)、[AppのC++統合](../verification/f446-all-cpp.md)。過去の5/6ソース構成の検証：[PR #16の検証](../verification/f446-source-layout.md)、[機能別配置](../verification/f446-module-layout.md)。旧設計のコード例はGit履歴に残す。
+
+## IWDG HALドライバの保持
+
+IWDGの起動はCubeMXの自動生成初期化に任せない。IWDG HALモジュールを有効にし、同一版の `stm32f4xx_hal_iwdg.h/.c` をDriversに保持する。CubeMX再生成後に `python3 tools/sync_cubeide_cpp.py` を実行する。HALモジュール定義やドライバが失われた場合は検査失敗となるため、元の管理ファイルから該当箇所を復元する。`--fix` はEclipseメタデータのみの修復でありIWDGの自動有効化はしない。既定boardConfigは無効。実機起動は別承認。

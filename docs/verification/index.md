@@ -115,3 +115,5 @@
 - [F446 AppのC++移行統合検証](f446-all-cpp.md)
 
 - [BenchDebug専用起動とCAN IRQの排他検証](f446-bench-startup.md)
+
+- [F446 IWDG実機用アダプタ](f446-iwdg-adapter.md)
