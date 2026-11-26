@@ -93,3 +93,5 @@
 - [RGB・ブザー出力境界と表示診断](f446-indicator-output-host.md)
 
 - [制御周期完了監視とIWDG更新境界](f446-cycle-watchdog-host.md)
+
+- [F446小規模ファイル統合](f446-file-consolidation.md)

@@ -145,7 +145,7 @@ App本体の `ControlCycle` は `MotorCommand::hasVerifiedConfiguration()` がfa
 
 ## Applicationの実測周期診断
 
-既存CAN1ランタイムでDWT時計を回収後に採取し、`Can1Observation.h`のHAL非依存C APIを通してApplicationへ渡す。初回や取得不能後の初回には差分を確定せず、重複・逆行時は診断カウンタを更新して時刻と差分を無効とする。通常の観測時刻と受信時刻を区別し、TIM7回数から実測時間を推測しない。`balancing_app_timing_snapshot()`は読み取り専用であり、ControlCycleの実機呼出・ARM・送信には接続しない。[検証記録](../verification/f446-application-timing-host.md)。
+既存CAN1ランタイムでDWT時計を回収後に採取し、`balancing_f446_can1_bridge.h`の監視コピーC APIを通してApplicationへ渡す。初回や取得不能後の初回には差分を確定せず、重複・逆行時は診断カウンタを更新して時刻と差分を無効とする。通常の観測時刻と受信時刻を区別し、TIM7回数から実測時間を推測しない。`balancing_app_timing_snapshot()`は読み取り専用であり、ControlCycleの実機呼出・ARM・送信には接続しない。[検証記録](../verification/f446-application-timing-host.md)。
 
 ## CAN1/CAN2の共通受信ランタイム
 
