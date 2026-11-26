@@ -1,4 +1,4 @@
-#include "balancing/device/Buzzer.hpp"
+#include "balancing/device/IndicatorOutput.hpp"
 #include "balancing/app/StatusIndicator.hpp"
 #include "balancing/device/StatusIndicatorPort.hpp"
 #ifdef NDEBUG

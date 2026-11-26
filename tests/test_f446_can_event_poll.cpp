@@ -1,4 +1,4 @@
-#include "balancing/app/CanEventPoll.hpp"
+#include "balancing/communication/can/CanRouter.hpp"
 #include "balancing/app/Can2ServiceLink.hpp"
 #include "balancing/app/PowerBoardService.hpp"
 #include "balancing/app/DiagnosticsService.hpp"
@@ -7,7 +7,6 @@
 #include "balancing/app/MotorService.hpp"
 #include "balancing/app/MotorCanLink.hpp"
 #include "balancing/communication/can/CanPort.hpp"
-#include "balancing/communication/can/CanRouter.hpp"
 #include "balancing/communication/can/CanTxScheduler.hpp"
 #include "balancing/communication/can/MotorFramePlan.hpp"
 #include "balancing/control/controller/MotorCommand.hpp"
