@@ -11,9 +11,6 @@ set(CMAKE_C_EXTENSIONS OFF)
 set(F446_APP firmware/f446/balancing_f446/App)
 
 add_library(balancing_core STATIC
-    ${F446_APP}/Src/balancing/control/controller/balancing_core.c
-    ${F446_APP}/Src/balancing/control/controller/balancing_leg_pd.c
-    ${F446_APP}/Src/balancing/control/controller/balancing_yaw_pi.c
     ${F446_APP}/Src/balancing/control/estimator/balancing_leg_kinematics.c
     ${F446_APP}/Src/balancing/control/filter/balancing_attitude_filter.c
 )
@@ -25,7 +22,7 @@ target_compile_options(balancing_core PRIVATE
 )
 
 enable_testing()
-add_executable(balancing_core_tests tests/test_core.c)
+add_executable(balancing_core_tests tests/test_core.cpp ${F446_APP}/Src/balancing/control/controller/BalanceControl.cpp)
 target_link_libraries(balancing_core_tests PRIVATE balancing_core m)
 add_test(NAME balancing_core_tests COMMAND balancing_core_tests)
 # Motor codecs share CanFrame and are independent of legacy C mathematics.
@@ -40,7 +37,7 @@ target_compile_options(balancing_motor_can_tests PRIVATE -Wall -Wextra -Wpedanti
 add_test(NAME balancing_motor_can_tests COMMAND balancing_motor_can_tests)
 
 # Yaw rate PI with conditional integration; no physical motor output (Issue #9).
-add_executable(balancing_yaw_pi_tests tests/test_yaw_pi.c)
+add_executable(balancing_yaw_pi_tests tests/test_yaw_pi.cpp ${F446_APP}/Src/balancing/control/controller/BalanceControl.cpp)
 target_link_libraries(balancing_yaw_pi_tests PRIVATE balancing_core m)
 target_compile_options(balancing_yaw_pi_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_yaw_pi_tests COMMAND balancing_yaw_pi_tests)
@@ -52,7 +49,7 @@ target_compile_options(balancing_leg_kinematics_tests PRIVATE -Wall -Wextra -Wpe
 add_test(NAME balancing_leg_kinematics_tests COMMAND balancing_leg_kinematics_tests)
 
 # Fixed-leg PD and Roll PD support-force math; host fixture only (Issue #9).
-add_executable(balancing_leg_pd_tests tests/test_leg_pd.c)
+add_executable(balancing_leg_pd_tests tests/test_leg_pd.cpp ${F446_APP}/Src/balancing/control/controller/BalanceControl.cpp)
 target_link_libraries(balancing_leg_pd_tests PRIVATE balancing_core m)
 target_compile_options(balancing_leg_pd_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_leg_pd_tests COMMAND balancing_leg_pd_tests)
