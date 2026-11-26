@@ -600,10 +600,11 @@ flowchart TD
     ROUTER --> CAN2["Can2ServiceLink：電源・操作"]
     MS --> APP["Application：周期コピー"]
     CAN2 --> APP
-    APP --> C["ControlCycle：推定・目標・制御・換算"]
+    APP --> R["drive_runtime（リンク時選択）"]
+    R --> D["tests/sil/DriveCycle"]
+    D --> C["ControlCycle：推定・目標・制御・換算"]
     C --> S["RobotSequence：状態決定"]
-    S --> D["DriveCycle"]
-    C --> D
+    S --> D
     D --> MS
     D --> P["MotorFramePlan"]
     P --> TX["CanTxScheduler：CAN1 4ms / CAN2 2ms"]
@@ -612,7 +613,7 @@ flowchart TD
     CAN -->|"照合済み終端"| D
 ```
 
-ホスト専用。ARMバイナリの通常駆動経路にはしない。未受付の旧周期は破棄、受付済みは中止を要求し終端を照合する。
+ホスト専用の駆動実装は tests/sil/ に配置。F446は同じ実行境界の非駆動実装をリンクし、Applicationに試験条件を持たせない。未受付の旧周期は破棄、受付済みは中止を要求し終端を照合する。
 
 
 ## DualSense USB操作

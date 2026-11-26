@@ -2,6 +2,7 @@
 #include "balancing/communication/can/Can2FilterPlan.hpp"
 #include "balancing_app_bridge.h"
 #include "balancing/app/ApplicationObservation.hpp"
+#include "sil/DriveSil.hpp"
 #include "balancing/device/ImuObservation.hpp"
 
 #ifdef NDEBUG
@@ -244,7 +245,6 @@ int main(int argc, char** argv)
         return 0;
     }
 
-#if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
     if (argc==2 && std::strcmp(argv[1],"--usb-input")==0) {
         using namespace balancing;
         // 人工の4バイト形式。実DualSenseの配置を表さない。
@@ -389,8 +389,8 @@ int main(int argc, char** argv)
             DWT->CYCCNT=static_cast<std::uint32_t>(at*168u);
             balancing_f446_can_service();
             balancing_app_control_tick();
-            assert(applicationObservation()->driveSil);
-            return *applicationObservation()->driveSil;
+            assert(driveSilObservation());
+            return *driveSilObservation();
         };
         struct Counts { unsigned stop{},enable{},torque{},zero{},current{},diagnostic{}; };
         auto classify=[](CAN_TypeDef& bus,unsigned i,Counts& c) {
@@ -636,7 +636,6 @@ int main(int argc, char** argv)
         std::puts("PASS: Application full SIL ARM, 250/500Hz, operation reference, abort/stop");
         return 0;
     }
-#endif
 
     if (argc == 2 && std::strcmp(argv[1], "--can2-services") == 0) {
         using namespace balancing;

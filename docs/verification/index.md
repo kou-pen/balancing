@@ -85,4 +85,6 @@
 
 - [CAN2通信の非駆動統合](f446-can2-service-integration-host.md)
 
+- [Application実行境界の分離](f446-application-runtime-refactor.md)（ホスト・ARMビルド検証済み）
+
 - [DualSense USB入力境界と操作統合](f446-dualsense-input-host.md)

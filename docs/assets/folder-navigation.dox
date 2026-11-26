@@ -276,7 +276,7 @@
 | <a href="ControlCycle_8hpp_source.html">ControlCycle.hpp</a> | 時刻付き観測・状態機械・数学制御を1周期で処理する契約 |
 | <a href="ApplicationObservation_8hpp_source.html">ApplicationObservation.hpp</a> | 非駆動周期の入力・状態・診断コピー |
 | <a href="DualSenseService_8hpp_source.html">DualSenseService.hpp</a> | USB操作イベントと長押し判定 |
-| <a href="DriveCycle_8hpp_source.html">DriveCycle.hpp</a> | ホスト専用周期統合と送信完了監視の契約 |
+| <a href="DriveRuntime_8hpp_source.html">DriveRuntime.hpp</a> | 周期実行・送信終端・CAN所有者結合の共通契約 |
 | <a href="Can2ServiceLink_8hpp_source.html">Can2ServiceLink.hpp</a> | 自作CAN2の受信・周期入力・応答・配信契約 |
 | <a href="PowerBoardService_8hpp_source.html">PowerBoardService.hpp</a> | 電源報告の受信API・生メタデータ・500ms期限・故障保持 |
 | <a href="RemoteControlService_8hpp_source.html">RemoteControlService.hpp</a> | 復号済み操作・切替・復帰管理 |
@@ -430,7 +430,7 @@
 | <a href="RobotSequence_8cpp_source.html">RobotSequence.cpp</a> | 運転状態の遷移、ARMINGの期限、FAULT記録 |
 | <a href="application_8cpp_source.html">application.cpp</a> | F446のC++側初期化、6軸・IMU観測の固定、非駆動ControlCycle |
 | <a href="DualSenseService_8cpp_source.html">DualSenseService.cpp</a> | 報告の連続性・操作元・長押しイベント |
-| <a href="DriveCycle_8cpp_source.html">DriveCycle.cpp</a> | ホスト専用のARM・制御・送信・停止の結合 |
+| <a href="DriveRuntime_8cpp_source.html">DriveRuntime.cpp</a> | F446の非駆動周期実行。ホスト駆動は tests/sil/ に分離 |
 | <a href="Can2ServiceLink_8cpp_source.html">Can2ServiceLink.cpp</a> | 電源・操作・診断配送と周期結果の応答生成 |
 | <a href="Can2ServiceLinkTx_8cpp_source.html">Can2ServiceLinkTx.cpp</a> | 背景送信・FAULT符号化・購読配信 |
 | <a href="PowerBoardService_8cpp_source.html">PowerBoardService.cpp</a> | CAN2電源状態の復号接続・受理と鮮度評価 |
