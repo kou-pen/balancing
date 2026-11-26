@@ -416,7 +416,7 @@ flowchart TB
     I2["CAN2 IRQ"] --> P2["CAN2 CanPort：独立キュー"]
     DWT["共有DWT時計"] --> I1
     DWT --> I2
-    P1 --> POLL["CanEventPoll：交互回収"]
+    P1 --> POLL["CanRouter：交互回収"]
     P2 --> POLL
     POLL --> R["CanRouter：分類"]
     R --> S1["CAN1監視コピー"]

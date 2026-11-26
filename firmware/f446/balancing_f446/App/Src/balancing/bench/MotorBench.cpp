@@ -1,5 +1,4 @@
 #include "balancing/bench/MotorBench.hpp"
-#include "balancing/app/CanEventPoll.hpp"
 #include <algorithm>
 #include <cmath>
 #include <limits>

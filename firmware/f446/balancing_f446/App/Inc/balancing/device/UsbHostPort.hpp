@@ -1,5 +1,5 @@
 #pragma once
-#include "balancing/communication/usb/DualSenseHostClass.hpp"
+#include "balancing/communication/usb/DualSenseProtocol.hpp"
 #include <array>
 #include <optional>
 

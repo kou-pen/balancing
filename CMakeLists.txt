@@ -15,7 +15,6 @@ add_library(balancing_core STATIC
     ${F446_APP}/Src/balancing/control/controller/balancing_leg_pd.c
     ${F446_APP}/Src/balancing/control/controller/balancing_yaw_pi.c
     ${F446_APP}/Src/balancing/communication/balancing_motor_can.c
-    ${F446_APP}/Src/balancing/communication/balancing_tx_scheduler.c
     ${F446_APP}/Src/balancing/control/estimator/balancing_leg_kinematics.c
     ${F446_APP}/Src/balancing/control/estimator/balancing_observation.c
     ${F446_APP}/Src/balancing/app/balancing_operator_input.c
@@ -36,12 +35,6 @@ add_executable(balancing_motor_can_tests tests/test_motor_can.c)
 target_link_libraries(balancing_motor_can_tests PRIVATE balancing_core m)
 target_compile_options(balancing_motor_can_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_motor_can_tests COMMAND balancing_motor_can_tests)
-
-# HAL-independent issue #5 scheduler: 3 simulated CAN1 mailboxes + virtual time.
-add_executable(balancing_tx_scheduler_tests tests/test_tx_scheduler.c)
-target_link_libraries(balancing_tx_scheduler_tests PRIVATE balancing_core m)
-target_compile_options(balancing_tx_scheduler_tests PRIVATE -Wall -Wextra -Wpedantic)
-add_test(NAME balancing_tx_scheduler_tests COMMAND balancing_tx_scheduler_tests)
 
 # Yaw rate PI with conditional integration; no physical motor output (Issue #9).
 add_executable(balancing_yaw_pi_tests tests/test_yaw_pi.c)
@@ -104,20 +97,18 @@ set(BALANCING_CAN2_SERVICE_SOURCES
     ${F446_APP}/Src/balancing/communication/can/RemoteControlCodec.cpp
     ${F446_APP}/Src/balancing/communication/can/DiagnosticsCodec.cpp
 )
-set(BALANCING_CAN2_TX_SOURCE ${F446_APP}/Src/balancing/app/Can2ServiceLinkTx.cpp)
 add_executable(balancing_cpp_app_tests
     tests/test_cpp_app.cpp
+    ${F446_APP}/Src/balancing/communication/can/CanPort.cpp
+    ${F446_APP}/Src/balancing/communication/can/CanTxScheduler.cpp
     ${F446_APP}/Src/balancing/app/DriveRuntime.cpp
     ${BALANCING_CONTROL_MATH_SOURCES}
     ${F446_APP}/Src/balancing/app/RobotSequence.cpp
     ${F446_APP}/Src/balancing/app/application.cpp
     ${F446_APP}/Src/balancing/device/UsbHostPort.cpp
-    ${F446_APP}/Src/balancing/communication/usb/DualSenseHostClass.cpp
     ${F446_APP}/Src/balancing/app/CycleHealthMonitor.cpp
-    ${F446_APP}/Src/balancing/device/WatchdogPort.cpp
     ${F446_APP}/Src/balancing/app/DualSenseService.cpp
-    ${F446_APP}/Src/balancing/device/UsbHidInput.cpp
-    ${F446_APP}/Src/balancing/communication/usb/DualSenseHidCodec.cpp
+    ${F446_APP}/Src/balancing/communication/usb/DualSenseProtocol.cpp
     ${BALANCING_CAN2_SERVICE_SOURCES}
     ${F446_APP}/Src/balancing/app/PowerBoardService.cpp
     ${BALANCING_POWER_CODEC_SOURCES}
@@ -127,6 +118,7 @@ add_executable(balancing_cpp_app_tests
     ${F446_APP}/Src/balancing/app/StatusIndicator.cpp
 )
 target_include_directories(balancing_cpp_app_tests PRIVATE
+    tests/stubs_can1
     ${F446_APP}/Inc
 )
 target_link_libraries(balancing_cpp_app_tests PRIVATE balancing_core m)
@@ -171,7 +163,6 @@ target_compile_options(balancing_f446_can_port_tests PRIVATE -Wall -Wextra -Wped
 add_test(NAME balancing_f446_can_port_tests COMMAND balancing_f446_can_port_tests)
 
 set(BALANCING_CAN_DISPATCH_SOURCES
-    ${F446_APP}/Src/balancing/app/CanEventPoll.cpp
     ${F446_APP}/Src/balancing/communication/can/CanRouter.cpp
     ${F446_APP}/Src/balancing/communication/can/ProtocolId.cpp
     ${F446_APP}/Src/balancing/communication/can/CanTxScheduler.cpp
@@ -198,18 +189,14 @@ add_executable(balancing_f446_can1_runtime_tests
     tests/sil/DriveCycle.cpp
     tests/sil/DriveRuntime.cpp
     ${F446_APP}/Src/balancing/communication/can/MotorFramePlan.cpp
-    ${BALANCING_CAN2_TX_SOURCE}
     ${BALANCING_CONTROL_MATH_SOURCES}
     ${BALANCING_RS06_SERVICE_SOURCES}
     ${F446_APP}/Src/balancing/app/MotorCanLink.cpp
     ${F446_APP}/Src/balancing/app/application.cpp
     ${F446_APP}/Src/balancing/device/UsbHostPort.cpp
-    ${F446_APP}/Src/balancing/communication/usb/DualSenseHostClass.cpp
     ${F446_APP}/Src/balancing/app/CycleHealthMonitor.cpp
-    ${F446_APP}/Src/balancing/device/WatchdogPort.cpp
     ${F446_APP}/Src/balancing/app/DualSenseService.cpp
-    ${F446_APP}/Src/balancing/device/UsbHidInput.cpp
-    ${F446_APP}/Src/balancing/communication/usb/DualSenseHidCodec.cpp
+    ${F446_APP}/Src/balancing/communication/usb/DualSenseProtocol.cpp
     ${BALANCING_CAN2_SERVICE_SOURCES}
     ${F446_APP}/Src/balancing/app/PowerBoardService.cpp
     ${BALANCING_POWER_CODEC_SOURCES}
@@ -239,6 +226,8 @@ add_test(NAME balancing_f446_drive_sil_tests COMMAND balancing_f446_can1_runtime
 add_test(NAME balancing_f446_usb_input_tests COMMAND balancing_f446_can1_runtime_tests --usb-input)
 add_test(NAME balancing_f446_drive_sil_usb_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-usb)
 add_test(NAME balancing_f446_drive_sil_timeout_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-timeout)
+add_test(NAME balancing_f446_drive_sil_short_deadline_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-short-deadline)
+add_test(NAME balancing_f446_drive_sil_long_deadline_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-long-deadline)
 add_test(NAME balancing_f446_drive_sil_invalid_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-invalid)
 add_test(NAME balancing_f446_drive_sil_gap_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-gap)
 add_test(NAME balancing_f446_drive_sil_rx_loss_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-rx-loss)
@@ -252,7 +241,6 @@ add_test(NAME balancing_f446_drive_sil_stale_tests COMMAND balancing_f446_can1_r
 add_executable(balancing_f446_can_event_poll_tests
     tests/test_f446_can_event_poll.cpp
     ${BALANCING_CAN2_SERVICE_SOURCES}
-    ${BALANCING_CAN2_TX_SOURCE}
     ${F446_APP}/Src/balancing/app/RemoteControlService.cpp
     ${F446_APP}/Src/balancing/app/PowerBoardService.cpp
     ${BALANCING_POWER_CODEC_SOURCES}

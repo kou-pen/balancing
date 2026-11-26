@@ -57,33 +57,10 @@ for label, flags in [
     print(f"[{label}] 実行", flush=True)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
-# HALとは独立した送信スケジューラの故障注入を通常・UBSanの両方で確認する。
-scheduler_common = [
-    "gcc",
-    "-std=c11",
-    "-Wall",
-    "-Wextra",
-    "-Werror",
-    "-pedantic",
-    "-I",
-    str(F446_APP / "Inc"),
-    str(F446_APP / "Src" / "balancing" / "communication" / "balancing_tx_scheduler.c"),
-    str(ROOT / "tests" / "test_tx_scheduler.c"),
-]
-for label, flags in [
-    ("CANスケジューラ通常ビルド", []),
-    ("CANスケジューラ未定義動作検査", ["-fsanitize=undefined", "-fno-sanitize-recover=all"]),
-]:
-    path = OUT / ("test_tx_scheduler_ubsan" if flags else "test_tx_scheduler")
-    print(f"[{label}] コンパイル", flush=True)
-    subprocess.run(scheduler_common + flags + ["-o", str(path)], check=True, cwd=ROOT, timeout=30)
-    print(f"[{label}] 実行", flush=True)
-    subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
-
 # Both Application tests now link the actual C++ control cycle and C11 math.
 app_source = F446_APP / "Src" / "balancing"
 app_math_cpp = [str(app_source / name) for name in (
-    "app/ControlCycle.cpp", "app/CycleHealthMonitor.cpp", "device/WatchdogPort.cpp", "device/UsbHostPort.cpp", "communication/usb/DualSenseHostClass.cpp", "app/PowerBoardService.cpp", "app/DualSenseService.cpp", "device/UsbHidInput.cpp", "communication/usb/DualSenseHidCodec.cpp", "app/RemoteControlService.cpp", "app/DiagnosticsService.cpp", "app/StatusIndicator.cpp", "device/StatusIndicatorPort.cpp", "control/controller/MotorCommand.cpp",
+    "app/ControlCycle.cpp", "app/CycleHealthMonitor.cpp", "device/UsbHostPort.cpp", "app/PowerBoardService.cpp", "app/DualSenseService.cpp", "communication/usb/DualSenseProtocol.cpp", "app/RemoteControlService.cpp", "app/DiagnosticsService.cpp", "app/StatusIndicator.cpp", "device/StatusIndicatorPort.cpp", "control/controller/MotorCommand.cpp",
     "control/controller/BalanceControl.cpp", "control/estimator/StateEstimator.cpp",
     "control/estimator/LegKinematics.cpp", "control/estimator/WheelOdometry.cpp")]
 power_codec_sources = [str(app_source / ("communication/can/" + name)) for name in
@@ -117,6 +94,9 @@ cpp_common = [
     str(F446_APP / "Src" / "balancing" / "app" / "application.cpp"),
     str(app_source / "app" / "DriveRuntime.cpp"),
     str(ROOT / "tests" / "test_cpp_app.cpp"),
+    "-I", str(ROOT / "tests" / "stubs_can1"),
+    str(app_source / "communication/can/CanPort.cpp"),
+    str(app_source / "communication/can/CanTxScheduler.cpp"),
     str(app_source / "app" / "RobotSequence.cpp"),
     *app_math_cpp, power_id_source,
 ]
@@ -354,8 +334,6 @@ can_dispatch_common = [
     str(rs06_source / "communication" / "can" / "CanRouter.cpp"),
     str(rs06_source / "communication" / "can" / "ProtocolId.cpp"),
     str(rs06_source / "communication" / "can" / "CanTxScheduler.cpp"),
-    str(rs06_source / "app" / "CanEventPoll.cpp"),
-    str(rs06_source / "app" / "Can2ServiceLinkTx.cpp"),
 ]
 for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"])]:
     executable=OUT / f"test_motor_bench{suffix}"
@@ -365,7 +343,6 @@ for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-saniti
         str(rs06_source / "communication/can/CanRouter.cpp"),
         str(rs06_source / "communication/can/ProtocolId.cpp"),
         str(rs06_source / "communication/can/CanTxScheduler.cpp"),
-        str(rs06_source / "app/CanEventPoll.cpp"),
         str(rs06_source / "communication/Rs06Codec.cpp"),
         str(rs06_source / "device/Rs06Motor.cpp"),
         str(rs06_source / "device/C620Motor.cpp"),
@@ -405,7 +382,7 @@ for test, extra_sources in [
             subprocess.run([str(path), "--usb-host"], check=True, cwd=ROOT, timeout=30)
             subprocess.run([str(path), "--drive-sil-usb-host"], check=True, cwd=ROOT, timeout=30)
             subprocess.run([str(path), "--watchdog"], check=True, cwd=ROOT, timeout=30)
-            for mode in ("--usb-input", "--drive-sil-usb", "--drive-sil", "--drive-sil-timeout", "--drive-sil-invalid",
+            for mode in ("--usb-input", "--drive-sil-usb", "--drive-sil", "--drive-sil-timeout", "--drive-sil-short-deadline", "--drive-sil-long-deadline", "--drive-sil-invalid",
                          "--drive-sil-stale", "--drive-sil-rs-timeout", "--drive-sil-tx-error", "--drive-sil-estop",
                          "--drive-sil-invalid-model", "--drive-sil-rx-loss", "--drive-sil-gap"):
                 subprocess.run([str(path), mode], check=True, cwd=ROOT, timeout=30)

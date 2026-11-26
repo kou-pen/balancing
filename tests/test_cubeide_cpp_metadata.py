@@ -127,7 +127,7 @@ class CubeIdeMetadataTests(unittest.TestCase):
         expected = (
             "balancing/bench/MotorBench.hpp",
             "balancing/communication/balancing_motor_can.h",
-            "balancing/communication/balancing_tx_scheduler.h",
+            "balancing/communication/can/CanTxScheduler.hpp",
             "balancing/control/controller/balancing_core.h",
         )
         inc = PROJECT / "App" / "Inc"

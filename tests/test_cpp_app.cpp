@@ -43,6 +43,11 @@ void balancing::serviceCan2ApplicationTx() noexcept {}
 std::optional<std::uint64_t> balancing::observationClockUs() noexcept
 { return available ? std::optional<std::uint64_t>{observed.motors.sampledAtUs} : std::nullopt; }
 
+// CANポートはこの試験で起動しない。リンクに必要なIRQマスクだけ模擬。
+std::uint32_t __get_PRIMASK() { return 0u; }
+void __disable_irq() {}
+void __enable_irq() {}
+
 int main()
 {
     BF446AppTimingSnapshot timing{};
