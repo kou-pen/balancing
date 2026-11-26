@@ -60,6 +60,6 @@ C++17では `C620Motor` が受信ごとにロータ角の8192カウント折返�
 
 `StateEstimator` は元の各軸・IMU測定時刻と実測周期間隔を返します。片脚が未受信・非到達・特異であれば、一部の脚だけ使える `ControlSnapshot` は返しません。ただしIMU欠損中も車輪が新規受信していれば位置は積算しておき、復旧周期に正しい原点の継続を扱います。
 
-**安全境界:** 旧C11 `b_leg_fixture_forward` の幾何は実機の六節リンクCADと未照合です。新しい `ControlSnapshot.fixtureOnly` は常に `true` であり、数学上の推定成功は実機のARM/トルク許可ではありません。実機CAD・原点・軸方向・姿勢取付方向の確定と、HAL/I2C/CAN/実時間確認は後続です。
+**安全境界:** `LegKinematics::forward` の幾何は実機の六節リンクCADと未照合です。新しい `ControlSnapshot.fixtureOnly` は常に `true` であり、数学上の推定成功は実機のARM/トルク許可ではありません。実機CAD・原点・軸方向・姿勢取付方向の確定と、HAL/I2C/CAN/実時間確認は後続です。
 
 [StateEstimatorの実装とホスト検証](../verification/f446-state-estimator-host.md)

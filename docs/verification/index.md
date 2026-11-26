@@ -108,4 +108,6 @@
 
 - [BalanceControlのC++数値演算統合](f446-balance-math-cpp.md)
 
+- [脚運動学・VMCのC++統合](f446-leg-math-cpp.md)
+
 - [姿勢フィルタのC++統合](f446-attitude-math-cpp.md)
