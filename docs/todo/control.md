@@ -11,7 +11,7 @@
 | T-CTRL-05 | BNO055非同期取得・姿勢フィルタ・状態推定 | 取付方向・校正・実サンプル時刻 |
 | T-CTRL-06/07 | 線形シミュレーションと数学fixtureのLQR演算 | 実機モデル、K_300、実トルク上限での検証 |
 | T-CTRL-08/09 | 脚長・Roll・Yaw、VMC、6軸換算・制限のSIL | 実機支持力・補償と符号、ゲイン調整 |
-| T-CTRL-10/11 | RobotSequence、ControlCycle、500 Hz SIL・無効化・FAULT | 保護限界の実機確認、本番操作・モータ経路統合 |
+| T-CTRL-10/11 | RobotSequence、ControlCycle、500 Hz SIL・6軸模擬CAN、無効化・FAULT | 保護限界の実機確認、USB・実機モデル・本番出力経路 |
 
 根拠: [検証一覧](../verification/index.md)。未確定の機体定数を数学fixtureで代用しない。
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "balancing/app/RobotSequence.hpp"
+#include "balancing/app/balancing_operator_input.h"
 #include "balancing/control/controller/BalanceControl.hpp"
 #include "balancing/control/controller/MotorCommand.hpp"
 #include "balancing/control/estimator/StateEstimator.hpp"
@@ -23,6 +24,8 @@ struct ControlTickInput {
     Rs06ArmFeedback armFeedback{};
     FaultFlags observedFaults{FaultFlags::None};
     BalanceReference target{};
+    // 明示SIL時のみ使用。実測推定から移動位置基準を生成する候補則。
+    std::optional<BOperatorTarget> movingTarget{};
     // 初回のみ使用。TIM7の単なるカウントから実測時刻を捏造しない。
     std::chrono::microseconds firstElapsed{0};
 };
@@ -37,6 +40,7 @@ struct ControlTickResult {
     std::optional<StateEstimateError> estimateError{};
     std::optional<BalanceControlOutput> mathematicalTorques{};
     std::optional<MotorCommandPreview> motorCommandPreview{};
+    std::optional<BalanceReference> appliedReference{};
     FaultFlags observedFaults{FaultFlags::None};
 };
 
@@ -63,7 +67,7 @@ public:
      *  @param[in] input 上流が単調時計で採取し今周期に固定した観測・状態。
      *  @return 欠損周期では部分的な駆動プレビューを返さない。
      *  @pre 主ループからのみ呼び、各周期に新しい観測時刻を与える。
-     *  @warning 本結果を実機の非ゼロCANフレームへ変換して送ってはならない。
+     *  @warning 本結果を実機へ送ってはならない。ホスト専用DriveCycleの模擬CAN試験に限り符号化・配送する。
      *  @spec{BOARD-F446-001}
      */
     ControlTickResult step(const ControlTickInput& input) noexcept;
@@ -74,6 +78,7 @@ private:
     BalanceControl& control_;
     MotorCommand& converter_;
     std::optional<std::uint64_t> previousUs_{};
+    std::optional<float> movingPositionM_{};
 };
 
 } // namespace balancing

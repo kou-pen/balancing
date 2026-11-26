@@ -114,6 +114,12 @@ public:
             pendingFaults_, mappingVerified_};
     }
 
+#if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
+    void bindDriveSil() noexcept
+    {
+        if (selfDefinedCan2_) (void)balancing::bindDriveSilRuntime(motors_,link_,tx1_,tx2_);
+    }
+#endif
     bool selfDefinedCan2() const noexcept { return selfDefinedCan2_; }
 
     void serviceCan2Tx() noexcept
@@ -167,6 +173,9 @@ private:
     {
         // 受信専用。終端の配送だけで、送信候補は生成しない。
         link_.onCanTransmit(bus, token, outcome, atUs);
+#if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
+        balancing::driveSilTerminal(bus,token,outcome,atUs);
+#endif
         if (selfDefinedCan2_ && bus==balancing::CanBus::Can2)
             if (auto* link=balancing::applicationCan2Link())
                 link->onTxTerminal(bus,token,outcome,atUs);
@@ -291,6 +300,9 @@ bool balancing::startCanObservation(CAN_HandleTypeDef* can1, CAN_HandleTypeDef* 
         return false;
     }
     started = true;
+#if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
+    runtime->bindDriveSil();
+#endif
     return true;
 }
 

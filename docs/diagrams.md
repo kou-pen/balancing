@@ -589,3 +589,27 @@ flowchart TD
 ```
 
 明示プロファイル時のホスト検証経路。既定起動は自作フィルタ・送信無効。背景送信は停止・通常・周期待ちより下位。通常モータ駆動経路・実機電源操作は含めない。
+
+
+## Application通常運転SIL
+
+```mermaid
+flowchart TD
+    IRQ["模擬CAN IRQ"] --> ROUTER["CanRouter"]
+    ROUTER --> MS["MotorService / MotorCanLink"]
+    ROUTER --> CAN2["Can2ServiceLink：電源・操作"]
+    MS --> APP["Application：周期コピー"]
+    CAN2 --> APP
+    APP --> C["ControlCycle：推定・目標・制御・換算"]
+    C --> S["RobotSequence：状態決定"]
+    S --> D["DriveCycle"]
+    C --> D
+    D --> MS
+    D --> P["MotorFramePlan"]
+    P --> TX["CanTxScheduler：CAN1 4ms / CAN2 2ms"]
+    MS --> TX
+    TX --> CAN["模擬CanPort"]
+    CAN -->|"照合済み終端"| D
+```
+
+ホスト専用。ARMバイナリの通常駆動経路にはしない。未受付の旧周期は破棄、受付済みは中止を要求し終端を照合する。

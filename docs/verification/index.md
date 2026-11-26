@@ -45,6 +45,8 @@
 
 ## 現時点の境界
 
+通常運転SILレビュー版: [Application通常運転・6軸模擬CAN](f446-drive-cycle-sil.md)は追加10モード、CTest 44/44。実機への通常指令はコンパイル境界で分離。
+
 2026-11-26 CAN2統合レビュー版: [非駆動Application配送・診断/操作応答](f446-can2-service-integration-host.md)でCTest 34/34、通常/UBSan、全46 AppソースのDebug/Release ARMビルドが合格。通常モータ駆動と実機試験は未実施。
 
 2026-11-26、PR #68統合時点の最新ホスト結果はCTest 33/33、通常/UBSan全件合格。CAN2 v1の受信分類・フィルタ計画・電源状態受信、非駆動Application周期、BNO055、6軸観測、SIL制御・指令計画を検証済み。現行master 0692c4eの[全44 AppソースのARMクロスビルド](f446-crossbuild-20261126.md)はDebug/Releaseとも合格。本番操作・送信経路の統合と実機試験は未確認。進行順は [P0ロードマップ](../todo/roadmap.md) を参照。

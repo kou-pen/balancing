@@ -15,7 +15,8 @@ CanTxSubmitResult CanTxScheduler::trySubmit(const CanFrame& frame, TxToken token
 {
     // 直送も停止の優先順位を守る。通常イベントでFIFOがすでに空でも、その終端まで
     // 次のフレームは待つ。先に投入すると小さいCAN IDが通常イベントを追い越し得る。
-    if (hasStop() || eventCount_ != 0 || hasEventInFlight() || hasQueuedPeriodic(token)) {
+    if (hasStop() || eventCount_ != 0 || hasEventInFlight() || hasQueuedPeriodic(token) ||
+        std::any_of(accepted_.begin(),accepted_.end(),[](const AcceptedTx& e){return e.cancellationPending;})) {
         return CanTxSubmitResult::Busy;
     }
     return submit(frame, {token, nowUs});
@@ -30,7 +31,7 @@ CanTxSubmitResult CanTxScheduler::trySubmitBackground(const CanFrame& frame, TxT
     if (hasStop() || eventCount_!=0 || hasEventInFlight() || isKnownToken(token) ||
         std::any_of(periodic_.requests.begin(),periodic_.requests.end(),
                     [](const auto& request){ return request.has_value(); }) ||
-        std::any_of(accepted_.begin(),accepted_.end(),[](const AcceptedTx& tx){ return tx.background; })) {
+        std::any_of(accepted_.begin(),accepted_.end(),[](const AcceptedTx& tx){ return tx.background || tx.cancellationPending; })) {
         return CanTxSubmitResult::Busy;
     }
     return submit(frame,{token,nowUs,0,false,true});
@@ -120,6 +121,18 @@ PeriodicBatchResult CanTxScheduler::replacePeriodic(const PeriodicTxBatch& batch
     return PeriodicBatchResult::Queued;
 }
 
+void CanTxScheduler::invalidatePeriodic() noexcept
+{
+    periodic_.requests={};
+    for (auto& entry:accepted_) {
+        if (entry.periodicGeneration && !entry.cancellationPending) {
+            // 中止要求時にすでに完了している可能性もある。照合表は終端でのみ消す。
+            entry.cancellationPending=true;
+            (void)port_.requestAbort(entry.token);
+        }
+    }
+}
+
 EventEnqueueResult CanTxScheduler::enqueueEvent(const EventTxRequest& request, std::uint64_t nowUs) noexcept
 {
     const auto token = request.token;
@@ -166,6 +179,10 @@ ScheduledTxProgress CanTxScheduler::service(std::uint64_t nowUs) noexcept
     if (hasStop()) {
         return serviceStop(nowUs);
     }
+    // 旧周期の中止終端が未確認なら新しい周期・通常要求は入れない。
+    if (std::any_of(accepted_.begin(),accepted_.end(),
+                    [](const AcceptedTx& tx){return tx.cancellationPending;}))
+        return {ScheduledTxResult::Busy,{}};
     if (eventCount_ == 0) {
         // 受付時点でFIFOの枠は返すため、FIFOが空でもメールボックスに通常イベントが残り得る。
         // 周期フレームを投入できるのは、その送信結果を回収して照合表を空けた後。
@@ -202,7 +219,14 @@ ScheduledTxProgress CanTxScheduler::serviceStop(std::uint64_t nowUs) noexcept
     // 別の軸が終端待ち・再試行待ちでも、まだ受付されていない停止先を進められる。
     // 空き枠は通常イベントの終端を待たず利用する。既にHWにあるフレームの順序は変えない。
     const auto pending = std::find_if(stops_.begin(), stops_.end(),
-                                      [](const StopSlot& slot) { return slot.state == StopState::Pending; });
+        [this](const StopSlot& slot) {
+            if (slot.state!=StopState::Pending) return false;
+            const auto target=static_cast<std::size_t>(&slot-stops_.data());
+            // 旧指令が停止より後に到達し得る軸だけ終端を待つ。他軸の停止を遅延させない。
+            return std::none_of(accepted_.begin(),accepted_.end(),[target](const AcceptedTx& tx) {
+                return tx.cancellationPending && tx.periodicTarget==target;
+            });
+        });
     if (pending == stops_.end()) {
         return {ScheduledTxResult::Busy, {}};
     }
@@ -285,7 +309,9 @@ ScheduledTxProgress CanTxScheduler::servicePeriodic(std::uint64_t nowUs) noexcep
         return {ScheduledTxResult::Busy, {}};
     }
 
-    const auto progress = submitScheduled(request.frame, {token, nowUs, periodic_.generation});
+    const auto target=static_cast<std::size_t>(slot-periodic_.requests.begin());
+    const auto progress = submitScheduled(request.frame, {token, nowUs, periodic_.generation,
+                                                           false,false,false,target});
     if (progress.result == ScheduledTxResult::Accepted || progress.result == ScheduledTxResult::Invalid) {
         slot->reset();
     }

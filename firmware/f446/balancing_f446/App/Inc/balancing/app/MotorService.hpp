@@ -141,6 +141,10 @@ public:
      *  @spec{PROTO-RS06-001}
      */
     bool hasRs06Configuration() const noexcept { return configured_; }
+    /** @brief 起動時固定の軸割当コピー。送信側と受信側のIDを二重設定しない。
+     * @spec{PROTO-RS06-001}
+     */
+    Rs06BusConfig rs06BusConfig() const noexcept { return config_; }
 
 private:
     Rs06Motor* findMotor(std::uint8_t id) noexcept;

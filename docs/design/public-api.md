@@ -206,3 +206,23 @@ ApplicationはMotorObservationSnapshotとImuAttitudeを同じ周期時刻で固�
 購読はRegister 2〜9について設定された周期・期限内のみ。未知のPARAM_READにはPARAM_ERRORを返す。F446からの電源要求は独立した模擬リンクでだけ許可し、Applicationでは無効。POWER_RESULTは要求番号・種別と送信終端を照合して保持するがPOWER_STATUSの代用にはしない。同一IRQでTX終端とRXを観測し先後が不明な応答は保守的に採用しない。
 
 [検証記録](../verification/f446-can2-service-integration-host.md)。
+
+
+## Application通常運転経路（ホストSIL専用）
+
+`DriveCycle` は既存のControlCycle・RobotSequence・MotorService・MotorCanLink・両CanTxSchedulerを参照する。MotorFramePlanの軸IDはMotorServiceの起動設定から取得し、重複設定しない。
+
+| API | 責務 |
+|---|---|
+| `initializeDriveSil(profile)` | 人工の推定・制御・換算・ARM期限・送信期限・CAN2設定を起動前に一回注入 |
+| `bindDriveSilRuntime(motors, link, tx1, tx2)` | 起動済み模擬CANの既存所有者をApplicationへ結合 |
+| `DriveCycle::step(input)` | 実際の4軸ARM応答・送信完了監視を集約し、ControlCycleを一度実行、状態に応じたフレームを予約 |
+| `DriveCycle::poll(nowUs)` | 有限回のCAN受付、異常時の旧予約破棄と停止方向のみの抑止 |
+| `DriveCycle::onTxTerminal(bus, token, outcome, atUs)` | 最新世代の送信完了だけ鮮度更新。バス・軸・世代を混同しない |
+| `CanTxScheduler::invalidatePeriodic()` | 未受付の周期フレームを破棄し、受付済みに中止要求。対応する軸は終端まで停止送信を待つが他軸は独立 |
+
+`ControlTickInput::movingTarget` の候補則は走行時に実測dtで目標位置を移動させ、速度0では現在位置へ戻す。物理モデルに対する制御性能の比較は後続。通常指令はCAN1 4ms / CAN2 2ms、ARMINGと非駆動は車輪ゼロ、停止は既存MotorServiceが軸別に管理する。
+
+`BALANCING_HOST_SIL` かつ非ARM/ThumbビルドでのみDriveCycleとApplication結合入口が存在する。C ABIの既定起動は非駆動のまま。実機にfixtureを昇格させない。送信中止は終端が来るまで物理的な取消を意味しない。
+
+[検証記録](../verification/f446-drive-cycle-sil.md)。

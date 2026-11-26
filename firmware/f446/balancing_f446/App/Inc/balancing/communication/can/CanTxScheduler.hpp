@@ -134,6 +134,13 @@ public:
      */
     PeriodicBatchResult replacePeriodic(const PeriodicTxBatch& batch, std::uint64_t nowUs) noexcept;
 
+    /** @brief 未受付周期を破棄し、受付済み周期に中止要求を出す。
+     * @pre 周期requestsの添字と停止対象番号は同じ軸に割り当てる。
+     * @note 対応軸の停止と新周期は終端確認を待つ。他軸の停止は独立。中止要求は取消成功の証明ではない。
+     * @spec{BEHAV-001}
+     */
+    void invalidatePeriodic() noexcept;
+
     /** @brief 期限内の通常イベントをFIFO末尾に追加する。
      *  @param[in] request フレーム、固有トークン、絶対送信期限 [us]。
      *  @param[in] nowUs CanPortと共通の単調時計の時刻 [us]。
@@ -181,6 +188,8 @@ private:
         std::uint64_t periodicGeneration{0};
         bool normalEvent{false};
         bool background{false};
+        bool cancellationPending{false};
+        std::size_t periodicTarget{0};
     };
 
     enum class StopState : std::uint8_t { Idle, Pending, InFlight, RetryRequired };

@@ -185,6 +185,8 @@ set(BALANCING_CAN_DISPATCH_SOURCES
 # Startup, RX observation and IRQ ownership at both STM32F446 CAN buses.
 add_executable(balancing_f446_can1_runtime_tests
     tests/test_f446_can1_runtime.cpp
+    ${F446_APP}/Src/balancing/app/DriveCycle.cpp
+    ${F446_APP}/Src/balancing/communication/can/MotorFramePlan.cpp
     ${BALANCING_CAN2_TX_SOURCE}
     ${BALANCING_CONTROL_MATH_SOURCES}
     ${BALANCING_RS06_SERVICE_SOURCES}
@@ -206,11 +208,22 @@ target_include_directories(balancing_f446_can1_runtime_tests PRIVATE
     ${F446_APP}/Inc
 )
 target_link_libraries(balancing_f446_can1_runtime_tests PRIVATE balancing_core m)
+target_compile_definitions(balancing_f446_can1_runtime_tests PRIVATE BALANCING_HOST_SIL)
 target_compile_options(balancing_f446_can1_runtime_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_can1_runtime_tests COMMAND balancing_f446_can1_runtime_tests)
 add_test(NAME balancing_f446_can_rollback_failure_tests COMMAND balancing_f446_can1_runtime_tests --rollback-failure)
 add_test(NAME balancing_f446_motor_observation_tests COMMAND balancing_f446_can1_runtime_tests --motor-observation)
 add_test(NAME balancing_f446_can2_services_tests COMMAND balancing_f446_can1_runtime_tests --can2-services)
+add_test(NAME balancing_f446_drive_sil_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil)
+add_test(NAME balancing_f446_drive_sil_timeout_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-timeout)
+add_test(NAME balancing_f446_drive_sil_invalid_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-invalid)
+add_test(NAME balancing_f446_drive_sil_gap_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-gap)
+add_test(NAME balancing_f446_drive_sil_rx_loss_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-rx-loss)
+add_test(NAME balancing_f446_drive_sil_invalid_model_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-invalid-model)
+add_test(NAME balancing_f446_drive_sil_estop_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-estop)
+add_test(NAME balancing_f446_drive_sil_tx_error_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-tx-error)
+add_test(NAME balancing_f446_drive_sil_rs_timeout_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-rs-timeout)
+add_test(NAME balancing_f446_drive_sil_stale_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-stale)
 
 # A shared main-loop poll with separate bxCAN IRQ sources.
 add_executable(balancing_f446_can_event_poll_tests
