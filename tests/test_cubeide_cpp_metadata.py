@@ -125,11 +125,10 @@ class CubeIdeMetadataTests(unittest.TestCase):
 
     def test_public_headers_mirror_source_modules(self) -> None:
         expected = (
-            "balancing/app/balancing_motor_bench.h",
+            "balancing/bench/MotorBench.hpp",
             "balancing/communication/balancing_motor_can.h",
             "balancing/communication/balancing_tx_scheduler.h",
             "balancing/control/controller/balancing_core.h",
-            "balancing/device/balancing_f446_motor_bench_port.h",
         )
         inc = PROJECT / "App" / "Inc"
         self.assertTrue((inc / "balancing_app_bridge.h").is_file())
