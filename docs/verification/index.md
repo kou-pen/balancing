@@ -2,16 +2,16 @@
 
 各記録は当時のコード・環境・試験結果です。最新の実装説明は[全体構成](../architecture.md)、[フォルダ別コード案内](../design/public-api.md)に置き、過去のPASSを現在の実機動作に読み替えません。
 
-## 最新の基準（#88レビュー版 cb3abed）
+## 最新の基準（ARM準備診断レビュー版 f56c72c）
 
 | 項目 | 結果 |
 |---|---|
 | App自作コード | 96ファイル、45 .cpp、旧 .c 0 |
-| CTest・通常/UBSan | 70/70・全件PASS |
+| CTest・通常/UBSan | 71/71・全件PASS |
 | ARM管理ビルド | Debug / Release / BenchDebug すべて0 error / 0 warning |
 | 実機 | 書込み、実通信、実時間、物理停止、倒立は未検証 |
 
-出典：[停止専用経路の検証](f446-stop-output.md)。#88のマージ前はmasterとレビュー版を区別する。今回の文書整理でファームウェアの実装を変更していない。
+出典：[ARM準備診断](f446-arm-readiness.md)。レビュー版とmasterを区別する。停止専用経路 #88 と構造案内 #89 はmaster反映済み。
 
 ## 機能別の記録
 
@@ -28,6 +28,7 @@
 
 ### 周期・状態機械・安全・診断
 
+- [F446 ARM準備診断](f446-arm-readiness.md)
 - [RobotSequenceのホスト検証](robot-sequence-host.md)
 - [F446 ControlCycleのC++17本体化・ホスト検証](f446-control-cycle-core-host.md)
 - [F446 Applicationの共通時計・周期診断](f446-application-timing-host.md)

@@ -1,6 +1,6 @@
 # 起動・周期・通信の処理順序
 
-対象は #88レビュー版 cb3abed。実際の呼び出し順と将来仕様を分けます。クラスの所在は [フォルダ別コード案内](design/public-api.md)。
+対象は停止専用送信とARM準備診断の実装。実際の呼び出し順と将来仕様を分けます。クラスの所在は [フォルダ別コード案内](design/public-api.md)。
 
 ## 1. 通常起動と試運転起動
 
@@ -44,6 +44,7 @@ sequenceDiagram
     Note over A: #88の明示設定時は停止予約・送信処理も行う
     A->>A: 診断・表示・観測ack
     A->>W: 健全な完了証跡がある場合のみrefresh
+    A->>A: ARM準備の観測診断を更新
     M->>M: imu_poll と app_poll
 </pre>
 
@@ -154,7 +155,23 @@ flowchart LR
 
 IWDGを有効にした場合のみ更新されます。FAULT中でも停止処理を完了した健全周期は更新可。ISR・背景pollだけでは更新しません。物理リセット期限は未測定。
 
-## 9. 詳細資料
+## 9. ARM準備診断
+
+<pre class="mermaid">
+flowchart LR
+    CFG["起動固定の数学設定"] --> FORM["inspectArmConfiguration"]
+    BUS["CAN起動成功時の軸割当"] --> FORM2["inspectArmMotorConfiguration"]
+    FORM --> STATIC["configuration 不足ビット"]
+    FORM2 --> STATIC
+    OBS["最新周期の観測・推定・電源"] --> DYNAMIC["inspectArmObservations"]
+    DYNAMIC --> LIVE["observation 不足ビット"]
+    STATIC --> REPORT["ApplicationObservation.armReadiness"]
+    LIVE --> REPORT
+</pre>
+
+ARM準備診断は状態機械へ許可を与えない。実機駆動経路が未接続であることと、実機機構安全の未検証を常に報告する。起動時の数値形式検査と毎周期の観測不成立を区別する。
+
+## 10. 詳細資料
 
 - [CAN送信調停](design/can-scheduler.md)
 - [観測データの流れ](design/observation-snapshot.md)

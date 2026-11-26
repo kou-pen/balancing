@@ -102,9 +102,17 @@ public:
      */
     bool hasVerifiedConfiguration() const noexcept { return configValid_; }
 
-private:
+    /** @brief 軸別の変換設定を既存の数値・通信範囲条件で検査。
+     * @spec{CTRL-LQR-001}
+     * @spec{PROTO-RS06-001}
+     */
     static bool valid(const Rs06TorqueConversion& axis) noexcept;
+    /** @brief 車輪別の換算設定を検査。実機の許容電流は認定しない。
+     * @spec{PROTO-C620-001}
+     */
     static bool valid(const C620CurrentConversion& axis) noexcept;
+
+private:
 
     MotorCommandConfig config_{};
     bool configValid_{false};

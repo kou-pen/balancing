@@ -146,6 +146,11 @@ public:
      */
     Rs06BusConfig rs06BusConfig() const noexcept { return config_; }
 
+    /** @brief 4軸のIDが非ゼロ・非重複かを検査。配線照合とは別。
+     * @spec{PROTO-RS06-001}
+     */
+    static bool validRs06Ids(const std::array<std::uint8_t,4>&) noexcept;
+
 private:
     Rs06Motor* findMotor(std::uint8_t id) noexcept;
 

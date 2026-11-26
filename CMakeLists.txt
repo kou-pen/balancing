@@ -228,7 +228,7 @@ add_executable(balancing_f446_stop_output_tests
 target_include_directories(balancing_f446_stop_output_tests PRIVATE tests/stubs_can1 ${F446_APP}/Inc)
 target_link_libraries(balancing_f446_stop_output_tests PRIVATE balancing_core balancing_motor_codecs m)
 target_compile_options(balancing_f446_stop_output_tests PRIVATE -Wall -Wextra -Wpedantic)
-foreach(mode default collision normal timing faults retry)
+foreach(mode default collision normal timing faults retry readiness)
     add_test(NAME balancing_f446_stop_output_${mode}_tests COMMAND balancing_f446_stop_output_tests --${mode})
 endforeach()
 add_executable(balancing_f446_can1_runtime_tests

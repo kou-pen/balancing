@@ -10,6 +10,7 @@
 #include <cassert>
 #include <cstring>
 #include <cstdio>
+#include <limits>
 
 using namespace balancing;
 namespace {
@@ -100,6 +101,76 @@ ImuAttitude balancing::imuAttitude(std::uint64_t) noexcept{return {};}
 int main(int argc,char** argv){
     assert(argc==2);
     const char* mode=argv[1];
+    if (!std::strcmp(mode,"--readiness")) {
+        using I=ArmReadinessIssue;
+        const auto bits=[](I v){return static_cast<std::uint32_t>(v);};
+        assert(bits(inspectArmConfiguration({}))==(((1u<<17)-1u)|(1u<<21)));
+        DriveControlConfig cfg{};
+        cfg.arm={100000,true};
+        for(auto& leg:cfg.estimator.legs){
+            leg.motor={{0,0},{0,0},{1,-1},16,24,true};
+            leg.fixture={0.1f,0.1f,0.1f,0.2f,0.2f,0.01f,0.01f,1};
+        }
+        for(auto& wheel:cfg.estimator.wheels) wheel={0.1f,19,1,true};
+        cfg.controller.lqr.verified=true;cfg.controller.lqr.max_position_error_m=1;
+        cfg.controller.legPd={1,1,1,1,1,true};
+        cfg.controller.yawPi={1,1,1,true};
+        cfg.controller.wheelTorqueLimitNm={1,1};
+        for(auto& axis:cfg.converter.rs06) axis={1,1,1,true};
+        for(auto& axis:cfg.converter.c620) axis={1,1,1,true};
+        assert(inspectArmConfiguration(cfg)==I::DrivePathUnavailable);
+        const auto check=[&](const DriveControlConfig& c,I expected){
+            assert(inspectArmConfiguration(c)==(I::DrivePathUnavailable|expected));
+        };
+        auto bad=cfg;bad.arm.durationUs=0;check(bad,I::ArmDeadline);
+        for(unsigned i=0;i<2;++i){
+            bad=cfg;bad.estimator.legs[i].motor.direction[0]=0;
+            check(bad,i?I::RightLegCalibration:I::LeftLegCalibration);
+            bad=cfg;bad.estimator.legs[i].fixture.branch=0;
+            check(bad,i?I::RightLegGeometry:I::LeftLegGeometry);
+            bad=cfg;bad.estimator.wheels[i].wheelRadiusM=0;
+            check(bad,i?I::RightWheelCalibration:I::LeftWheelCalibration);
+            bad=cfg;bad.converter.c620[i].maxAbsCurrentA=21;
+            check(bad,i?I::RightWheelConversion:I::LeftWheelConversion);
+        }
+        for(unsigned i=0;i<4;++i){
+            bad=cfg;bad.converter.rs06[i].verified=false;
+            check(bad,static_cast<I>(1u<<(11+i)));
+        }
+        bad=cfg;bad.controller.lqr.gain[0][0]=std::numeric_limits<float>::quiet_NaN();check(bad,I::Lqr);
+        bad=cfg;bad.controller.legPd.length_kp_n_m=-1;check(bad,I::LegPd);
+        bad=cfg;bad.controller.yawPi.integral_limit_nm=-1;check(bad,I::YawPi);
+        bad=cfg;bad.controller.wheelTorqueLimitNm[0]=0;check(bad,I::WheelTorqueLimits);
+        MotorObservationConfig motors{{{11,12,13,14},0x5a},true,{{{1000,true},{1000,true}}},{}};
+        assert(inspectArmMotorConfiguration(motors,true)==I::None);
+        assert(inspectArmMotorConfiguration(motors,false)==I::Can2NotConfigured);
+        auto m=motors;m.rs06.motorIds[1]=11;assert(inspectArmMotorConfiguration(m,true)==I::Rs06Mapping);
+        m=motors;m.wheelContinuity[0].maxCaptureGapUs=0;
+        assert(inspectArmMotorConfiguration(m,true)==I::LeftWheelContinuity);
+        m=motors;m.wheelContinuity[1].maxCaptureGapUs=20001;
+        assert(inspectArmMotorConfiguration(m,true)==I::RightWheelContinuity);
+        ApplicationObservation obs{};
+        assert(bits(inspectArmObservations(obs))&bits(I::NoCycleObservation));
+        obs.motors.emplace();obs.timing.sample_valid=true;obs.cycle.emplace();
+        obs.motors->rs06MappingVerified=true;obs.imu.valid=true;obs.imu.fresh=true;
+        obs.power.ready=true;obs.cycle->estimate.emplace();
+        for(auto& a:obs.motors->motors.rs06){a.latest.emplace();a.fresh=true;}
+        for(auto& a:obs.motors->motors.c620){
+            a.latest.emplace();a.fresh=true;a.position.emplace();a.continuity=C620ContinuityStatus::Continuous;
+        }
+        assert(inspectArmObservations(obs)==I::MechanismUnverified);
+        obs.imu.fresh=false;assert(inspectArmObservations(obs)==(I::MechanismUnverified|I::ImuUnavailable));
+        obs.imu.fresh=true;obs.motors->motors.c620[1].position.reset();
+        assert(inspectArmObservations(obs)==(I::MechanismUnverified|I::MotorsUnavailable));
+        obs.motors->motors.c620[1].position.emplace();obs.power.ready=false;
+        assert(inspectArmObservations(obs)==(I::MechanismUnverified|I::PowerUnavailable));
+        obs.power.ready=true;obs.cycle->estimate.reset();
+        assert(inspectArmObservations(obs)==(I::MechanismUnverified|I::EstimateUnavailable));
+        obs.cycle->estimate.emplace();obs.cycle->sequence.state=RobotState::Fault;obs.fault.emplace();
+        assert(inspectArmObservations(obs)==(I::MechanismUnverified|I::FaultActive|I::NotDisarmed));
+        std::puts("PASS: static ARM readiness single missing item and dynamic observation diagnostics");
+        return 0;
+    }
     CAN_HandleTypeDef h1{CAN1,HAL_CAN_STATE_READY},h2{CAN2,HAL_CAN_STATE_READY};
     MotorObservationConfig cfg{{{11,12,13,14},0x5a},true,{}, {true,true}};
     if(!std::strcmp(mode,"--default")){
@@ -133,6 +204,9 @@ int main(int argc,char** argv){
     assert(!startCanObservation(&h1,&h2,cfg,false));
     assert(!starts&&!filterCalls);
     assert(startCanObservation(&h1,&h2,cfg,true));
+    const auto configIssues=applicationObservation()->armReadiness.configuration;
+    assert((static_cast<std::uint32_t>(configIssues)&static_cast<std::uint32_t>(ArmReadinessIssue::Rs06Mapping))==0);
+    assert((static_cast<std::uint32_t>(configIssues)&static_cast<std::uint32_t>(ArmReadinessIssue::DrivePathUnavailable))!=0);
     assert(!startCanObservation(&h1,&h2,cfg,true));
     assert(!startCanObservation(&h1,&h2,{},true));
     balancing_app_poll();own();assert(!pending(1)&&!pending(2));

@@ -169,6 +169,7 @@
 | ファイル | 内容 |
 |---|---|
 | [index.md](../verification/index.md) | 最新基準・機能別の全記録 |
+| [f446-arm-readiness.md](../verification/f446-arm-readiness.md) | ARM準備の設定・観測診断 |
 | [can-contract-audit.md](../verification/can-contract-audit.md) | CAN通信契約の静的照合（Issue #6） |
 | [core-mode-contract-audit.md](../verification/core-mode-contract-audit.md) | 制御コア状態機械の仕様差分監査 |
 | [cpp17-migration-preflight-20261112.md](../verification/cpp17-migration-preflight-20261112.md) | C++17集中移植前のmaster基準検証（2026-11-12） |
@@ -457,7 +458,7 @@ ApplicationObservationは周期コピー、ControlCycleは数学と状態判定�
 | <a href="RemoteControlService_8cpp_source.html">RemoteControlService.cpp</a> | 操作入力の検証、ニュートラル復帰、変化率制限、状態ごとの目標 |
 | <a href="RobotSequence_8cpp_source.html">RobotSequence.cpp</a> | 運転状態の遷移、ARMINGの期限、FAULT記録 |
 | <a href="StatusIndicator_8cpp_source.html">StatusIndicator.cpp</a> | FAULT優先と時刻差による点滅・鳴動 |
-| <a href="application_8cpp_source.html">application.cpp</a> | Application/ObservationCycleの所有、500 Hz周期・診断・更新の調停 |
+| <a href="application_8cpp_source.html">application.cpp</a> | Application/ObservationCycleの所有、500 Hz周期・ARM準備診断・更新の調停 |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Src_balancing_bench bench/

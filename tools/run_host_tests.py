@@ -312,7 +312,7 @@ for test, extra_sources in [
             subprocess.run(can_dispatch_common + production +
                 [str(rs06_source / "app/DriveRuntime.cpp"),str(ROOT / "tests/test_f446_stop_output.cpp")] +
                 flags + ["-lm","-o",str(stop_path)],check=True,cwd=ROOT,timeout=30)
-            for mode in ("default","collision","normal","timing","faults","retry"):
+            for mode in ("default","collision","normal","timing","faults","retry","readiness"):
                 subprocess.run([str(stop_path),"--"+mode],check=True,cwd=ROOT,timeout=30)
             subprocess.run([str(path), "--rollback-failure"], check=True, cwd=ROOT, timeout=30)
             subprocess.run([str(path), "--motor-observation"], check=True, cwd=ROOT, timeout=30)

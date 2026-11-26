@@ -86,6 +86,15 @@ public:
                                 const std::array<float, 2>& angleRad,
                                 const std::array<float, 2>& velocityRadS) noexcept;
 
+    /** @brief 校正の形式検査。実機原点の正しさは証明しない。
+     * @spec{CTRL-EST-001}
+     */
+    static bool validCalibration(const LegMotorTransform&) noexcept;
+    /** @brief 数学幾何の形式検査。到達性や実機CADとは別。
+     * @spec{CTRL-EST-001}
+     */
+    static bool validFixtureGeometry(const LegFixtureGeometry&) noexcept;
+
     /** @brief 校正済み歯数比・原点・方向を適用。失敗時は両軸ゼロ。
      * @spec{CTRL-EST-001}
      */

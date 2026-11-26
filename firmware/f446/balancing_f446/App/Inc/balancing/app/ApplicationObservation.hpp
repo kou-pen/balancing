@@ -25,6 +25,43 @@ struct StopOutputSummary {
     FaultFlags outputFaults{FaultFlags::None};
 };
 
+/** @brief ARM準備の不足項目。実機用診断であって許可判定を代替しない。
+ * @spec{BEHAV-001}
+ * @spec{BOARD-F446-001}
+ */
+enum class ArmReadinessIssue : std::uint32_t {
+    None=0, ArmDeadline=1u<<0,
+    LeftLegCalibration=1u<<1, RightLegCalibration=1u<<2,
+    LeftLegGeometry=1u<<3, RightLegGeometry=1u<<4,
+    LeftWheelCalibration=1u<<5, RightWheelCalibration=1u<<6,
+    Lqr=1u<<7, LegPd=1u<<8, YawPi=1u<<9, WheelTorqueLimits=1u<<10,
+    LeftLegAConversion=1u<<11, LeftLegBConversion=1u<<12,
+    RightLegAConversion=1u<<13, RightLegBConversion=1u<<14,
+    LeftWheelConversion=1u<<15, RightWheelConversion=1u<<16,
+    Rs06Mapping=1u<<17, LeftWheelContinuity=1u<<18, RightWheelContinuity=1u<<19,
+    Can2NotConfigured=1u<<20, DrivePathUnavailable=1u<<21,
+    NoCycleObservation=1u<<22, ImuUnavailable=1u<<23,
+    MotorsUnavailable=1u<<24, PowerUnavailable=1u<<25,
+    EstimateUnavailable=1u<<26, MechanismUnverified=1u<<27,
+    FaultActive=1u<<28, NotDisarmed=1u<<29
+};
+
+/** @brief 不足条件を結合。ワイヤの故障ビットではない。
+ * @spec{BEHAV-001}
+ */
+constexpr ArmReadinessIssue operator|(ArmReadinessIssue a,ArmReadinessIssue b) noexcept
+{
+    return static_cast<ArmReadinessIssue>(static_cast<std::uint32_t>(a)|static_cast<std::uint32_t>(b));
+}
+
+/** @brief 固定設定と当該周期の観測を区別する。数学形式PASSは実機安全の証明ではない。
+ * @spec{BEHAV-001}
+ */
+struct ArmReadinessSummary {
+    ArmReadinessIssue configuration{ArmReadinessIssue::DrivePathUnavailable};
+    ArmReadinessIssue observation{ArmReadinessIssue::NoCycleObservation};
+};
+
 /** @brief 非駆動Applicationの一周期分の観測・推定結果。古い結果を再公開しない。
  * @spec{BOARD-F446-001}
  * @spec{CTRL-EST-001}
@@ -45,6 +82,7 @@ struct ApplicationObservation {
     CycleHealthSnapshot cycleHealth{};
     WatchdogSummary watchdog{};
     StopOutputSummary stopOutput{};
+    ArmReadinessSummary armReadiness{};
 };
 
 /** @brief 主ループで最後の周期診断を取得。初期化前は空。

@@ -21,10 +21,15 @@ static_assert(canAdd(std::numeric_limits<std::int64_t>::min() + 1, -1));
 static_assert(!canAdd(std::numeric_limits<std::int64_t>::min(), -1));
 }
 
+bool C620Motor::validConfig(C620ContinuityConfig config) noexcept
+{
+    return config.verified && config.maxCaptureGapUs>0 &&
+           config.maxCaptureGapUs<=feedbackTimeoutUs;
+}
+
 C620Motor::C620Motor(C620ContinuityConfig config) noexcept
     : config_{config},
-      configValid_{config.verified && config.maxCaptureGapUs > 0 &&
-                   config.maxCaptureGapUs <= feedbackTimeoutUs},
+      configValid_{validConfig(config)},
       continuity_{configValid_ ? C620ContinuityStatus::Waiting :
                                 C620ContinuityStatus::Unverified}
 {

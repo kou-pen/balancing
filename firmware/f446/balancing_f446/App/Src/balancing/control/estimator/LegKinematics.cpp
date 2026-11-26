@@ -39,6 +39,13 @@ static bool validMotorMap(const LegMotorTransform& map) noexcept
 
 } // namespace
 
+bool LegKinematics::validCalibration(const LegMotorTransform& map) noexcept
+{
+    if (!validMotorMap(map)) return false;
+    const float ratio=map.drivingTeeth/map.drivenTeeth;
+    return std::isfinite(ratio) && ratio>0.0f;
+}
+
 bool LegKinematics::motorToJoint(const LegMotorTransform& map, const std::array<float,2>& motor_angle_rad,
                           const std::array<float,2>& motor_rate_rad_s, LegJointState& joint) noexcept
 {
@@ -83,11 +90,16 @@ static bool validGeometry(const LegFixtureGeometry& g) noexcept
            g.minCrossSine < 1.0f && g.minLegLengthM > 0.0f;
 }
 
+bool LegKinematics::validFixtureGeometry(const LegFixtureGeometry& g) noexcept
+{
+    return validGeometry(g) && (g.branch==-1 || g.branch==1);
+}
+
 LegSolveError LegKinematics::forward(const LegFixtureGeometry& g,
                                  const LegJointState& joint, LegEstimate& out) noexcept
 {
     out = {};
-    if (!validGeometry(g) || (g.branch != -1 && g.branch != 1) ||
+    if (!validFixtureGeometry(g) ||
         !finitePair(joint.angleRad) || !finitePair(joint.velocityRadS)) {
         return LegSolveError::InvalidGeometry;
     }

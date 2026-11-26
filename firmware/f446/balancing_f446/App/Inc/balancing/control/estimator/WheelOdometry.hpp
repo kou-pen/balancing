@@ -87,8 +87,12 @@ public:
      */
     void reset() noexcept;
 
-private:
+    /** @brief 起動時の校正形式検査。実測妥当性とは別。
+     * @spec{CTRL-EST-001}
+     */
     static bool validConfig(const WheelOdometryConfig& config) noexcept;
+
+private:
     WheelUpdateResult accept(std::size_t axis, const C620AxisFeedback& report,
                              std::uint64_t sampledAtUs) noexcept;
 

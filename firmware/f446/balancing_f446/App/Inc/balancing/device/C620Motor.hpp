@@ -81,6 +81,11 @@ public:
      */
     bool resetReference() noexcept;
 
+    /** @brief 受信連続性設定の形式検査。半周未満の実測条件は別。
+     * @spec{PROTO-C620-001}
+     */
+    static bool validConfig(C620ContinuityConfig) noexcept;
+
 private:
     void lose(C620ContinuityStatus reason) noexcept;
 
