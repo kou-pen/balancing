@@ -1,76 +1,79 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version='1.0' encoding='utf-8'?>
 <doxygenlayout version="1.0">
   <navindex>
-    <tab type="mainpage" visible="yes"/>
-    <!-- フォルダのURLはfolder-navigation.doxの固定ページIDを参照する。 -->
+    <tab type="mainpage" visible="yes" />
     <tab type="usergroup" title="docs/" url="@ref folder_docs">
-      <tab type="user" title="ai/" url="@ref folder_docs_ai"/>
-      <tab type="user" title="assets/" url="@ref folder_docs_assets"/>
-      <tab type="user" title="design/" url="@ref folder_docs_design"/>
-      <tab type="user" title="development/" url="@ref folder_docs_development"/>
+      <tab type="user" title="ai/" url="@ref folder_docs_ai" />
+      <tab type="user" title="assets/" url="@ref folder_docs_assets" />
+      <tab type="user" title="design/" url="@ref folder_docs_design" />
+      <tab type="user" title="development/" url="@ref folder_docs_development" />
       <tab type="usergroup" title="specs/" url="@ref folder_docs_specs">
-        <tab type="user" title="behavior/" url="@ref folder_docs_specs_behavior"/>
-        <tab type="user" title="boards/" url="@ref folder_docs_specs_boards"/>
-        <tab type="user" title="control/" url="@ref folder_docs_specs_control"/>
-        <tab type="user" title="protocols/" url="@ref folder_docs_specs_protocols"/>
+        <tab type="user" title="behavior/" url="@ref folder_docs_specs_behavior" />
+        <tab type="user" title="boards/" url="@ref folder_docs_specs_boards" />
+        <tab type="user" title="control/" url="@ref folder_docs_specs_control" />
+        <tab type="user" title="protocols/" url="@ref folder_docs_specs_protocols" />
       </tab>
-      <tab type="user" title="todo/" url="@ref folder_docs_todo"/>
-      <tab type="user" title="verification/" url="@ref folder_docs_verification"/>
+      <tab type="user" title="todo/" url="@ref folder_docs_todo" />
+      <tab type="user" title="verification/" url="@ref folder_docs_verification" />
     </tab>
     <tab type="usergroup" title="firmware/" url="@ref folder_firmware">
       <tab type="usergroup" title="f446/" url="@ref folder_firmware_f446">
         <tab type="usergroup" title="balancing_f446/" url="@ref folder_firmware_f446_balancing_f446">
           <tab type="usergroup" title="App/" url="@ref folder_firmware_f446_balancing_f446_App">
-            <tab type="user" title="Examples/" url="@ref folder_firmware_f446_balancing_f446_App_Examples"/>
+            <tab type="user" title="Examples/" url="@ref folder_firmware_f446_balancing_f446_App_Examples" />
             <tab type="usergroup" title="Inc/" url="@ref folder_firmware_f446_balancing_f446_App_Inc">
               <tab type="usergroup" title="balancing/" url="@ref folder_firmware_f446_balancing_f446_App_Inc_balancing">
-                <tab type="user" title="app/" url="@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_app"/>
+                <tab type="user" title="app/" url="@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_app" />
+                <tab type="user" title="bench/" url="@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_bench" />
                 <tab type="usergroup" title="communication/" url="@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_communication">
-                  <tab type="user" title="can/" url="@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_communication_can"/>
+                  <tab type="user" title="can/" url="@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_communication_can" />
+                  <tab type="user" title="usb/" url="@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_communication_usb" />
                 </tab>
                 <tab type="usergroup" title="control/" url="@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_control">
-                  <tab type="user" title="controller/" url="@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_control_controller"/>
-                  <tab type="user" title="estimator/" url="@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_control_estimator"/>
-                  <tab type="user" title="filter/" url="@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_control_filter"/>
+                  <tab type="user" title="controller/" url="@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_control_controller" />
+                  <tab type="user" title="estimator/" url="@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_control_estimator" />
+                  <tab type="user" title="filter/" url="@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_control_filter" />
                 </tab>
-                <tab type="user" title="core/" url="@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_core"/>
-                <tab type="user" title="device/" url="@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_device"/>
+                <tab type="user" title="core/" url="@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_core" />
+                <tab type="user" title="device/" url="@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_device" />
               </tab>
             </tab>
             <tab type="usergroup" title="Src/" url="@ref folder_firmware_f446_balancing_f446_App_Src">
               <tab type="usergroup" title="balancing/" url="@ref folder_firmware_f446_balancing_f446_App_Src_balancing">
-                <tab type="user" title="app/" url="@ref folder_firmware_f446_balancing_f446_App_Src_balancing_app"/>
+                <tab type="user" title="app/" url="@ref folder_firmware_f446_balancing_f446_App_Src_balancing_app" />
+                <tab type="user" title="bench/" url="@ref folder_firmware_f446_balancing_f446_App_Src_balancing_bench" />
                 <tab type="usergroup" title="communication/" url="@ref folder_firmware_f446_balancing_f446_App_Src_balancing_communication">
-                  <tab type="user" title="can/" url="@ref folder_firmware_f446_balancing_f446_App_Src_balancing_communication_can"/>
+                  <tab type="user" title="can/" url="@ref folder_firmware_f446_balancing_f446_App_Src_balancing_communication_can" />
+                  <tab type="user" title="usb/" url="@ref folder_firmware_f446_balancing_f446_App_Src_balancing_communication_usb" />
                 </tab>
                 <tab type="usergroup" title="control/" url="@ref folder_firmware_f446_balancing_f446_App_Src_balancing_control">
-                  <tab type="user" title="controller/" url="@ref folder_firmware_f446_balancing_f446_App_Src_balancing_control_controller"/>
-                  <tab type="user" title="estimator/" url="@ref folder_firmware_f446_balancing_f446_App_Src_balancing_control_estimator"/>
-                  <tab type="user" title="filter/" url="@ref folder_firmware_f446_balancing_f446_App_Src_balancing_control_filter"/>
+                  <tab type="user" title="controller/" url="@ref folder_firmware_f446_balancing_f446_App_Src_balancing_control_controller" />
+                  <tab type="user" title="estimator/" url="@ref folder_firmware_f446_balancing_f446_App_Src_balancing_control_estimator" />
+                  <tab type="user" title="filter/" url="@ref folder_firmware_f446_balancing_f446_App_Src_balancing_control_filter" />
                 </tab>
-                <tab type="user" title="device/" url="@ref folder_firmware_f446_balancing_f446_App_Src_balancing_device"/>
+                <tab type="user" title="device/" url="@ref folder_firmware_f446_balancing_f446_App_Src_balancing_device" />
               </tab>
             </tab>
           </tab>
         </tab>
       </tab>
     </tab>
-    <tab type="pages" visible="no"/>
-    <tab type="modules" visible="yes"/>
+    <tab type="pages" visible="no" />
+    <tab type="modules" visible="yes" />
     <tab type="namespaces" visible="yes">
-      <tab type="namespacelist" visible="yes"/>
-      <tab type="namespacemembers" visible="yes"/>
+      <tab type="namespacelist" visible="yes" />
+      <tab type="namespacemembers" visible="yes" />
     </tab>
     <tab type="classes" visible="yes">
-      <tab type="classlist" visible="yes"/>
-      <tab type="classindex" visible="$ALPHABETICAL_INDEX"/>
-      <tab type="hierarchy" visible="yes"/>
-      <tab type="classmembers" visible="yes"/>
+      <tab type="classlist" visible="yes" />
+      <tab type="classindex" visible="$ALPHABETICAL_INDEX" />
+      <tab type="hierarchy" visible="yes" />
+      <tab type="classmembers" visible="yes" />
     </tab>
     <tab type="files" visible="yes">
-      <tab type="filelist" visible="yes"/>
-      <tab type="globals" visible="yes"/>
+      <tab type="filelist" visible="yes" />
+      <tab type="globals" visible="yes" />
     </tab>
-    <tab type="examples" visible="yes"/>
+    <tab type="examples" visible="yes" />
   </navindex>
 </doxygenlayout>

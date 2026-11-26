@@ -27,6 +27,6 @@ tests/test_f446_stop_output.cpp を実製品DriveRuntimeとリンクし、SILを
 ## 結果
 
 - CTest 70/70（初回69/69、追加retryを含め再実行70/70）、通常/UBSan全件（c071ac24c6c347e2、追加retryも通常・UBSan各直接実行PASS）。
-- CubeIDE Debug/Release/BenchDebug 45 Appソース、全0 errors/0 warnings（cfd4aca490b84715）。nmで通常だけに停止専用起動境界、全3構成にSIL/試運転非ゼロ入口/MotorFramePlan::composeがないことを確認。独立停止試験のホストELFにもSILシンボルなし。
+- CubeIDE Debug/Release/BenchDebug 45 Appソース、全0 errors/0 warnings（cfd4aca490b84715）。nmで通常だけに停止専用起動境界、全3構成にSIL/試運転非ゼロ入口/`MotorFramePlan::compose` がないことを確認。独立停止試験のホストELFにもSILシンボルなし。
 - Release text75352/data2828/bss12584 B（基準よりtext+5500、bss+312）。Debug text215924/data2828/bss12584、BenchDebug text83660/data2748/bss14272 B（基準よりtext+12、bss+96）。非駆動から既存の停止送信処理をリンクしたためサイズ増加。RAM/WCETの実機評価は未実施。
 - 仕様476 API参照、CAN契約監査19/19、CubeIDE設定24/24、Doxygen全sourceリンク、diff check合格。

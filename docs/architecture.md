@@ -1,49 +1,73 @@
 # ソフトウェア構成
 
-**目標は、入力・推定・制御・駆動を分離し、最後に安全状態で出力を許可すること。** このページの図には未実装の機能も含まれます。
+**基準：PR #88のコード cb3abed（停止専用送信を含むレビュー版）。** masterに未マージの場合、その機能はレビュー版のみです。このページは目標構成ではなく実際のコードを中心に記述します。要求は [仕様](spec-index.md)、実装根拠は [検証記録](verification/index.md)。
 
-## 全体像
+## 1. ロボット全体
+
+<pre class="mermaid">
+flowchart LR
+    PS5["DualSense"] -->|USB| F446["STM32F446"]
+    PI["Raspberry Pi"] <-->|CAN2| F446
+    PWR["F303 電源基板"] <-->|CAN2| F446
+    IMU["BNO055"] -->|I2C| F446
+    F446 <-->|CAN1| LEGS["RS06 脚4軸"]
+    F446 <-->|CAN2| WHEEL["C620 車輪2軸"]
+</pre>
+
+図は機器の接続関係。F446に通信処理があっても実機での通信・駆動が確認済みという意味ではありません。F303/Piの対向コードは本リポジトリでは未確認です。
+
+## 2. F446内部の構成
 
 <pre class="mermaid">
 flowchart TB
-    INPUT["操作・観測・電源状態"] --> APP["Application：周期入力を固定"]
-    APP --> EST["StateEstimator：機体・車体・脚・車輪"]
-    APP --> SEQ["RobotSequence：状態と駆動許可"]
-    EST --> CTRL["BalanceControl：6軸の要求トルク"]
-    EST --> SEQ
-    SEQ --> CTRL
-    CTRL --> CMD["MotorCommand：変換と上限"]
-    CMD --> FINAL["Application：周期の出力を確定"]
-    SEQ --> FINAL
-    FINAL --> MOTOR["MotorService：RS06／C620"]
-    SEQ --> DIAG["DiagnosticsService：PCへCAN診断"]
+    CORE["Core/Src/main.c と割り込み"] --> APP["app/ Application"]
+    CORE --> IO["device/ HAL・機器接続"]
+    IO --> COMM["communication/ CAN・USB"]
+    COMM --> APP
+    APP --> CYCLE["app/ControlCycle"]
+    CYCLE --> EST["control/estimator"]
+    IO --> FILTER["control/filter 姿勢フィルタ"]
+    FILTER --> APP
+    CYCLE --> SEQ["RobotSequence 状態判定"]
+    CYCLE --> CTRL["control/controller 数学演算"]
+    APP --> DRIVE["DriveRuntime 停止専用出力"]
+    DRIVE --> COMM
+    CORE -. 別ビルド .-> BENCH["bench/ MotorBench"]
 </pre>
 
-C++17の設計構成です。現在のC++入口は非駆動です。各型・関数の責務は [公開API設計](design/public-api.md)、呼び出し順は [起動・周期・停止の詳細図](diagrams.md) を参照してください。
-
-## 処理周期
-
-| 処理 | 設計周期 | 現在の検証 |
+| 場所 | 主な責務 | 入口 |
 |---|---|---|
-| 状態推定・LQR/VMC | 500 Hz（2 ms） | 制御コアの一部をホスト検証。実機の時間保証は未検証 |
-| RS06 4軸への送信要求 | 250 Hz（4 ms） | 3メールボックスの仮想時刻モデルでホスト検証 |
-| C620共通電流指令 | 500 Hz（2 ms） | 送信要求モデルとCAN codecをホスト検証 |
+| `Core/` | CubeMX生成初期化、TIM7割り込み、主ループ | `Core/Src/main.c` |
+| `App/.../app/` | 一周期の管理、運転状態、入力・電源・診断、モータ集合 | `application.cpp` |
+| `App/.../control/` | 状態推定、LQR/VMC、機構側→モータ側変換 | `ControlCycle.cpp` から呼ぶ |
+| `App/.../communication/` | ワイヤ形式の符号化、CANメールボックス、送信順序 | `CanRouter.cpp`、`CanTxScheduler.cpp` |
+| `App/.../device/` | 機器1台の状態・HAL接続・受信時刻 | `f446_can1_runtime.cpp`、`f446_imu_runtime.cpp` |
+| `App/.../bench/` | 通常運転と独立した単軸試運転 | `f446_motor_bench_runtime.cpp` |
 
-受信した値がすべて500 Hzで更新されるという意味ではありません。実際の通信周期・バス負荷・送信完了期限は実機で別途確認します。
+詳細は [フォルダ別コード案内](design/public-api.md)。実行順は [起動・周期処理図](diagrams.md)。
 
-## 実装済みと未接続を分ける
+## 3. 三つの実行経路を混同しない
 
-| 層 | 現状 | 詳細 |
+| 対象 | 何が起動するか | 駆動出力 |
 |---|---|---|
-| C++入口・CubeIDE | 現行10ソースのDebug/Release ARMビルドPASS | [現行ホスト・ビルド記録](verification/issue10-observation-host.md) |
-| 状態機械・LQR数値関数 | ホスト試験PASS。一部の仕様不一致は残存 | [制御コア](software-core.md)・[仕様差分](verification/core-mode-contract-audit.md) |
-| RS06/C620通信と送信調停 | コーデック・スケジューラのホスト試験PASS | [モータ通信](design/motor-layer.md)・[送信モデル](design/can-scheduler.md) |
-| IMU/車輪と操作入力 | 時刻付き入力、相補フィルタ、USB/CAN操作元モックのホスト試験PASS。実I/Oは未接続 | [観測](design/observation-snapshot.md)・[入力](design/operator-input.md)・[姿勢フィルタ](design/attitude-filter.md) |
-| VMC・実CAN駆動 | 通常運転経路は未完成 | [ロードマップ](todo/roadmap.md) |
-| F303電源連携・実機倒立 | 未検証 | [実機検証TODO](todo/verification.md) |
+| Debug / Release | 通常Application、CAN1/2、IMU起動判断、TIM7、IWDG起動判断 | 既定はモータ送信なし。#88の明示設定時のみRS06停止＋C620全ゼロ |
+| BenchDebug | 試運転専用の起動経路 | 既定の未検証設定ではCAN開始前に停止。明示設定で停止確認。パルス入力は未接続 |
+| PCのSIL | `tests/sil/DriveRuntime.cpp` と `DriveCycle.cpp` | 人工モデルによるARMING・6軸指令を模擬CANで検証。STM32にはリンクしない |
 
-## 安全に関する境界
+実行中に通常/試運転を切り替える機能はありません。通常ビルドにSILの人工ゲインを投入していません。
 
-公開状態は **DISARMED／ARMING／BALANCING／FAULT** です。ARMINGでは全体の絶対期限内に、RS06全4軸のType 3のTx完了後に届く正常応答を確認します。駆動許可が落ちた周期は、旧非ゼロ指令を無効化して停止要求に切り替えます。独立した物理非常停止はソフトウェアとCANの外側で電源を遮断します。
+## 4. 周期と実装状況
 
-安全条件と数値の正本は [動作仕様](specs/behavior/robot_operation.md)、[F446仕様](specs/boards/f446_control.md)、[F303仕様](specs/boards/f303_power.md) です。未確定のモータ設定やゲインを推測で採用しません。
+| 処理 | 設計周期 | 現在 |
+|---|---|---|
+| TIM7、状態推定・制御 | 500 Hz / 2 ms | 実装・ホスト検証。実時間未測定 |
+| RS06 4軸の通常駆動 | 250 Hz / 4 ms | SILのみ。実機用Type1/Type3は未接続 |
+| C620共通電流 | 500 Hz / 2 ms | SIL通常指令、#88通常停止専用ゼロ指令 |
+| CAN・IMU受信 | 機器依存 | IRQ／非同期回収と時刻管理を実装 |
+| IWDG | 公称500 ms候補 | 更新経路を実装、既定無効、実測未実施 |
+
+状態機械、制御数学、CAN・USB・I2C、表示・診断は実装済みの部分とホスト検証済みの部分があります。どの設定も実機の許可を意味しません。 [最新の検証](verification/index.md) と [残作業](todo/f446.md) を確認してください。
+
+## 5. 安全境界
+
+運転状態は DISARMED / ARMING / BALANCING / FAULT。`RobotSequence` が状態を決定し、`ControlCycle` の数学結果だけではモータ送信を許可しません。通常運転の非ゼロ出力はまだ未接続です。物理非常停止、支持治具、原点・極性・ゲイン・物理上限、実時間・実機動作は未検証。 [動作仕様](specs/behavior/robot_operation.md) と [基板仕様](specs/boards/f446_control.md) が要求の正本です。

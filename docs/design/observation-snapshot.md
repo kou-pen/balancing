@@ -1,65 +1,24 @@
-# センサ値を500 Hzで扱うための観測スナップショット
+# 観測スナップショット（現行C++17）
 
-> 旧C11実装の設計・検証記録。現在の状態機械・観測・送信・試運転の契約は [F446公開API](../design/public-api.md) と [C++移行検証](../verification/f446-legacy-observation-retirement.md) を参照。旧コードを再現する場合は移行前のGit履歴を使用する。
+500 Hz制御とセンサ受信頻度は別です。同じデータを読み返しても測定時刻は更新しません。
 
-**制御周期とセンサの新規測定周期は異なります。** 制御計算を2 msごとに行っても、IMU・車輪・RS06がそのたび新しいデータを返すわけではありません。
-
-このモジュールは最後に受け取った値と**元の観測時刻**を保存し、制御周期の先頭でコピーします。現時点の実装はIMUと左右C620車輪のホスト側データ処理です。
-
-## データの流れ
-
-<pre class="mermaid">
-flowchart LR
-    I["BNO055の新規測定を外部確認"] --> IN["観測ストア"]
-    C["C620 0x201/0x202を復号"] --> IN
-    IN --> SNAP["2 msの開始時に固定コピー"]
-    SNAP --> F["時刻に基づく鮮度判定"]
-    SNAP --> EST["状態推定・制御（後続）"]
-</pre>
-
-| 入力 | 受信・更新規則 | 否定されたとき |
+| 入力 | 保持する場所 | 周期で読む場所 |
 |---|---|---|
-| IMU | 新規測定の証拠と有限な校正済み物理値が必要 | 既存データと時刻を保持 |
-| C620 | 新しい受信時刻、0〜8191の角度、検証済み減速比・半径・符号 | 位置を積算せず、鮮度を更新しない |
-| 制御ティック | 値と時刻をコピー。新しい測定として保存しない | 受信内容を改変しない |
-| RS06・F303 | この段階では受信値を保持しない | 全系統の鮮度判定では常に未取得 |
+| RS06の角度・速度・状態 | Rs06Motor × 4 | MotorService.feedback |
+| C620の角度・RPM・連続性 | C620Motor × 2 | MotorService.feedback → WheelOdometry |
+| BNO055 | Bno055、ImuAttitudeSource | imuAttitude(nowUs) |
+| F303電源 | PowerBoardService | snapshot(nowUs) |
+| 操作入力 | DualSenseService、RemoteControlService | Applicationの操作イベントと目標 |
 
-## 車輪位置の扱い
+CANはIRQで時刻付きイベントを記録し、`f446_can1_runtime.cpp` のCanRuntime.serviceが両バスを回収します。回収終了時の共通時刻でMotorObservationSnapshotを生成します。ApplicationはこのコピーとIMU・電源・操作を使ってControlTickInputを作ります。
 
-M3508のC620エンコーダはロータ1回転あたり8192カウントです。前回との差分を通常の一周折返しで補正し、**ロータ回転数／車輪回転数**と車輪半径、左右符号を入力値として位置を積算します。最初の受信位置は0 mを基準にします。RPMは別に車輪の周速度へ換算します。
+C620の連続性が失われた場合、古い角度を積算し続けません。車輪原点の再設定は明示操作であり、ARM/DISARMのたびに自動実行しません。受信した時刻・回収番号・制御開始番号を別々に扱います。
 
-| 実装上の境界 | 意味 |
+| 判定対象 | 所有者 |
 |---|---|
-| ちょうど4096カウントの差 | 回転方向が確定できないため拒否 |
-| サンプル間で半回転以上進んだ場合 | 失われた巻数は原理的に復元できない。入力頻度と速度制約の外部検証が必要 |
-| 減速比、半径、符号を変更 | 途中で変えると積算位置が不連続になるので拒否。ストアを再初期化する |
-| 時刻の重複、逆行、未来時刻 | 新規測定として扱わない |
-| 入力未校正・NaN/Inf | 値も観測時刻も更新しない |
+| IMU 50ms・RS06 30ms・C620 20ms・電源 500msの鮮度 | 各機器サービス（期限ちょうどは無効） |
+| 6軸と姿勢を統合できるか | StateEstimator |
+| 運転状態と保護条件 | RobotSequence |
+| 制御開始・完了の照合 | CycleHealthMonitor |
 
-## 制御への接続の条件
-
-共通型 `BObservedStamps` を `balancing/core/balancing_observation_time.h` に移し、既存の制御状態機械とスナップショットが同じ時刻定義を使うようにしました。鮮度期限（IMU 50 ms、左右車輪20 ms等）は既存の `b_check_freshness` が所有し、**この変更では変更していません**。
-
-現在のストアは非同期IRQから直接読書きする設計ではありません。将来のF446統合では、受信を単一所有者の処理へ直列化してから2 ms周期のコピーを取る必要があります。また、IMUの新規測定証明方法とBNO055取付方向・静止バイアスは未確定です。I2C読出し成功を新規測定と同義にはしません。
-
-[仕様：状態推定](../specs/control/state_estimation.md) · [ホスト検証記録](../verification/issue10-observation-host.md)
-
-## C++17の車輪オドメトリ（PR #44の6軸入力から移植）
-
-C++17では `C620Motor` が受信ごとにロータ角の8192カウント折返しを行い、64bit累積カウント・受理番号・原点世代を保持します。`WheelOdometry` は `MotorService::feedback(nowUs)` の周期コピーに含まれる累積値とRPMを物理量に換算するだけです。同一IRQ時刻の別報告も受信順に処理し、時刻一致で新規報告を捨てません。旧C11の積算器は比較用に残し、同時運用しません。
-
-各軸の実機最大ロータ速度と取得遅延から、隣接実測値の変位が半回転未満となる取得間隔上限を検証して固定します。未検証設定では通信鮮度が成立しても累積位置は公開しません。半回転差・取得間隔超過・逆行・不正報告・RxLost/BusOffで連続性を失った場合、正常報告だけでは自動復旧しません。原点再設定はDISARMED、旧キュー排除、新規報告、MotorServiceとStateEstimatorの世代同期を必要とします。車輪半径、減速比、符号も起動時固定です。最新報告の20ms鮮度と位置連続性は区別します。
-
-[受信順累積の検証](../verification/f446-c620-continuity-host.md)。
-
-**既知の仕様境界差分:** C11の `b_check_freshness()` は20 msちょうどを有効とする一方、C++17の `C620Motor::feedback()` は20 msちょうどを期限切れにします。今回はどちらの式も変更せず、統合SILでの整合判定を残します。実行結果と未検証範囲は [C++17車輪オドメトリのホスト検証](../verification/f446-wheel-odometry-host.md) に記録します。
-
-## 同一周期のC++17 StateEstimator
-
-500 Hzの制御周期開始時にIMUの姿勢推定出力と6軸 `MotorService::feedback(nowUs)` を固定し、`StateEstimator::update()` が `ControlSnapshot` か失敗理由を返します。RS06は左右各脚2軸のモータ角を外部伝達比・原点で機構角へ変換し、既存の閉リンク数学fixtureで脚長・仮想角・解析ヤコビアンへ写像します。C620は `WheelOdometry` の左右変位・周速度に写像し、その平均を車体前後位置・速度とします。姿勢フィルタはIMUの測定時刻を保持し、500 Hzで新規観測時刻を捏造しません。
-
-`StateEstimator` は元の各軸・IMU測定時刻と実測周期間隔を返します。片脚が未受信・非到達・特異であれば、一部の脚だけ使える `ControlSnapshot` は返しません。ただしIMU欠損中も車輪が新規受信していれば位置は積算しておき、復旧周期に正しい原点の継続を扱います。
-
-**安全境界:** `LegKinematics::forward` の幾何は実機の六節リンクCADと未照合です。新しい `ControlSnapshot.fixtureOnly` は常に `true` であり、数学上の推定成功は実機のARM/トルク許可ではありません。実機CAD・原点・軸方向・姿勢取付方向の確定と、HAL/I2C/CAN/実時間確認は後続です。
-
-[StateEstimatorの実装とホスト検証](../verification/f446-state-estimator-host.md)
+旧C観測ストアは廃止済み。 [データ所有権](data-model.md) ／ [周期図](../diagrams.md) ／ [C++統合の記録](../verification/f446-legacy-observation-retirement.md)。旧設計の詳細は [整理前の全文（Git履歴）](https://github.com/kou-pen/balancing/blob/cb3abeda89acdbcb08fd9890735f2b8c95ed9d83/docs/design/observation-snapshot.md)。

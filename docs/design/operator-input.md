@@ -1,6 +1,6 @@
 # 操作入力：通信断・復帰を安全に扱う
 
-USB DualSenseとCAN_REMOTEの**操作量を扱う数学モデル**です。まだ実際のUSB HIDやCANフレームは読んでいません。
+USB DualSenseとCAN_REMOTEの操作入力は、DualSenseProtocol / DualSenseService / Can2ServiceLinkからRemoteControlServiceへ渡ります。実機USB Host・CAN2自作通信は明示設定が必要で、既定のmainでは未有効化です。ホスト試験で操作量とイベントを検証しています。
 
 ## 動作の流れ
 
@@ -14,7 +14,7 @@ flowchart LR
     RATE --> TARGET["制御用の目標値"]
 </pre>
 
-**ARM要求はこのモジュールから発生させません。** 操作の復帰とモータ駆動許可は別の処理です。
+RemoteControlServiceの操作目標生成と、DualSenseService / Can2ServiceLinkからのARM/DISARMイベントを区別します。操作の復帰だけでは駆動を許可しません。
 
 ## 重要な判断
 

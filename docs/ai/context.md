@@ -26,20 +26,19 @@ routing:
     - docs/specs/control/
     - docs/specs/behavior/robot_operation.md
     - docs/software-core.md
-    - docs/verification/core-mode-contract-audit.md
     - docs/design/leg-kinematics.md
-    - docs/verification/issue7-kinematics-host.md
+    - docs/verification/f446-leg-math-cpp.md
     - docs/design/observation-snapshot.md
     - docs/design/operator-input.md
     - docs/design/attitude-filter.md
-    - docs/verification/issue10-observation-host.md
+    - docs/verification/f446-all-cpp.md
     - firmware/f446/balancing_f446/App/Src/balancing/app/RemoteControlService.cpp
     - firmware/f446/balancing_f446/App/Src/balancing/control/filter/ImuAttitudeSource.cpp
   can:
     - docs/specs/protocols/
     - docs/design/motor-layer.md
     - docs/design/can-scheduler.md
-    - docs/verification/issue5-can-scheduler-host.md
+    - docs/verification/f446-c-scheduler-migration.md
     - docs/verification/can-contract-audit.md
   stm32:
     - docs/design/cubeide-cpp.md

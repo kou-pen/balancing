@@ -26,9 +26,9 @@
 | @subpage folder_docs_verification "verification/" | 実行した試験、結果と未検証範囲 |
 | [architecture.md](../architecture.md) | F446とF303の構成、制御周期、実装・検証の現状 |
 | [can-id-table.md](../can-id-table.md) | CAN1・CAN2の用途、ID、データと物理単位 |
-| [diagrams.md](../diagrams.md) | 制御のデータフロー、状態遷移、停止と電源遮断の図 |
+| [diagrams.md](../diagrams.md) | 起動・周期・CAN・停止・状態遷移の図 |
 | [index.md](../index.md) | GitHubで文書フォルダをたどる入口 |
-| [software-core.md](../software-core.md) | 旧C11の状態機械、制御演算、ホスト回帰 |
+| [software-core.md](../software-core.md) | 現行C++の制御数学・状態判定の案内 |
 | [spec-index.md](../spec-index.md) | 仕様IDと仕様書の対応表 |
 */
 
@@ -73,7 +73,7 @@
 | [motor-layer.md](../design/motor-layer.md) | RS06・C620のコーデック、単軸試運転、HAL接続 |
 | [observation-snapshot.md](../design/observation-snapshot.md) | 500 Hz制御に渡す観測コピーとセンサ時刻の管理 |
 | [operator-input.md](../design/operator-input.md) | USB／CANの操作元切替、通信断、復帰とニュートラル判定 |
-| [public-api.md](../design/public-api.md) | F446のC++17公開型、関数、モジュールの責務 |
+| [public-api.md](../design/public-api.md) | 現行の実フォルダ、宣言と実装、役割の一覧 |
 | [yaw-pi.md](../design/yaw-pi.md) | Yaw角速度PI、積分飽和防止と倒立を優先する出力配分 |
 */
 
@@ -162,37 +162,74 @@
 
 /** @page folder_docs_verification verification/
 
-@ref folder_docs "docs/" / `verification/`
+@ref folder_docs "docs/" / verification/
 
-| フォルダ・ファイル | 内容 |
+最新の基準と機能別の分類は [index.md](../verification/index.md) を参照。古い結果は履歴として保存。
+
+| ファイル | 内容 |
 |---|---|
-| [can-contract-audit.md](../verification/can-contract-audit.md) | CAN ID、DLC、単位、重複と未確定項目の静的照合 |
-| [core-mode-contract-audit.md](../verification/core-mode-contract-audit.md) | C11状態機械とARM・FAULT仕様の差分 |
-| [cpp17-migration-preflight-20261112.md](../verification/cpp17-migration-preflight-20261112.md) | C++17移植前のmaster、ホスト試験とクロスビルドの基準 |
-| [f446-can-event-dispatch-host.md](../verification/f446-can-event-dispatch-host.md) | CAN1・CAN2のイベント配送、終端照合、周期送信、通常FIFO |
-| [f446-can1-rs06-port-host.md](../verification/f446-can1-rs06-port-host.md) | CANポートとRS06の結合、メールボックス再利用とバスオフ |
-| [f446-can1-runtime-host.md](../verification/f446-can1-runtime-host.md) | CAN1の起動、受信フィルタ、割り込み、DWT時計のホスト検証 |
-| [f446-crossbuild-20261109.md](../verification/f446-crossbuild-20261109.md) | 2026年11月9日時点のF446ヘッドレスクロスビルド |
-| [f446-module-layout.md](../verification/f446-module-layout.md) | F446自作C11／C++の機能別配置と移動後の検証 |
-| [f446-wheel-odometry-host.md](../verification/f446-wheel-odometry-host.md) | C620左右車輪の折返し・位置・速度換算と時刻のホスト試験 |
-| [f446-state-estimator-host.md](../verification/f446-state-estimator-host.md) | IMU姿勢・RS06 4軸・C620 2軸の同一周期数学スナップショット |
-| [f446-sil-control-cycle-host.md](../verification/f446-sil-control-cycle-host.md) | 倒立優先・脚VMCと500HzのSIL周期・故障注入をホスト検証 |
-| [f446-motor-command-host.md](../verification/f446-motor-command-host.md) | RS06トルク・C620電流の6軸変換、個別飽和、同周期FAULTの数値検証 |
-| [f446-motor-frame-plan-host.md](../verification/f446-motor-frame-plan-host.md) | 6軸CAN符号化、停止優先・周期世代の模擬2バス検証 |
-| [f446-control-cycle-core-host.md](../verification/f446-control-cycle-core-host.md) | ControlCycleをテスト専用から本体Appに移し、初回時刻・停止・故障処理を検証 |
-| [f446-application-timing-host.md](../verification/f446-application-timing-host.md) | CAN1とApplicationの共通DWT時刻・周期診断 |
-| [f446-dual-can-runtime-host.md](../verification/f446-dual-can-runtime-host.md) | CAN1/2共通時計・受信監視・起動失敗の検証 |
-| [f446-c620-continuity-host.md](../verification/f446-c620-continuity-host.md) | C620受信順累積・連続性喪失・原点世代の検証 |
-| [f446-source-layout.md](../verification/f446-source-layout.md) | 旧ソース配置の統合とCubeIDEビルド手順 |
-| [index.md](../verification/index.md) | 試験記録の案内、判定の意味、実機未検証の範囲 |
-| [issue10-observation-host.md](../verification/issue10-observation-host.md) | センサ、操作入力、IMUのホスト回帰 |
-| [issue5-can-scheduler-host.md](../verification/issue5-can-scheduler-host.md) | 仮想時計を使うCAN送信周期とメールボックスの検証 |
-| [issue7-kinematics-host.md](../verification/issue7-kinematics-host.md) | 六節リンクの解析ヤコビアンと有限差分の比較 |
-| [issue9-leg-pd-host.md](../verification/issue9-leg-pd-host.md) | 脚長PD、Roll PD、ARM時の目標値と異常入力 |
-| [issue9-yaw-pi-host.md](../verification/issue9-yaw-pi-host.md) | Yaw PIの飽和、倒立優先、モードリセットの検証 |
-| [motor-service-rs06-host.md](../verification/motor-service-rs06-host.md) | RS06 4軸のARM、停止、再試行の模擬CAN検証 |
-| [motorbench-rx-owner.md](../verification/motorbench-rx-owner.md) | 単軸試運転の受信期限とCANポートの責務 |
-| [robot-sequence-host.md](../verification/robot-sequence-host.md) | ARMING、DISARM、FAULT、故障記録の状態遷移 |
+| [index.md](../verification/index.md) | 最新基準・機能別の全記録 |
+| [can-contract-audit.md](../verification/can-contract-audit.md) | CAN通信契約の静的照合（Issue #6） |
+| [core-mode-contract-audit.md](../verification/core-mode-contract-audit.md) | 制御コア状態機械の仕様差分監査 |
+| [cpp17-migration-preflight-20261112.md](../verification/cpp17-migration-preflight-20261112.md) | C++17集中移植前のmaster基準検証（2026-11-12） |
+| [f446-all-cpp.md](../verification/f446-all-cpp.md) | F446 AppのC++移行統合検証 |
+| [f446-application-observation-cycle-host.md](../verification/f446-application-observation-cycle-host.md) | Applicationの観測周期と統合SIL |
+| [f446-application-runtime-refactor.md](../verification/f446-application-runtime-refactor.md) | Application実行境界の分離 |
+| [f446-application-timing-host.md](../verification/f446-application-timing-host.md) | F446 Applicationの共通時計・周期診断 |
+| [f446-attitude-math-cpp.md](../verification/f446-attitude-math-cpp.md) | 姿勢フィルタのC++統合 |
+| [f446-balance-math-cpp.md](../verification/f446-balance-math-cpp.md) | BalanceControlのC++数値演算統合 |
+| [f446-bench-startup.md](../verification/f446-bench-startup.md) | BenchDebug専用起動とCAN IRQの排他検証 |
+| [f446-bno055-observation-host.md](../verification/f446-bno055-observation-host.md) | BNO055非同期取得・姿勢フィルタ接続 |
+| [f446-c-scheduler-migration.md](../verification/f446-c-scheduler-migration.md) | 旧C11送信モデルのC++実装への統合 |
+| [f446-c620-continuity-host.md](../verification/f446-c620-continuity-host.md) | C620受信順の累積位置と連続性の検証 |
+| [f446-can-event-dispatch-host.md](../verification/f446-can-event-dispatch-host.md) | F446 CANイベント回収・配送の検証 |
+| [f446-can1-rs06-port-host.md](../verification/f446-can1-rs06-port-host.md) | F446 共通CANポートとRS06のホスト検証 |
+| [f446-can1-runtime-host.md](../verification/f446-can1-runtime-host.md) | F446 CAN1の起動・割込みの検証 |
+| [f446-can2-filter-plan-host.md](../verification/f446-can2-filter-plan-host.md) | CAN2受信フィルタのホスト検証 |
+| [f446-can2-rx-routing-host.md](../verification/f446-can2-rx-routing-host.md) | CAN2自作通信の受信分類ホスト検証 |
+| [f446-can2-service-integration-host.md](../verification/f446-can2-service-integration-host.md) | F446 CAN2通信の非駆動統合 |
+| [f446-control-cycle-core-host.md](../verification/f446-control-cycle-core-host.md) | F446 ControlCycleのC++17本体化・ホスト検証 |
+| [f446-crossbuild-20261109.md](../verification/f446-crossbuild-20261109.md) | STM32F446ヘッドレスクロスビルドの検証記録 |
+| [f446-crossbuild-20261126.md](../verification/f446-crossbuild-20261126.md) | F446 PR #68統合版のARMクロスビルド |
+| [f446-cycle-watchdog-host.md](../verification/f446-cycle-watchdog-host.md) | 制御周期の完了監視とIWDG更新境界 |
+| [f446-diagnostics-codec-host.md](../verification/f446-diagnostics-codec-host.md) | 診断・設定読み出しコーデックのホスト検証 |
+| [f446-diagnostics-service-host.md](../verification/f446-diagnostics-service-host.md) | 診断イベント管理（論理層） |
+| [f446-drive-cycle-sil.md](../verification/f446-drive-cycle-sil.md) | F446 Application通常運転のSIL統合 |
+| [f446-dual-can-runtime-host.md](../verification/f446-dual-can-runtime-host.md) | F446 CAN1/CAN2共通受信ランタイムのホスト検証 |
+| [f446-dualsense-input-host.md](../verification/f446-dualsense-input-host.md) | F446 DualSense USB入力境界 |
+| [f446-file-consolidation.md](../verification/f446-file-consolidation.md) | F446の小規模ファイル統合 |
+| [f446-indicator-output-host.md](../verification/f446-indicator-output-host.md) | F446 RGB・ブザー出力境界 |
+| [f446-iwdg-adapter.md](../verification/f446-iwdg-adapter.md) | F446 IWDG実機用アダプタ |
+| [f446-leg-math-cpp.md](../verification/f446-leg-math-cpp.md) | 脚運動学・VMCのC++統合 |
+| [f446-legacy-observation-retirement.md](../verification/f446-legacy-observation-retirement.md) | 旧C11状態機械・観測ストアの廃止 |
+| [f446-module-layout.md](../verification/f446-module-layout.md) | F446自作C11/C++ファイルの機能別一括配置（構造変更PR） |
+| [f446-motor-bench-cpp.md](../verification/f446-motor-bench-cpp.md) | 独立単軸試運転のC++統合 |
+| [f446-motor-codecs-cpp.md](../verification/f446-motor-codecs-cpp.md) | モータ通信コーデックのC++統合 |
+| [f446-motor-command-host.md](../verification/f446-motor-command-host.md) | F446 MotorCommand 6軸変換・飽和のSIL検証 |
+| [f446-motor-frame-plan-host.md](../verification/f446-motor-frame-plan-host.md) | 6軸CANフレーム構築・2バス優先順位（SIL） |
+| [f446-operator-cpp.md](../verification/f446-operator-cpp.md) | 操作入力のC++統合 |
+| [f446-power-board-codec-host.md](../verification/f446-power-board-codec-host.md) | F303電源通信コーデックのホスト検証 |
+| [f446-power-service-host.md](../verification/f446-power-service-host.md) | F303電源の論理観測 |
+| [f446-power-status-receive-host.md](../verification/f446-power-status-receive-host.md) | F446 CAN2 電源状態の受信境界（ホスト検証） |
+| [f446-protocol-codec-host.md](../verification/f446-protocol-codec-host.md) | CAN2 v1共通コーデックのホスト検証 |
+| [f446-remote-control-codec-host.md](../verification/f446-remote-control-codec-host.md) | Raspberry Pi操作通信コーデックのホスト検証 |
+| [f446-remote-service-host.md](../verification/f446-remote-service-host.md) | 復号済み操作入力のC++17境界 |
+| [f446-runtime-motor-observation-host.md](../verification/f446-runtime-motor-observation-host.md) | CANランタイムの6軸観測接続 |
+| [f446-sil-control-cycle-host.md](../verification/f446-sil-control-cycle-host.md) | F446 C++17 BalanceControl・500 Hz SIL周期結合の検証 |
+| [f446-source-layout.md](../verification/f446-source-layout.md) | F446ソース配置統合と検証手順 |
+| [f446-state-estimator-host.md](../verification/f446-state-estimator-host.md) | F446 6軸・IMU同一周期StateEstimatorのホスト検証 |
+| [f446-status-indicator-host.md](../verification/f446-status-indicator-host.md) | LED/Buzzer論理表示と非ブロッキング道具 |
+| [f446-stop-output.md](../verification/f446-stop-output.md) | 通常運転の停止専用CAN送信経路 |
+| [f446-usb-host-transport.md](../verification/f446-usb-host-transport.md) | F446 USB Host転送とHCD接続 |
+| [f446-wheel-odometry-host.md](../verification/f446-wheel-odometry-host.md) | F446 C++17 車輪オドメトリのホスト検証 |
+| [issue10-observation-host.md](../verification/issue10-observation-host.md) | Issue #10：センサ・操作入力のホスト検証 |
+| [issue5-can-scheduler-host.md](../verification/issue5-can-scheduler-host.md) | Issue #5：CANスケジューラの仮想時刻ホスト検証 |
+| [issue7-kinematics-host.md](../verification/issue7-kinematics-host.md) | Issue #7：脚運動学の数学fixture・ホスト検証 |
+| [issue9-leg-pd-host.md](../verification/issue9-leg-pd-host.md) | Issue #9：固定脚長PD・Roll PDホスト検証 |
+| [issue9-yaw-pi-host.md](../verification/issue9-yaw-pi-host.md) | Issue #9：Yaw PIホスト検証 |
+| [motor-service-rs06-host.md](../verification/motor-service-rs06-host.md) | RS06 4軸の模擬CAN検証 |
+| [motorbench-rx-owner.md](../verification/motorbench-rx-owner.md) | 単軸試運転：RX期限をCANポートへ集約 |
+| [robot-sequence-host.md](../verification/robot-sequence-host.md) | RobotSequenceのホスト検証 |
 */
 
 /** @page folder_firmware firmware/
@@ -219,268 +256,376 @@
 
 | フォルダ・ファイル | 内容 |
 |---|---|
-| @subpage folder_firmware_f446_balancing_f446_App "App/" | F446のアプリ、制御、通信、デバイス実装 |
+| @subpage folder_firmware_f446_balancing_f446_App "App/" | 自作C++17の宣言・実装 |
+| Core/ | CubeMX生成。Core/Src/main.c と stm32f4xx_it.c が起動・IRQの入口 |
+| Drivers/ | STM32 HAL・CMSIS。自作制御と分離 |
+| Middlewares/ | ST USB Hostライブラリ |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App App/
 
-@ref folder_firmware_f446_balancing_f446 "firmware/f446/balancing_f446/" / `App/`
+@ref folder_firmware_f446_balancing_f446 "firmware/f446/balancing_f446/" / App/
 
-| フォルダ・ファイル | 内容 |
+Incは宣言、Srcは実装。Appは自作C++17。生成Core・Drivers・Middlewaresは別管理。
+[フォルダ別コード案内](../design/public-api.md) と [処理順序](../diagrams.md) を参照。
+
+| ファイル・フォルダ | 内容 |
 |---|---|
-| @subpage folder_firmware_f446_balancing_f446_App_Examples "Examples/" | 実装時に参照する記述例 |
-| @subpage folder_firmware_f446_balancing_f446_App_Inc "Inc/" | 公開宣言とC／C++の接続 |
-| @subpage folder_firmware_f446_balancing_f446_App_Src "Src/" | F446側の実装 |
+| @subpage folder_firmware_f446_balancing_f446_App_Examples "Examples/" | Doxygenコメントの記述例 |
+| @subpage folder_firmware_f446_balancing_f446_App_Inc "Inc/" | 公開宣言・C ABI |
+| @subpage folder_firmware_f446_balancing_f446_App_Src "Src/" | 実装 |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Examples Examples/
 
-@ref folder_firmware_f446_balancing_f446_App "firmware/f446/balancing_f446/App/" / `Examples/`
+@ref folder_firmware_f446_balancing_f446_App "firmware/f446/balancing_f446/App/" / Examples/
 
-| フォルダ・ファイル | 内容 |
+| ファイル・フォルダ | 内容 |
 |---|---|
 | <a href="documentation__example_8h_source.html">documentation_example.h</a> | 公開APIのDoxygenコメントと仕様IDの記述例 |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Inc Inc/
 
-@ref folder_firmware_f446_balancing_f446_App "firmware/f446/balancing_f446/App/" / `Inc/`
+@ref folder_firmware_f446_balancing_f446_App "firmware/f446/balancing_f446/App/" / Inc/
 
-| フォルダ・ファイル | 内容 |
+対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Src "Src/"
+
+| ファイル・フォルダ | 内容 |
 |---|---|
 | @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing "balancing/" | 機能単位のフォルダ |
-| <a href="balancing__app__bridge_8h_source.html">balancing_app_bridge.h</a> | 生成Cコードからアプリに入る初期化・周期通知と周期診断API |
-| <a href="balancing__f446__bench__bridge_8h_source.html">balancing_f446_bench_bridge.h</a> | 試運転専用ビルドの起動・周期・IRQ入口 |
-| <a href="balancing__f446__can1__bridge_8h_source.html">balancing_f446_can1_bridge.h</a> | CAN1/2の起動、IRQ取り込み、共通イベント回収のC API |
+| <a href="balancing__app__bridge_8h_source.html">balancing_app_bridge.h</a> | 生成Cコードからアプリに入る初期化・周期通知と周期診断API。実装: <a href="application_8cpp_source.html">application.cpp</a> |
+| <a href="balancing__f446__bench__bridge_8h_source.html">balancing_f446_bench_bridge.h</a> | 試運転専用ビルドの起動・周期・IRQ入口。実装: <a href="f446__motor__bench__runtime_8cpp_source.html">f446_motor_bench_runtime.cpp</a> |
+| <a href="balancing__f446__can1__bridge_8h_source.html">balancing_f446_can1_bridge.h</a> | CAN1/2の起動、IRQ取り込み、共通イベント回収のC API。実装: <a href="f446__can1__runtime_8cpp_source.html">f446_can1_runtime.cpp</a> |
+| <a href="balancing__f446__imu__bridge_8h_source.html">balancing_f446_imu_bridge.h</a> | BNO055 I2C起動・背景回収・I2C/DRDYイベントのC ABI。実装: <a href="f446__imu__runtime_8cpp_source.html">f446_imu_runtime.cpp</a> |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Src Src/
+
+@ref folder_firmware_f446_balancing_f446_App "firmware/f446/balancing_f446/App/" / Src/
+
+対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Inc "Inc/"
+
+| ファイル・フォルダ | 内容 |
+|---|---|
+| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing "balancing/" | 機能単位のフォルダ |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Inc_balancing balancing/
 
-@ref folder_firmware_f446_balancing_f446_App_Inc "firmware/f446/balancing_f446/App/Inc/" / `balancing/`
+@ref folder_firmware_f446_balancing_f446_App_Inc "firmware/f446/balancing_f446/App/Inc/" / balancing/
 
-| フォルダ・ファイル | 内容 |
+対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Src_balancing "Src/balancing/"
+
+| ファイル・フォルダ | 内容 |
 |---|---|
-| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_app "app/" | 起動、状態遷移、通常運転の管理 |
-| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_bench "bench/" | 独立した単軸試運転 |
-| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_communication "communication/" | フレーム変換、CAN送受信とスケジューリング |
-| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_control "control/" | 制御演算と状態推定 |
-| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_core "core/" | 複数モジュールで共用する基礎処理 |
-| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_device "device/" | HALとモータなどの機器への接続 |
+| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_app "app/" | 周期・安全状態・サービス管理 |
+| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_bench "bench/" | 通常運転と独立した単軸試運転 |
+| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_communication "communication/" | フレーム変換・送受信 |
+| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_control "control/" | 推定・制御数学 |
+| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_core "core/" | 共通の小さな状態機械基底 |
+| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_device "device/" | HAL接続・個別機器 |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Src_balancing balancing/
+
+@ref folder_firmware_f446_balancing_f446_App_Src "firmware/f446/balancing_f446/App/Src/" / balancing/
+
+対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Inc_balancing "Inc/balancing/"
+
+| ファイル・フォルダ | 内容 |
+|---|---|
+| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_app "app/" | 周期・安全状態・サービス管理 |
+| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_bench "bench/" | 通常運転と独立した単軸試運転 |
+| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_communication "communication/" | フレーム変換・送受信 |
+| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_control "control/" | 推定・制御数学 |
+| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_device "device/" | HAL接続・個別機器 |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_app app/
 
-@ref folder_firmware_f446_balancing_f446_App_Inc_balancing "firmware/f446/balancing_f446/App/Inc/balancing/" / `app/`
+@ref folder_firmware_f446_balancing_f446_App_Inc_balancing "firmware/f446/balancing_f446/App/Inc/balancing/" / app/
 
-| フォルダ・ファイル | 内容 |
+ApplicationObservationは周期コピー、ControlCycleは数学と状態判定の実行順、DriveRuntimeは実行境界。
+
+対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Src_balancing_app "Src/balancing/app/"
+
+| ファイル・フォルダ | 内容 |
 |---|---|
-| <a href="ControlCycle_8hpp_source.html">ControlCycle.hpp</a> | 時刻付き観測・状態機械・数学制御を1周期で処理する契約 |
-| <a href="CycleHealthMonitor_8hpp_source.html">CycleHealthMonitor.hpp</a> | 開始番号・完了証跡の照合、IWDG更新境界 |
-| <a href="ApplicationObservation_8hpp_source.html">ApplicationObservation.hpp</a> | 非駆動周期の入力・状態・停止送信・診断コピー |
-| <a href="DualSenseService_8hpp_source.html">DualSenseService.hpp</a> | USB報告連続性、操作イベントと長押し判定 |
-| <a href="DriveRuntime_8hpp_source.html">DriveRuntime.hpp</a> | 周期実行・送信終端・CAN所有者結合の共通契約 |
-| <a href="Can2ServiceLink_8hpp_source.html">Can2ServiceLink.hpp</a> | 自作CAN2の受信・周期入力・応答・配信契約 |
-| <a href="PowerBoardService_8hpp_source.html">PowerBoardService.hpp</a> | 電源報告の受信API・生メタデータ・500ms期限・故障保持 |
-| <a href="RemoteControlService_8hpp_source.html">RemoteControlService.hpp</a> | 操作元・設定・サンプル・目標型と操作管理API |
-| <a href="DiagnosticsService_8hpp_source.html">DiagnosticsService.hpp</a> | 診断イベント・固定領域・送信進捗 |
-| <a href="StatusIndicator_8hpp_source.html">StatusIndicator.hpp</a> | 状態別の論理表示パターン |
-| <a href="StatusIndicatorPort_8hpp_source.html">StatusIndicatorPort.hpp</a> | RGB・ブザー出力と出力失敗診断 |
-| <a href="F446Watchdog_8hpp_source.html">F446Watchdog.hpp</a> | 実機IWDGの固定設定・起動・リセット原因診断 |
-| <a href="MotorService_8hpp_source.html">MotorService.hpp</a> | RS06のARM・停止と、脚・車輪6軸の周期観測をまとめるAPI |
-| <a href="MotorCanLink_8hpp_source.html">MotorCanLink.hpp</a> | CAN1・CAN2の機器報告の配送、RS06の送信・終端接続 |
-| <a href="RobotSequence_8hpp_source.html">RobotSequence.hpp</a> | 運転状態、FAULT、要求と結果の公開型 |
+| <a href="ApplicationObservation_8hpp_source.html">ApplicationObservation.hpp</a> | 非駆動周期の入力・状態・停止送信・診断コピー。実装: <a href="application_8cpp_source.html">application.cpp</a> |
+| <a href="Can2ServiceLink_8hpp_source.html">Can2ServiceLink.hpp</a> | 自作CAN2の受信・周期入力・応答・配信契約。実装: <a href="Can2ServiceLink_8cpp_source.html">Can2ServiceLink.cpp</a> |
+| <a href="ControlCycle_8hpp_source.html">ControlCycle.hpp</a> | 時刻付き観測・状態機械・数学制御を1周期で処理する契約。実装: <a href="ControlCycle_8cpp_source.html">ControlCycle.cpp</a> |
+| <a href="CycleHealthMonitor_8hpp_source.html">CycleHealthMonitor.hpp</a> | 開始番号・完了証跡の照合、IWDG更新境界。実装: <a href="CycleHealthMonitor_8cpp_source.html">CycleHealthMonitor.cpp</a> |
+| <a href="DiagnosticsService_8hpp_source.html">DiagnosticsService.hpp</a> | 診断イベント・固定領域・送信進捗。実装: <a href="DiagnosticsService_8cpp_source.html">DiagnosticsService.cpp</a> |
+| <a href="DriveRuntime_8hpp_source.html">DriveRuntime.hpp</a> | 周期実行・送信終端・CAN所有者結合の共通契約。実装: <a href="DriveRuntime_8cpp_source.html">DriveRuntime.cpp</a> |
+| <a href="DualSenseService_8hpp_source.html">DualSenseService.hpp</a> | USB報告連続性、操作イベントと長押し判定。実装: <a href="DualSenseService_8cpp_source.html">DualSenseService.cpp</a> |
+| <a href="MotorCanLink_8hpp_source.html">MotorCanLink.hpp</a> | CAN1・CAN2の機器報告の配送、RS06の送信・終端接続。実装: <a href="MotorCanLink_8cpp_source.html">MotorCanLink.cpp</a> |
+| <a href="MotorService_8hpp_source.html">MotorService.hpp</a> | RS06のARM・停止と、脚・車輪6軸の周期観測をまとめるAPI。実装: <a href="MotorService_8cpp_source.html">MotorService.cpp</a> |
+| <a href="PowerBoardService_8hpp_source.html">PowerBoardService.hpp</a> | 電源報告の受信API・生メタデータ・500ms期限・故障保持。実装: <a href="PowerBoardService_8cpp_source.html">PowerBoardService.cpp</a> |
+| <a href="RemoteControlService_8hpp_source.html">RemoteControlService.hpp</a> | 操作元・設定・サンプル・目標型と操作管理API。実装: <a href="RemoteControlService_8cpp_source.html">RemoteControlService.cpp</a> |
+| <a href="RobotSequence_8hpp_source.html">RobotSequence.hpp</a> | 運転状態、FAULT、要求と結果の公開型。実装: <a href="RobotSequence_8cpp_source.html">RobotSequence.cpp</a> |
+| <a href="StatusIndicator_8hpp_source.html">StatusIndicator.hpp</a> | 状態別の論理表示パターン。実装: <a href="StatusIndicator_8cpp_source.html">StatusIndicator.cpp</a> |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_bench bench/
+
+@ref folder_firmware_f446_balancing_f446_App_Inc_balancing "firmware/f446/balancing_f446/App/Inc/balancing/" / bench/
+
+対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Src_balancing_bench "Src/balancing/bench/"
+
+| ファイル・フォルダ | 内容 |
+|---|---|
+| <a href="MotorBench_8hpp_source.html">MotorBench.hpp</a> | 単軸試運転のC++実装。実装: <a href="MotorBench_8cpp_source.html">MotorBench.cpp</a> |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_communication communication/
 
-@ref folder_firmware_f446_balancing_f446_App_Inc_balancing "firmware/f446/balancing_f446/App/Inc/balancing/" / `communication/`
+@ref folder_firmware_f446_balancing_f446_App_Inc_balancing "firmware/f446/balancing_f446/App/Inc/balancing/" / communication/
 
-| フォルダ・ファイル | 内容 |
+対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Src_balancing_communication "Src/balancing/communication/"
+
+| ファイル・フォルダ | 内容 |
 |---|---|
-| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_communication_can "can/" | CANポート、受信配送、送信順序 |
-| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_communication_usb "usb/" | USB HID報告・インターフェース検査 |
-| <a href="Rs06Codec_8hpp_source.html">Rs06Codec.hpp</a> | RS06通信の状態型とフレーム変換の宣言 |
-| <a href="C620Codec_8hpp_source.html">C620Codec.hpp</a> | C620の電流フレーム・フィードバックの型とAPI |
-*/
-
-/** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_communication_can can/
-
-@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_communication "firmware/f446/balancing_f446/App/Inc/balancing/communication/" / `can/`
-
-| フォルダ・ファイル | 内容 |
-|---|---|
-| <a href="CanPort_8hpp_source.html">CanPort.hpp</a> | 1バスの送受信、IRQ、メールボックスと共通DWT時計のAPI |
-| <a href="CanRouter_8hpp_source.html">CanRouter.hpp</a> | CANイベントの交互回収と配送API・CAN2自作通信6分類 |
-| <a href="Can2FilterPlan_8hpp_source.html">Can2FilterPlan.hpp</a> | CAN2の32bit Listフィルタ構成と生成API |
-| <a href="CanTxScheduler_8hpp_source.html">CanTxScheduler.hpp</a> | 対象別の停止要求、通常FIFO、周期送信、受付と終端の照合API |
-| <a href="MotorFramePlan_8hpp_source.html">MotorFramePlan.hpp</a> | SIL専用Type1×4＋C620共通0x200の符号化計画 |
-| <a href="CanTypes_8hpp_source.html">CanTypes.hpp</a> | フレーム、トークン、送信結果、IRQイベントの共通型 |
-| <a href="ProtocolId_8hpp_source.html">ProtocolId.hpp</a> | CAN2 v1のID構造と固定許可リストの公開API |
-| <a href="ProtocolPayload_8hpp_source.html">ProtocolPayload.hpp</a> | Big endianの整数・float32変換API |
-| <a href="PowerBoardCodec_8hpp_source.html">PowerBoardCodec.hpp</a> | 電源状態・要求・応答と非常停止の公開API |
-| <a href="RemoteControlCodec_8hpp_source.html">RemoteControlCodec.hpp</a> | 運動指令・操作要求・応答の公開API |
-| <a href="DiagnosticsCodec_8hpp_source.html">DiagnosticsCodec.hpp</a> | 診断と設定読み出し19種類の型と公開API |
+| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_communication_can "can/" | CANポート・配送・送信調停・プロトコル |
+| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_communication_usb "usb/" | USB HID報告・descriptor |
+| <a href="C620Codec_8hpp_source.html">C620Codec.hpp</a> | C620の電流フレーム・フィードバックの型とAPI。実装: <a href="C620Codec_8cpp_source.html">C620Codec.cpp</a> |
+| <a href="Rs06Codec_8hpp_source.html">Rs06Codec.hpp</a> | RS06通信の状態型とフレーム変換の宣言。実装: <a href="Rs06Codec_8cpp_source.html">Rs06Codec.cpp</a> |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_control control/
 
-@ref folder_firmware_f446_balancing_f446_App_Inc_balancing "firmware/f446/balancing_f446/App/Inc/balancing/" / `control/`
+@ref folder_firmware_f446_balancing_f446_App_Inc_balancing "firmware/f446/balancing_f446/App/Inc/balancing/" / control/
 
-| フォルダ・ファイル | 内容 |
+対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Src_balancing_control "Src/balancing/control/"
+
+| ファイル・フォルダ | 内容 |
 |---|---|
-| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_control_controller "controller/" | 倒立、脚長、Roll、Yawの制御 |
-| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_control_estimator "estimator/" | センサ観測の統合と脚運動学 |
-| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_control_filter "filter/" | 姿勢推定に使うセンサフィルタ |
-*/
-
-/** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_control_controller controller/
-
-@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_control "firmware/f446/balancing_f446/App/Inc/balancing/control/" / `controller/`
-
-| フォルダ・ファイル | 内容 |
-|---|---|
-| <a href="BalanceControl_8hpp_source.html">BalanceControl.hpp</a> | LQR・LegPD/RollPD・VMC・Yaw PIの数値合成API |
-| <a href="MotorCommand_8hpp_source.html">MotorCommand.hpp</a> | RS06・C620の6軸独立換算設定と数学プレビューAPI |
-*/
-
-/** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_control_estimator estimator/
-
-@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_control "firmware/f446/balancing_f446/App/Inc/balancing/control/" / `estimator/`
-
-| フォルダ・ファイル | 内容 |
-|---|---|
-| <a href="WheelOdometry_8hpp_source.html">WheelOdometry.hpp</a> | C620左右の位置・速度換算と原点リセットの公開契約 |
-| <a href="LegKinematics_8hpp_source.html">LegKinematics.hpp</a> | 2入力閉リンクの脚状態と数学fixtureの公開契約 |
-| <a href="StateEstimator_8hpp_source.html">StateEstimator.hpp</a> | IMU・RS06・車輪の同一周期スナップショットAPI |
-*/
-
-/** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_control_filter filter/
-
-@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_control "firmware/f446/balancing_f446/App/Inc/balancing/control/" / `filter/`
-
-| フォルダ・ファイル | 内容 |
-|---|---|
-| <a href="ImuAttitudeSource_8hpp_source.html">ImuAttitudeSource.hpp</a> | 新規IMU測定と姿勢フィルタ |
+| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_control_controller "controller/" | LQR・VMC・脚長/Roll/Yaw・指令換算 |
+| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_control_estimator "estimator/" | 機構・車輪・状態推定 |
+| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_control_filter "filter/" | 姿勢推定 |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_core core/
 
-@ref folder_firmware_f446_balancing_f446_App_Inc_balancing "firmware/f446/balancing_f446/App/Inc/balancing/" / `core/`
+@ref folder_firmware_f446_balancing_f446_App_Inc_balancing "firmware/f446/balancing_f446/App/Inc/balancing/" / core/
 
-| フォルダ・ファイル | 内容 |
+| ファイル・フォルダ | 内容 |
 |---|---|
 | <a href="StateMachine_8hpp_source.html">StateMachine.hpp</a> | 状態機械で共用する型付きの状態保持 |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_device device/
 
-@ref folder_firmware_f446_balancing_f446_App_Inc_balancing "firmware/f446/balancing_f446/App/Inc/balancing/" / `device/`
+@ref folder_firmware_f446_balancing_f446_App_Inc_balancing "firmware/f446/balancing_f446/App/Inc/balancing/" / device/
 
-| フォルダ・ファイル | 内容 |
+対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Src_balancing_device "Src/balancing/device/"
+
+| ファイル・フォルダ | 内容 |
 |---|---|
-| <a href="C620Motor_8hpp_source.html">C620Motor.hpp</a> | C620 1軸の受信順累積・連続性・鮮度のAPI |
-| <a href="Rs06Motor_8hpp_source.html">Rs06Motor.hpp</a> | RS06 1軸の有効化、停止、状態報告のAPI |
-| <a href="MotorObservation_8hpp_source.html">MotorObservation.hpp</a> | 6軸周期観測・回収番号・故障保持・停止専用設定 |
-| <a href="I2cPort_8hpp_source.html">I2cPort.hpp</a> | 非同期I2C転送の契約 |
-| <a href="UsbHostPort_8hpp_source.html">UsbHostPort.hpp</a> | 接続世代・転送連番・期限の契約 |
-| <a href="F446UsbHostPort_8hpp_source.html">F446UsbHostPort.hpp</a> | 基板設定と明示Host起動 |
-| <a href="Bno055_8hpp_source.html">Bno055.hpp</a> | ACCGYRO取得とDRDY・時間窓 |
-| <a href="ImuObservation_8hpp_source.html">ImuObservation.hpp</a> | 姿勢の周期読取API |
+| <a href="Bno055_8hpp_source.html">Bno055.hpp</a> | ACCGYRO取得とDRDY・時間窓。実装: <a href="Bno055_8cpp_source.html">Bno055.cpp</a> |
+| <a href="C620Motor_8hpp_source.html">C620Motor.hpp</a> | C620 1軸の受信順累積・連続性・鮮度のAPI。実装: <a href="C620Motor_8cpp_source.html">C620Motor.cpp</a> |
+| <a href="F446UsbHostPort_8hpp_source.html">F446UsbHostPort.hpp</a> | 基板設定と明示Host起動。実装: <a href="f446__usb__host__port_8cpp_source.html">f446_usb_host_port.cpp</a> |
+| <a href="F446Watchdog_8hpp_source.html">F446Watchdog.hpp</a> | IWDG固定設定・起動診断とC ABI。実装: <a href="F446Watchdog_8cpp_source.html">F446Watchdog.cpp</a> |
+| <a href="I2cPort_8hpp_source.html">I2cPort.hpp</a> | 非同期I2C転送の契約。実装: <a href="I2cPort_8cpp_source.html">I2cPort.cpp</a> |
+| <a href="ImuObservation_8hpp_source.html">ImuObservation.hpp</a> | 姿勢の周期読取API。実装: <a href="f446__imu__runtime_8cpp_source.html">f446_imu_runtime.cpp</a> |
 | <a href="IndicatorOutput_8hpp_source.html">IndicatorOutput.hpp</a> | GPIO極性、LED・RGB・ブザー出力 |
-*/
-
-/** @page folder_firmware_f446_balancing_f446_App_Src Src/
-
-@ref folder_firmware_f446_balancing_f446_App "firmware/f446/balancing_f446/App/" / `Src/`
-
-| フォルダ・ファイル | 内容 |
-|---|---|
-| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing "balancing/" | 機能単位のフォルダ |
-*/
-
-/** @page folder_firmware_f446_balancing_f446_App_Src_balancing balancing/
-
-@ref folder_firmware_f446_balancing_f446_App_Src "firmware/f446/balancing_f446/App/Src/" / `balancing/`
-
-| フォルダ・ファイル | 内容 |
-|---|---|
-| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_app "app/" | 起動、状態遷移、通常運転の管理 |
-| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_bench "bench/" | 独立した単軸試運転 |
-| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_communication "communication/" | フレーム変換、CAN送受信とスケジューリング |
-| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_control "control/" | 制御演算と状態推定 |
-| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_device "device/" | HALとモータなどの機器への接続 |
+| <a href="MotorObservation_8hpp_source.html">MotorObservation.hpp</a> | 6軸観測コピー・回収番号・故障保持・停止専用設定。実装: <a href="f446__can1__runtime_8cpp_source.html">f446_can1_runtime.cpp</a> |
+| <a href="Rs06Motor_8hpp_source.html">Rs06Motor.hpp</a> | RS06 1軸の有効化、停止、状態報告のAPI。実装: <a href="Rs06Motor_8cpp_source.html">Rs06Motor.cpp</a> |
+| <a href="StatusIndicatorPort_8hpp_source.html">StatusIndicatorPort.hpp</a> | RGB・ブザー出力と出力失敗診断。実装: <a href="StatusIndicatorPort_8cpp_source.html">StatusIndicatorPort.cpp</a> |
+| <a href="UsbHostPort_8hpp_source.html">UsbHostPort.hpp</a> | 接続世代・転送連番・期限の契約。実装: <a href="UsbHostPort_8cpp_source.html">UsbHostPort.cpp</a> |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Src_balancing_app app/
 
-@ref folder_firmware_f446_balancing_f446_App_Src_balancing "firmware/f446/balancing_f446/App/Src/balancing/" / `app/`
+@ref folder_firmware_f446_balancing_f446_App_Src_balancing "firmware/f446/balancing_f446/App/Src/balancing/" / app/
 
-| フォルダ・ファイル | 内容 |
+最初に application.cpp → DriveRuntime.cpp → ControlCycle.cpp を読む。RobotSequenceが運転状態を決定する。
+
+対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Inc_balancing_app "Inc/balancing/app/"
+
+| ファイル・フォルダ | 内容 |
 |---|---|
+| <a href="Can2ServiceLink_8cpp_source.html">Can2ServiceLink.cpp</a> | 電源・操作・診断配送と周期結果の応答生成、背景送信 |
 | <a href="ControlCycle_8cpp_source.html">ControlCycle.cpp</a> | 1周期の観測→ARM/FAULT→数学制御・指令変換の実行順 |
 | <a href="CycleHealthMonitor_8cpp_source.html">CycleHealthMonitor.cpp</a> | 欠落・重複・未完了の分離、更新要求照合 |
-| <a href="MotorService_8cpp_source.html">MotorService.cpp</a> | 6軸の観測取得、報告の軸選択、RS06のARM・停止要求 |
-| <a href="MotorCanLink_8cpp_source.html">MotorCanLink.cpp</a> | 既存軸別受信とCAN1の有効化・停止の配送、自作CAN2を除外 |
-| <a href="RobotSequence_8cpp_source.html">RobotSequence.cpp</a> | 運転状態の遷移、ARMINGの期限、FAULT記録 |
-| <a href="application_8cpp_source.html">application.cpp</a> | F446のC++側初期化、6軸・IMU観測の固定、非駆動ControlCycle |
+| <a href="DiagnosticsService_8cpp_source.html">DiagnosticsService.cpp</a> | 重要通常FIFO、3部分の終端照合 |
+| <a href="DriveRuntime_8cpp_source.html">DriveRuntime.cpp</a> | 通常の周期実行と#88停止専用送信。SIL実装はtests/sil/ |
 | <a href="DualSenseService_8cpp_source.html">DualSenseService.cpp</a> | 報告の連続性・操作元・長押しイベント |
-| <a href="DriveRuntime_8cpp_source.html">DriveRuntime.cpp</a> | F446の非駆動周期・明示設定時の停止送信。ホスト駆動は tests/sil/ に分離 |
-| <a href="Can2ServiceLink_8cpp_source.html">Can2ServiceLink.cpp</a> | 電源・操作・診断配送と周期結果の応答生成、背景送信 |
+| <a href="MotorCanLink_8cpp_source.html">MotorCanLink.cpp</a> | 既存軸別受信とCAN1の有効化・停止の配送、自作CAN2を除外 |
+| <a href="MotorService_8cpp_source.html">MotorService.cpp</a> | 6軸の観測取得、報告の軸選択、RS06のARM・停止要求 |
 | <a href="PowerBoardService_8cpp_source.html">PowerBoardService.cpp</a> | CAN2電源状態の復号接続・受理と鮮度評価 |
 | <a href="RemoteControlService_8cpp_source.html">RemoteControlService.cpp</a> | 操作入力の検証、ニュートラル復帰、変化率制限、状態ごとの目標 |
-| <a href="DiagnosticsService_8cpp_source.html">DiagnosticsService.cpp</a> | 重要通常FIFO、3部分の終端照合 |
+| <a href="RobotSequence_8cpp_source.html">RobotSequence.cpp</a> | 運転状態の遷移、ARMINGの期限、FAULT記録 |
 | <a href="StatusIndicator_8cpp_source.html">StatusIndicator.cpp</a> | FAULT優先と時刻差による点滅・鳴動 |
-| <a href="StatusIndicatorPort_8cpp_source.html">StatusIndicatorPort.cpp</a> | 極性変換・変更時書込み・失敗時OFF |
-| <a href="F446Watchdog_8cpp_source.html">F446Watchdog.cpp</a> | HAL初期化と周期完了に限定した更新・失敗ラッチ |
-| <a href="f446__indicator__output_8cpp_source.html">f446_indicator_output.cpp</a> | 生成GPIO割当と出力ラッチ照合 |
+| <a href="application_8cpp_source.html">application.cpp</a> | Application/ObservationCycleの所有、500 Hz周期・診断・更新の調停 |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Src_balancing_bench bench/
+
+@ref folder_firmware_f446_balancing_f446_App_Src_balancing "firmware/f446/balancing_f446/App/Src/balancing/" / bench/
+
+対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Inc_balancing_bench "Inc/balancing/bench/"
+
+| ファイル・フォルダ | 内容 |
+|---|---|
+| <a href="MotorBench_8cpp_source.html">MotorBench.cpp</a> | 単軸試運転のC++実装 |
+| <a href="f446__motor__bench__runtime_8cpp_source.html">f446_motor_bench_runtime.cpp</a> | 試運転専用CANの初期化・フィルタ・周期・IRQ |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Src_balancing_communication communication/
 
-@ref folder_firmware_f446_balancing_f446_App_Src_balancing "firmware/f446/balancing_f446/App/Src/balancing/" / `communication/`
+@ref folder_firmware_f446_balancing_f446_App_Src_balancing "firmware/f446/balancing_f446/App/Src/balancing/" / communication/
 
-| フォルダ・ファイル | 内容 |
+対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Inc_balancing_communication "Inc/balancing/communication/"
+
+| ファイル・フォルダ | 内容 |
 |---|---|
-| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_communication_can "can/" | CANポート、受信配送、送信順序 |
-| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_communication_usb "usb/" | USB HID報告・インターフェース検査 |
-| <a href="Rs06Codec_8cpp_source.html">Rs06Codec.cpp</a> | RS06フレームの符号化、状態報告の復号と検証 |
+| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_communication_can "can/" | CANポート・配送・送信調停・プロトコル |
+| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_communication_usb "usb/" | USB HID報告・descriptor |
 | <a href="C620Codec_8cpp_source.html">C620Codec.cpp</a> | C620電流の量子化・4軸符号化・フィードバック復号 |
-*/
-
-/** @page folder_firmware_f446_balancing_f446_App_Src_balancing_communication_can can/
-
-@ref folder_firmware_f446_balancing_f446_App_Src_balancing_communication "firmware/f446/balancing_f446/App/Src/balancing/communication/" / `can/`
-
-| フォルダ・ファイル | 内容 |
-|---|---|
-| <a href="CanPort_8cpp_source.html">CanPort.cpp</a> | bxCANレジスタ操作、送受信、IRQイベント回収 |
-| <a href="ProtocolId_8cpp_source.html">ProtocolId.cpp</a> | 35件のIDと予約領域の検証 |
-| <a href="ProtocolPayload_8cpp_source.html">ProtocolPayload.cpp</a> | DLC境界・非有限値を検査するデータ変換 |
-| <a href="PowerBoardCodec_8cpp_source.html">PowerBoardCodec.cpp</a> | 電源フレームの符号化・復号と形式検査 |
-| <a href="RemoteControlCodec_8cpp_source.html">RemoteControlCodec.cpp</a> | 操作フレームの符号化・復号と形式検査 |
-| <a href="DiagnosticsCodec_8cpp_source.html">DiagnosticsCodec.cpp</a> | 診断フレームの符号化・型付き復号・値の検査 |
-| <a href="CanRouter_8cpp_source.html">CanRouter.cpp</a> | 交互回収、バス・IDE・固定ID・DLC・宛先で受信分類、送信終端・状態配送 |
-| <a href="Can2FilterPlan_8cpp_source.html">Can2FilterPlan.cpp</a> | C620と自作受信IDの照合ワード生成 |
-| <a href="CanTxScheduler_8cpp_source.html">CanTxScheduler.cpp</a> | 停止送信の優先順位と再試行、通常FIFO、周期指令の期限と終端照合 |
-| <a href="MotorFramePlan_8cpp_source.html">MotorFramePlan.cpp</a> | 状態別の通常トルク抑止とC11コーデックによる5フレーム生成 |
+| <a href="Rs06Codec_8cpp_source.html">Rs06Codec.cpp</a> | RS06フレームの符号化、状態報告の復号と検証 |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Src_balancing_control control/
 
-@ref folder_firmware_f446_balancing_f446_App_Src_balancing "firmware/f446/balancing_f446/App/Src/balancing/" / `control/`
+@ref folder_firmware_f446_balancing_f446_App_Src_balancing "firmware/f446/balancing_f446/App/Src/balancing/" / control/
 
-| フォルダ・ファイル | 内容 |
+対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Inc_balancing_control "Inc/balancing/control/"
+
+| ファイル・フォルダ | 内容 |
 |---|---|
-| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_control_controller "controller/" | 倒立、脚長、Roll、Yawの制御 |
-| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_control_estimator "estimator/" | センサ観測の統合と脚運動学 |
-| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_control_filter "filter/" | 姿勢推定に使うセンサフィルタ |
+| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_control_controller "controller/" | LQR・VMC・脚長/Roll/Yaw・指令換算 |
+| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_control_estimator "estimator/" | 機構・車輪・状態推定 |
+| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_control_filter "filter/" | 姿勢推定 |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Src_balancing_device device/
+
+@ref folder_firmware_f446_balancing_f446_App_Src_balancing "firmware/f446/balancing_f446/App/Src/balancing/" / device/
+
+対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Inc_balancing_device "Inc/balancing/device/"
+
+| ファイル・フォルダ | 内容 |
+|---|---|
+| <a href="Bno055_8cpp_source.html">Bno055.cpp</a> | BNO055の非同期読出し・サンプル時刻・有効性 |
+| <a href="C620Motor_8cpp_source.html">C620Motor.cpp</a> | C620 1軸の受信順折返し、連続性喪失、通信鮮度 |
+| <a href="F446Watchdog_8cpp_source.html">F446Watchdog.cpp</a> | HAL IWDG起動・完了証跡からの更新・失敗ラッチ |
+| <a href="I2cPort_8cpp_source.html">I2cPort.cpp</a> | I2C転送要求・完了・失敗の非同期管理 |
+| <a href="Rs06Motor_8cpp_source.html">Rs06Motor.cpp</a> | RS06 1軸の有効化・停止フレームと応答の照合 |
+| <a href="StatusIndicatorPort_8cpp_source.html">StatusIndicatorPort.cpp</a> | 極性変換・変更時書込み・失敗時OFF |
+| <a href="UsbHostPort_8cpp_source.html">UsbHostPort.cpp</a> | 固定長転送と一回限りの完了配送 |
+| <a href="f446__can1__runtime_8cpp_source.html">f446_can1_runtime.cpp</a> | CAN1/2起動、共有フィルタ、IRQ、共通DWT時計、独立した監視集計 |
+| <a href="f446__imu__runtime_8cpp_source.html">f446_imu_runtime.cpp</a> | BNO055とI2C HAL・DRDYイベント・姿勢フィルタの接続 |
+| <a href="f446__indicator__output_8cpp_source.html">f446_indicator_output.cpp</a> | 生成GPIO割当と出力ラッチ照合 |
+| <a href="f446__usb__host__port_8cpp_source.html">f446_usb_host_port.cpp</a> | ST Host Core・HCD接続、非同期reset・回収・IRQ |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_communication_can can/
+
+@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_communication "firmware/f446/balancing_f446/App/Inc/balancing/communication/" / can/
+
+対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Src_balancing_communication_can "Src/balancing/communication/can/"
+
+| ファイル・フォルダ | 内容 |
+|---|---|
+| <a href="Can2FilterPlan_8hpp_source.html">Can2FilterPlan.hpp</a> | CAN2の32bit Listフィルタ構成と生成API。実装: <a href="Can2FilterPlan_8cpp_source.html">Can2FilterPlan.cpp</a> |
+| <a href="CanPort_8hpp_source.html">CanPort.hpp</a> | 1バスの送受信、IRQ、メールボックスと共通DWT時計のAPI。実装: <a href="CanPort_8cpp_source.html">CanPort.cpp</a> |
+| <a href="CanRouter_8hpp_source.html">CanRouter.hpp</a> | CANイベントの交互回収と配送API・CAN2自作通信6分類。実装: <a href="CanRouter_8cpp_source.html">CanRouter.cpp</a> |
+| <a href="CanTxScheduler_8hpp_source.html">CanTxScheduler.hpp</a> | 対象別の停止要求、通常FIFO、周期送信、受付と終端の照合API。実装: <a href="CanTxScheduler_8cpp_source.html">CanTxScheduler.cpp</a> |
+| <a href="CanTypes_8hpp_source.html">CanTypes.hpp</a> | フレーム、トークン、送信結果、IRQイベントの共通型 |
+| <a href="DiagnosticsCodec_8hpp_source.html">DiagnosticsCodec.hpp</a> | 診断と設定読み出し19種類の型と公開API。実装: <a href="DiagnosticsCodec_8cpp_source.html">DiagnosticsCodec.cpp</a> |
+| <a href="MotorFramePlan_8hpp_source.html">MotorFramePlan.hpp</a> | SIL専用Type1×4＋C620共通0x200の符号化計画。実装: <a href="MotorFramePlan_8cpp_source.html">MotorFramePlan.cpp</a> |
+| <a href="PowerBoardCodec_8hpp_source.html">PowerBoardCodec.hpp</a> | 電源状態・要求・応答と非常停止の公開API。実装: <a href="PowerBoardCodec_8cpp_source.html">PowerBoardCodec.cpp</a> |
+| <a href="ProtocolId_8hpp_source.html">ProtocolId.hpp</a> | CAN2 v1のID構造と固定許可リストの公開API。実装: <a href="ProtocolId_8cpp_source.html">ProtocolId.cpp</a> |
+| <a href="ProtocolPayload_8hpp_source.html">ProtocolPayload.hpp</a> | Big endianの整数・float32変換API。実装: <a href="ProtocolPayload_8cpp_source.html">ProtocolPayload.cpp</a> |
+| <a href="RemoteControlCodec_8hpp_source.html">RemoteControlCodec.hpp</a> | 運動指令・操作要求・応答の公開API。実装: <a href="RemoteControlCodec_8cpp_source.html">RemoteControlCodec.cpp</a> |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_communication_usb usb/
+
+@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_communication "firmware/f446/balancing_f446/App/Inc/balancing/communication/" / usb/
+
+対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Src_balancing_communication_usb "Src/balancing/communication/usb/"
+
+| ファイル・フォルダ | 内容 |
+|---|---|
+| <a href="DualSenseProtocol_8hpp_source.html">DualSenseProtocol.hpp</a> | 非Boot HID descriptor・操作報告の型と検査。実装: <a href="DualSenseProtocol_8cpp_source.html">DualSenseProtocol.cpp</a> |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_control_controller controller/
+
+@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_control "firmware/f446/balancing_f446/App/Inc/balancing/control/" / controller/
+
+対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Src_balancing_control_controller "Src/balancing/control/controller/"
+
+| ファイル・フォルダ | 内容 |
+|---|---|
+| <a href="BalanceControl_8hpp_source.html">BalanceControl.hpp</a> | LQR・LegPD/RollPD・VMC・Yaw PIの数値合成API。実装: <a href="BalanceControl_8cpp_source.html">BalanceControl.cpp</a> |
+| <a href="MotorCommand_8hpp_source.html">MotorCommand.hpp</a> | RS06・C620の6軸独立換算設定と数学プレビューAPI。実装: <a href="MotorCommand_8cpp_source.html">MotorCommand.cpp</a> |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_control_estimator estimator/
+
+@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_control "firmware/f446/balancing_f446/App/Inc/balancing/control/" / estimator/
+
+対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Src_balancing_control_estimator "Src/balancing/control/estimator/"
+
+| ファイル・フォルダ | 内容 |
+|---|---|
+| <a href="LegKinematics_8hpp_source.html">LegKinematics.hpp</a> | 2入力閉リンクの脚状態と数学fixtureの公開契約。実装: <a href="LegKinematics_8cpp_source.html">LegKinematics.cpp</a> |
+| <a href="StateEstimator_8hpp_source.html">StateEstimator.hpp</a> | IMU・RS06・車輪の同一周期スナップショットAPI。実装: <a href="StateEstimator_8cpp_source.html">StateEstimator.cpp</a> |
+| <a href="WheelOdometry_8hpp_source.html">WheelOdometry.hpp</a> | C620左右の位置・速度換算と原点リセットの公開契約。実装: <a href="WheelOdometry_8cpp_source.html">WheelOdometry.cpp</a> |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_control_filter filter/
+
+@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_control "firmware/f446/balancing_f446/App/Inc/balancing/control/" / filter/
+
+対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Src_balancing_control_filter "Src/balancing/control/filter/"
+
+| ファイル・フォルダ | 内容 |
+|---|---|
+| <a href="ImuAttitudeSource_8hpp_source.html">ImuAttitudeSource.hpp</a> | 新規IMU測定と姿勢フィルタ。実装: <a href="ImuAttitudeSource_8cpp_source.html">ImuAttitudeSource.cpp</a> |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Src_balancing_communication_can can/
+
+@ref folder_firmware_f446_balancing_f446_App_Src_balancing_communication "firmware/f446/balancing_f446/App/Src/balancing/communication/" / can/
+
+対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Inc_balancing_communication_can "Inc/balancing/communication/can/"
+
+| ファイル・フォルダ | 内容 |
+|---|---|
+| <a href="Can2FilterPlan_8cpp_source.html">Can2FilterPlan.cpp</a> | C620と自作受信IDの照合ワード生成 |
+| <a href="CanPort_8cpp_source.html">CanPort.cpp</a> | bxCANレジスタ操作、送受信、IRQイベント回収 |
+| <a href="CanRouter_8cpp_source.html">CanRouter.cpp</a> | 交互回収、バス・IDE・固定ID・DLC・宛先で受信分類、送信終端・状態配送 |
+| <a href="CanTxScheduler_8cpp_source.html">CanTxScheduler.cpp</a> | 停止送信の優先順位と再試行、通常FIFO、周期指令の期限と終端照合 |
+| <a href="DiagnosticsCodec_8cpp_source.html">DiagnosticsCodec.cpp</a> | 診断フレームの符号化・型付き復号・値の検査 |
+| <a href="MotorFramePlan_8cpp_source.html">MotorFramePlan.cpp</a> | SILで使用する5フレーム計画。通常ELFへは未接続 |
+| <a href="PowerBoardCodec_8cpp_source.html">PowerBoardCodec.cpp</a> | 電源フレームの符号化・復号と形式検査 |
+| <a href="ProtocolId_8cpp_source.html">ProtocolId.cpp</a> | 35件のIDと予約領域の検証 |
+| <a href="ProtocolPayload_8cpp_source.html">ProtocolPayload.cpp</a> | DLC境界・非有限値を検査するデータ変換 |
+| <a href="RemoteControlCodec_8cpp_source.html">RemoteControlCodec.cpp</a> | 操作フレームの符号化・復号と形式検査 |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Src_balancing_communication_usb usb/
+
+@ref folder_firmware_f446_balancing_f446_App_Src_balancing_communication "firmware/f446/balancing_f446/App/Src/balancing/communication/" / usb/
+
+対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Inc_balancing_communication_usb "Inc/balancing/communication/usb/"
+
+| ファイル・フォルダ | 内容 |
+|---|---|
+| <a href="DualSenseProtocol_8cpp_source.html">DualSenseProtocol.cpp</a> | USB descriptor検証と報告復号 |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Src_balancing_control_controller controller/
 
-@ref folder_firmware_f446_balancing_f446_App_Src_balancing_control "firmware/f446/balancing_f446/App/Src/balancing/control/" / `controller/`
+@ref folder_firmware_f446_balancing_f446_App_Src_balancing_control "firmware/f446/balancing_f446/App/Src/balancing/control/" / controller/
 
-| フォルダ・ファイル | 内容 |
+対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Inc_balancing_control_controller "Inc/balancing/control/controller/"
+
+| ファイル・フォルダ | 内容 |
 |---|---|
 | <a href="BalanceControl_8cpp_source.html">BalanceControl.cpp</a> | LQR・脚長/Roll PD・Yaw PI・車輪配分の数値実装とVMC合成 |
 | <a href="MotorCommand_8cpp_source.html">MotorCommand.cpp</a> | モータ軸トルク/電流換算、最終軸別飽和と原子的な不採用 |
@@ -488,69 +633,24 @@
 
 /** @page folder_firmware_f446_balancing_f446_App_Src_balancing_control_estimator estimator/
 
-@ref folder_firmware_f446_balancing_f446_App_Src_balancing_control "firmware/f446/balancing_f446/App/Src/balancing/control/" / `estimator/`
+@ref folder_firmware_f446_balancing_f446_App_Src_balancing_control "firmware/f446/balancing_f446/App/Src/balancing/control/" / estimator/
 
-| フォルダ・ファイル | 内容 |
+対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Inc_balancing_control_estimator "Inc/balancing/control/estimator/"
+
+| ファイル・フォルダ | 内容 |
 |---|---|
-| <a href="WheelOdometry_8cpp_source.html">WheelOdometry.cpp</a> | C620累積カウント・RPMの物理換算、受理番号と世代の照合 |
 | <a href="LegKinematics_8cpp_source.html">LegKinematics.cpp</a> | 機構角変換、閉リンク数値演算、解析JとVMC |
 | <a href="StateEstimator_8cpp_source.html">StateEstimator.cpp</a> | 6軸とIMUを同期評価し制御状態かエラーを返す |
+| <a href="WheelOdometry_8cpp_source.html">WheelOdometry.cpp</a> | C620累積カウント・RPMの物理換算、受理番号と世代の照合 |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Src_balancing_control_filter filter/
 
-@ref folder_firmware_f446_balancing_f446_App_Src_balancing_control "firmware/f446/balancing_f446/App/Src/balancing/control/" / `filter/`
+@ref folder_firmware_f446_balancing_f446_App_Src_balancing_control "firmware/f446/balancing_f446/App/Src/balancing/control/" / filter/
 
-| フォルダ・ファイル | 内容 |
+対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Inc_balancing_control_filter "Inc/balancing/control/filter/"
+
+| ファイル・フォルダ | 内容 |
 |---|---|
-*/
-
-/** @page folder_firmware_f446_balancing_f446_App_Src_balancing_device device/
-
-@ref folder_firmware_f446_balancing_f446_App_Src_balancing "firmware/f446/balancing_f446/App/Src/balancing/" / `device/`
-
-| フォルダ・ファイル | 内容 |
-|---|---|
-| <a href="C620Motor_8cpp_source.html">C620Motor.cpp</a> | C620 1軸の受信順折返し、連続性喪失、通信鮮度 |
-| <a href="Rs06Motor_8cpp_source.html">Rs06Motor.cpp</a> | RS06 1軸の有効化・停止フレームと応答の照合 |
-| <a href="f446__can1__runtime_8cpp_source.html">f446_can1_runtime.cpp</a> | CAN1/2起動、共有フィルタ、IRQ、共通DWT時計、独立した監視集計 |
-| <a href="UsbHostPort_8cpp_source.html">UsbHostPort.cpp</a> | 固定長転送と一回限りの完了配送 |
-| <a href="f446__usb__host__port_8cpp_source.html">f446_usb_host_port.cpp</a> | ST Host Core・HCD接続、非同期reset・回収・IRQ |
-*/
-
-/** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_communication_usb usb/
-
-@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_communication "communication/" / `usb/`
-
-| ファイル | 内容 |
-|---|---|
-| <a href="DualSenseProtocol_8hpp_source.html">DualSenseProtocol.hpp</a> | 非Boot HID descriptor・操作報告の型と検査 |
-*/
-
-/** @page folder_firmware_f446_balancing_f446_App_Src_balancing_communication_usb usb/
-
-@ref folder_firmware_f446_balancing_f446_App_Src_balancing_communication "communication/" / `usb/`
-
-| ファイル | 内容 |
-|---|---|
-| <a href="DualSenseProtocol_8cpp_source.html">DualSenseProtocol.cpp</a> | USB descriptor検証と報告復号 |
-*/
-
-/** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_bench bench/
-
-@ref folder_firmware_f446_balancing_f446_App_Inc_balancing "balancing/" / `bench/`
-
-| ファイル | 内容 |
-|---|---|
-| <a href="MotorBench_8hpp_source.html">MotorBench.hpp</a> | 単軸試運転のC++実装 |
-*/
-
-/** @page folder_firmware_f446_balancing_f446_App_Src_balancing_bench bench/
-
-@ref folder_firmware_f446_balancing_f446_App_Src_balancing "balancing/" / `bench/`
-
-| ファイル | 内容 |
-|---|---|
-| <a href="MotorBench_8cpp_source.html">MotorBench.cpp</a> | 単軸試運転のC++実装 |
-| <a href="f446__motor__bench__runtime_8cpp_source.html">f446_motor_bench_runtime.cpp</a> | 試運転専用CANの初期化・フィルタ・周期・IRQ |
+| <a href="ImuAttitudeSource_8cpp_source.html">ImuAttitudeSource.cpp</a> | 静止校正・軸変換・相補フィルタと姿勢出力 |
 */

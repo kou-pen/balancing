@@ -1,88 +1,22 @@
-# 実機非依存の制御コア設計
+# 実機非依存の制御コア（現行C++17）
 
-> 旧C11実装の歴史的記録。現在は [BalanceControlのC++統合](verification/f446-balance-math-cpp.md) と [公開API](design/public-api.md) を参照。
+現在、自作Appに旧C11の制御関数は残っていません。HAL非依存の制御数学と状態判断は以下のクラスに集約されています。
 
-**作成日：** 2026-10-28／仕様との整合注記：2026-11-09  
-**位置付け：** 2026-10-28当時のC11ロジックと移行時の比較基準。旧状態機械・観測ストア・操作入力は後続C++実装に統合済み。本ページの旧状態機械の記述は履歴であり、現行の安全仕様ではない。[C++17公開API設計](design/public-api.md)に新しい型・呼び出し順を記載。  
-**対応仕様：** [F446](specs/boards/f446_control.md)、[状態推定](specs/control/state_estimation.md)、[LQR・VMC](specs/control/balance_vmc.md)、[動作・状態遷移](specs/behavior/robot_operation.md)。[図はこちら](diagrams.md)。
+| ファイル | 入力 → 出力 |
+|---|---|
+| control/filter/ImuAttitudeSource.hpp/.cpp | 加速度・ジャイロ → 姿勢 |
+| control/estimator/LegKinematics.hpp/.cpp | モータ角 → 閉リンク幾何・ヤコビアン、仮想力 → 関節Nm |
+| control/estimator/WheelOdometry.hpp/.cpp | 車輪累積角度・RPM → 位置・速度 |
+| control/estimator/StateEstimator.hpp/.cpp | IMUと6軸 → ControlSnapshot |
+| control/controller/BalanceControl.hpp/.cpp | 制御状態・目標 → LQR、脚長/Roll PD、Yaw PI、VMCと機構Nm |
+| control/controller/MotorCommand.hpp/.cpp | 機構Nm → RS06 Nm・C620 Aと軸別制限 |
+| app/RobotSequence.hpp/.cpp | 状態・保護条件・操作 → 状態と駆動要求 |
+| app/ControlCycle.hpp/.cpp | 上記を一周期に結合（CAN/HAL送信なし） |
 
-## ソフトウェアの境界
+LQRの6状態は仮想脚角・角速度、車体位置・速度、Pitch角・角速度です。機構側の力・トルクとモータ側の電流を区別します。脚長基準はARM時に捕捉し、Yawは倒立優先の余力で配分します。通常の数学飽和だけをFAULTにしません。
 
-| 層 | 役割 | 現状 |
-|---|---|---|
-| 機器ドライバ | CAN1／CAN2、I2C、USB、タイマ割込、物理非常停止 | F446のTIM7→C++骨組みはクロスビルドPASS。CAN1/2開始・フィルタ・IRQ・モータCANポートは未統合 |
-| 通信アダプタ | フレーム組立／解析、受信時刻、RS06有効化応答 | RS06/C620 CAN層と単軸試運転をC11実装・ホスト試験済み。F446実機は未検証 |
-| 状態推定 | BNO055、モータ角度、6節リンクから6状態へ変換 | 未実装 |
-| 純粋制御コア | 更新鮮度、3状態機械、変化率制限、車輪配分、LQR数値計算 | **実装・ホスト検証済み** |
-| 脚長・Yaw・Roll・VMC | 制御ループ、幾何ヤコビアン、トルク変換 | 未実装 |
-| 校正とパラメータ | 実測K_300、電流上限、機械原点 | 未確定 |
-| MCU統合 | F446／F303動作、500 Hz実測、CANバス負荷 | 未検証 |
+式と詳細は [倒立・VMC仕様](specs/control/balance_vmc.md)、[状態推定仕様](specs/control/state_estimation.md)、[脚運動学](design/leg-kinematics.md)、[脚長・Roll](design/leg-pd-roll.md)、[Yaw](design/yaw-pi.md)、[姿勢](design/attitude-filter.md)。コードの所在は [フォルダ別案内](design/public-api.md)。
 
-実装ファイルは`firmware/f446/balancing_f446/App/Inc/balancing/control/controller/balancing_core.h`と`firmware/f446/balancing_f446/App/Src/balancing/control/controller/balancing_core.c`。HAL、ROS、MCU固有ライブラリに依存しない。
+実機のCAD・原点・極性・ゲイン・変換・上限は未確定です。人工モデルの計算結果はSIL用であり、実機非ゼロ出力には接続されていません。
 
-## データ構造の原則
-
-[構造体の関係と所有権](design/data-model.md)を正本とする。6状態は `BControlState`、抽象トルクは `BControlTorque` とし、LQRの数値計算内だけを添字付き配列にする。現行のフィードバック鮮度は各機器の所有者が評価し、RobotSequenceへ判定を渡す。
-
-## 公開APIと単位
-
-| API | 主要入力 | 出力・動作 |
-|---|---|---|
-| 各機器の鮮度判定（旧 `b_check_freshness` 廃止） | 同一単調時計の更新時刻 [µs] | IMU 50 ms、RS06 30 ms、車輪20 ms、電源500 msの鮮度判定 |
-| `RobotSequence::update`（旧 `b_mode_step` 廃止） | 電源・通信・校正・姿勢・検証済みパラメータと操作イベント | DISARMED／ARMING／BALANCING／FAULT、駆動要求 |
-| `RemoteControlService::update`（旧 `b_rate_limit` を内部に移行） | 前回目標、今回目標、最大変化率、dt [s] | 変化率を制限した目標 |
-| `b_wheel_allocate` | 合計倒立トルク、Yaw差動、左右上限 [N·m] | 左右車輪トルク [N·m] |
-| `b_lqr_compute` | `BLqrConfig`と名前付きの`BControlState`（状態・目標） | `BControlTorque`（車輪合計／仮想股関節合計 [N·m]） |
-
-各関数のC宣言には、対応仕様IDをDoxygenの`@spec`として記載した。通信フォーマットやトルクを電流に換算する処理は別の責務とする。
-
-## ARM許可の2段階処理（旧実装の履歴）
-
-**注意（MOTOR-151,159,197,198）：** この節は実装済みホストコアの現状を説明する。2026-11-09に再現監査を行い、ARMの姿勢範囲ゲートが仕様と不一致、脚長目標初期化と有効化失敗FAULTが未実装/未統合であることを確認した。詳細は[制御コア仕様差分監査](verification/core-mode-contract-audit.md)。**本文の現状説明を最新の確定仕様として誤読しない。**
-
-公開モードは3種類のみ。ARM待機はDISARMED内の`arm_pending`で表す。
-
-1. ARM要求の立上り時に、電源ON、センサ鮮度、姿勢、校正、モデル、制限値の検証状態をチェックする。
-2. 満たす場合だけRS06有効化要求を返す。**この段階では駆動しない。**
-3. 各RS06へのType 3**実送信受付時刻**を`rs_enable_sent[4]`として受け取り、その時刻より新しく30 ms以内で、全4台が動作可能と示す応答を確認してBALANCINGへ遷移する。要求を出しただけでは送信済みとみなさない。
-4. 待機中の前提条件喪失は待機取消しと停止要求。BALANCING中の前提条件喪失はFAULT。
-5. FAULTはラッチする。単なるCLEAR_FAULT操作で自動解除せず、原因解消の明示的な外部許可も必要。
-6. BALANCING中、前回処理から6 ms以上経過した場合または単調時計が逆行した場合はスケジューラ異常のFAULTへ遷移する。ただし実機タイマの割り込み・実行時間計測は未実装。
-
-**移行先の契約：** ARMの絶対期限・一時的な未受付の再試行・待機中の必須条件消失は[動作仕様](specs/behavior/robot_operation.md)に記載。ARM期限の実機値は測定待ち。MOTOR-095の再起動FAULT復元、MOTOR-132の起き上がりモーションは保留。ARM時の脚長目標初期値はMOTOR-159で現在脚長に決定。
-
-## 制御式と制限
-
-LQRは`u = u_eq - K (x - x_ref)`の積和のみを行う。状態は[仮想脚角 rad、角速度 rad/s、位置 m、速度 m/s、Pitch rad、Pitch角速度 rad/s]の順。位置誤差だけを設定上限で制限し、他の状態誤差には掛けない。実機K_300は設定せず、検証フラグが偽なら計算を拒否する。
-
-車輪配分はまず`T_base = clamp(T_w/2, ±min(左右上限))`を確保し、残りのトルクで`T_left = T_base - ΔT`、`T_right = T_base + ΔT`を決める。**飽和のみではFAULTにしない。**
-
-受信の新規性はCANドライバが保証する。単に読み出しを繰り返しただけの値へ新しい時刻を付けない。未来の時刻や未受信値は無効。数値計算でNaN・無限大・非正上限が見つかった場合は失敗とゼロ出力にする。
-
-## ホストでの試験
-
-```sh
-cd /home/dev-admin/chatgpt-workspace/balancing
-python3 tools/run_host_tests.py
-python3 tools/validate_specs.py
-doxygen Doxyfile
-```
-
-C11の厳格警告付きビルドに加えUBSanによる未定義動作検査を実施。鮮度閾値の境界、ARM後の4台応答、FAULT解除、変化率制限、未検証LQRの拒否、車輪配分1万入力を試験する。**これはロジックの試験であり、500 Hzの実時間性や実機の倒立性能を保証しない。**
-
-## ホスト向け数学シミュレーション
-
-[6状態・2入力の離散モデル検査器](design/linear-simulation.md)を追加。外部JSONから行列を読み込み、物理値を捏造せずに時間発展とCSVを検証できる。これは実機の倒立モデルではない。
-
-## モータCAN層の追加（2026-11-09）
-
-[モータCAN制御層と単軸試運転](design/motor-layer.md)を参照。RS06/C620のCANフレーム生成・復号、単軸試験の時間制限と受信鮮度をホスト試験済み。F446向け薄いHALアダプタはCubeIDEのコンパイル対象に含まれ、PR #16の5ソース構成でクロスビルドPASS。ただし、**CAN開始・フィルタ・IRQおよび通常運転の呼出し経路は未接続**。一括再配置後の6ソース構成は別途CubeIDE管理ビルドを確認する。この試運転器を通常の`BModeMachine`と混同しない。
-
-## 次の開発課題
-
-**2026-11-09の状態機械監査では、既存動作を保つ回帰テストを追加したが、安全状態機械の機能変更は行っていない。** [差分表](verification/core-mode-contract-audit.md)に、MOTOR-151の姿勢ゲート不一致、MOTOR-198の有効化失敗判定未実装、脚長初期化・DISARM時のC620ゼロ指令の未統合を記録した。仕様上の安全動作を変える修正は承認後に行う。
-
-- 500 Hz制御・250 Hz RS06指令の純粋な周期分周と異常時処理はIssue #5でホスト検証済み。残るのはHAL/Safetyへの統合と実機監視期限の実測確定。
-- 状態推定・6節リンクの運動学と数値微分による検証。
-- VMC、脚長PD、Roll PD、Yaw PI、指令の上限配分。
-- 既知フレームを用いたCAN符号化／復号のホスト試験。未確定IDは新設しない。
+旧C11実装の説明・過去の差分は [整理前の全文（Git履歴）](https://github.com/kou-pen/balancing/blob/cb3abeda89acdbcb08fd9890735f2b8c95ed9d83/docs/software-core.md) と [C++統合検証](verification/f446-all-cpp.md) に残しています。
