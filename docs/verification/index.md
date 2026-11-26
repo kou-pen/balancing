@@ -88,6 +88,7 @@
 - [Application実行境界の分離](f446-application-runtime-refactor.md)（ホスト・ARMビルド検証済み）
 
 - [DualSense USB入力境界と操作統合](f446-dualsense-input-host.md)
+- [F446 USB Host転送とHCD接続](f446-usb-host-transport.md)
 
 - [RGB・ブザー出力境界と表示診断](f446-indicator-output-host.md)
 

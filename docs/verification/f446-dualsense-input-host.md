@@ -37,3 +37,5 @@
 | 仕様・Doxygen・差分 | PASS（既知の日本語翻訳警告のみ） |
 
 Release text=61892 B、data=92 B、bss=11472 B。ログ: build/cubeide-headless-dualsense/{Debug,Release}.log。再現: cmake -S . -B build/dualsense -DCMAKE_BUILD_TYPE=Debug、cmake --build build/dualsense -j 8、ctest --test-dir build/dualsense --output-on-failure、python3 tools/run_host_tests.py、python3 tools/verify_f446_build.py。USB実機転送と列挙は未試験。
+
+後続実装: [USB Host転送とHCD接続](f446-usb-host-transport.md)。本ページの未接続という記述は当時の検証状態。

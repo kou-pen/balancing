@@ -299,6 +299,7 @@
 | フォルダ・ファイル | 内容 |
 |---|---|
 | @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_communication_can "can/" | CANポート、受信配送、送信順序 |
+| @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing_communication_usb "usb/" | USB HID報告・インターフェース検査 |
 | <a href="Rs06Codec_8hpp_source.html">Rs06Codec.hpp</a> | RS06通信の状態型とフレーム変換の宣言 |
 | <a href="balancing__motor__can_8h_source.html">balancing_motor_can.h</a> | C11のRS06／C620フレーム変換API |
 | <a href="balancing__tx__scheduler_8h_source.html">balancing_tx_scheduler.h</a> | 旧C11のCAN周期送信モデルの型と関数 |
@@ -393,6 +394,9 @@
 | <a href="Can2Observation_8h_source.html">Can2Observation.h</a> | CAN2の受信・左右分類・バス異常・共通評価時刻 |
 | <a href="MotorObservation_8hpp_source.html">MotorObservation.hpp</a> | 6軸周期観測と回収番号・故障保持 |
 | <a href="I2cPort_8hpp_source.html">I2cPort.hpp</a> | 非同期I2C転送の契約 |
+| <a href="UsbHostPort_8hpp_source.html">UsbHostPort.hpp</a> | 接続世代・転送連番・期限の契約 |
+| <a href="F446UsbHostPort_8hpp_source.html">F446UsbHostPort.hpp</a> | 基板設定と明示Host起動 |
+| <a href="UsbHidInput_8hpp_source.html">UsbHidInput.hpp</a> | HID報告連続性 |
 | <a href="Bno055_8hpp_source.html">Bno055.hpp</a> | ACCGYRO取得とDRDY・時間窓 |
 | <a href="ImuObservation_8hpp_source.html">ImuObservation.hpp</a> | 姿勢の周期読取API |
 | <a href="Led_8hpp_source.html">Led.hpp</a> | 明示極性付きLED・RGB論理出力 |
@@ -456,6 +460,7 @@
 | フォルダ・ファイル | 内容 |
 |---|---|
 | @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_communication_can "can/" | CANポート、受信配送、送信順序 |
+| @subpage folder_firmware_f446_balancing_f446_App_Src_balancing_communication_usb "usb/" | USB HID報告・インターフェース検査 |
 | <a href="Rs06Codec_8cpp_source.html">Rs06Codec.cpp</a> | RS06フレームの符号化、状態報告の復号と検証 |
 | <a href="balancing__motor__can_8c_source.html">balancing_motor_can.c</a> | RS06／C620のC11フレーム生成・解析 |
 | <a href="balancing__tx__scheduler_8c_source.html">balancing_tx_scheduler.c</a> | 旧C11のCAN送信周期、受付、完了を模擬する処理 |
@@ -535,4 +540,27 @@
 | <a href="Rs06Motor_8cpp_source.html">Rs06Motor.cpp</a> | RS06 1軸の有効化・停止フレームと応答の照合 |
 | <a href="balancing__f446__motor__bench__port_8c_source.html">balancing_f446_motor_bench_port.c</a> | F446 HALと単軸試運転の送受信・周期を接続 |
 | <a href="f446__can1__runtime_8cpp_source.html">f446_can1_runtime.cpp</a> | CAN1/2起動、共有フィルタ、IRQ、共通DWT時計、独立した監視集計 |
+| <a href="UsbHostPort_8cpp_source.html">UsbHostPort.cpp</a> | 固定長転送と一回限りの完了配送 |
+| <a href="f446__usb__host__port_8cpp_source.html">f446_usb_host_port.cpp</a> | ST Host Core・HCD接続、非同期reset・回収・IRQ |
+| <a href="UsbHidInput_8cpp_source.html">UsbHidInput.cpp</a> | 入力世代・連番検査 |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_communication_usb usb/
+
+@ref folder_firmware_f446_balancing_f446_App_Inc_balancing_communication "communication/" / `usb/`
+
+| ファイル | 内容 |
+|---|---|
+| <a href="DualSenseHostClass_8hpp_source.html">DualSenseHostClass.hpp</a> | 非Boot HIDとIN descriptor検査 |
+| <a href="DualSenseHidCodec_8hpp_source.html">DualSenseHidCodec.hpp</a> | 操作報告の復号 |
+*/
+
+/** @page folder_firmware_f446_balancing_f446_App_Src_balancing_communication_usb usb/
+
+@ref folder_firmware_f446_balancing_f446_App_Src_balancing_communication "communication/" / `usb/`
+
+| ファイル | 内容 |
+|---|---|
+| <a href="DualSenseHostClass_8cpp_source.html">DualSenseHostClass.cpp</a> | 非Boot HIDとIN descriptor検査 |
+| <a href="DualSenseHidCodec_8cpp_source.html">DualSenseHidCodec.cpp</a> | 操作報告の復号 |
 */

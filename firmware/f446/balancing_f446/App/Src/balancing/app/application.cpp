@@ -19,6 +19,8 @@ struct ObservationCycle {
     PowerBoardService power{};
     RemoteControlService remote;
     DualSenseService usb;
+    UsbHostPort usbHost{};
+    std::uint8_t usbReportLength{};
     // 実機FIFO容量・配信仕様は未確定。ゼロ容量で最新状態と欠落数だけ記録。
     DiagnosticsService diagnostics;
     Can2ServiceLink can2;
@@ -33,6 +35,7 @@ struct ObservationCycle {
     explicit ObservationCycle(const Can2ObservationProfile& profile={},
                               const DriveControlConfig& config={}) noexcept
         : remote{profile.operatorConfig},usb{remote,profile.usb},
+          usbReportLength{profile.usb.hid.length},
           diagnostics{profile.faultSlots,profile.faultCapacity,nullptr,0,
                       profile.communication.tokenOrigin},
           can2{power,remote,diagnostics,profile.communication},
@@ -59,6 +62,8 @@ public:
      */
     bool init(const Can2ObservationProfile& profile={},bool requireCan2=false) noexcept
     {
+        // 起動済みHostを別のApplicationへ暗黙再結合しない。
+        if (control_ && control_->usbHost.summary().started) return false;
         if (control_) control_->indicatorOutput.disable();
         observation_ = {};
         previousUs_.reset();
@@ -82,6 +87,14 @@ public:
     }
     DualSenseService* usbLink() noexcept
     { return control_ && control_->usb.enabled()? &control_->usb:nullptr; }
+    bool startUsbHost(UsbHostConfig config,UsbHostBackend backend) noexcept
+    {
+        if (!usbLink() || !observationClockUs() || config.reportLength!=control_->usbReportLength)
+            return false;
+        const bool started=control_->usbHost.start(config,backend);
+        observation_.usbHost=control_->usbHost.summary();
+        return started;
+    }
     bool selectUsb(BOperatorSource target,std::uint64_t now) noexcept
     { return usbLink() && usbLink()->selectSource(target,control_->sequence.state(),now); }
     Can2ServiceLink* can2Link() noexcept
@@ -236,6 +249,20 @@ public:
             return;
         }
         // 受信・状態機械の更新後に背景送信を1件だけ試行する。
+        // USB Hostは余剰時間に一段だけ処理。制御周期側には列挙待ちを置かない。
+        if (control_->usbHost.summary().started) {
+            if (const auto now=observationClockUs()) {
+                control_->usbHost.poll(*now);
+                if (const auto event=control_->usbHost.takeConnectionEvent()) {
+                    if (event->connected) (void)control_->usb.connect(event->generation,event->atUs);
+                    else (void)control_->usb.disconnect(event->generation,event->atUs);
+                }
+                if (const auto report=control_->usbHost.takeReport())
+                    (void)control_->usb.receive(report->token.generation,report->token.serial,
+                        report->data.data(),report->length,report->receivedAtUs,*now);
+                observation_.usbHost=control_->usbHost.summary();
+            }
+        }
         drive_runtime::poll();
         if (can2Link()) serviceCan2ApplicationTx();
     }
@@ -337,6 +364,8 @@ bool initializeCan2Observation(const Can2ObservationProfile& profile) noexcept
 }
 
 DualSenseService* applicationDualSense() noexcept { return application.usbLink(); }
+bool startApplicationUsbHost(UsbHostConfig config,UsbHostBackend backend) noexcept
+{ return application.startUsbHost(config,backend); }
 bool selectApplicationUsbSource(BOperatorSource target,std::uint64_t now) noexcept
 { return application.selectUsb(target,now); }
 

@@ -238,7 +238,7 @@ ApplicationはMotorObservationSnapshotとImuAttitudeを同じ周期時刻で固�
 | `applicationDualSense()` | 明示設定済みの入力入口、既定は空 |
 | `selectApplicationUsbSource(target, nowUs)` | USB側からの明示選択要求を現在のRobotSequenceで評価。割当は未確定 |
 
-USB受信完了通知は主ループに配送し、再読出し時刻で鮮度を更新しない。既存RemoteControlServiceに速度目標・中立復帰・変化率を委ねる。実USB Host列挙・HIDドライバは未接続。[検証記録](../verification/f446-dualsense-input-host.md)。
+USB受信完了通知は主ループに配送し、再読出し時刻で鮮度を更新しない。既存RemoteControlServiceに速度目標・中立復帰・変化率を委ねる。USB Host列挙・HIDドライバは明示設定による起動経路を実装済み（既定無効、実基板未検証）。[検証記録](../verification/f446-dualsense-input-host.md)。
 
 ## 状態表示出力
 
@@ -253,6 +253,18 @@ USB受信完了通知は主ループに配送し、再読出し時刻で鮮度�
 論理表示と物理出力の両方が明示検証済みの設定だけApplicationに結合する。GPIOラッチ照合は物理発光・鳴動を保証しない。未設定の既定起動は出力しない。PWMやLED1〜5の用途・色・極性を新規に決めない。表示異常は診断コピーに保持しRobotSequenceやCAN契約の意味を変えない。
 
 [検証記録](../verification/f446-indicator-output-host.md)。
+
+## STM32F446 USB Host転送境界
+
+| API | 契約 |
+|---|---|
+| `validUsbHostConfig` / `findDualSenseInterface` | 明示設定とVID/PID、Full Speed非Boot HID、Interrupt IN descriptorの境界を照合 |
+| `UsbHostPort::start/poll` | 一度だけ起動、pollあたり下位イベント1件と新規転送受付最大1件 |
+| `UsbHostPort::takeConnectionEvent/takeReport` | 接続世代・転送連番・完了採取時刻付きの通知を一回だけ回収 |
+| `startApplicationUsbHost(config, backend)` | 設定済みDualSenseServiceと共通時計へ接続、既定無効 |
+| `startF446UsbHost(board, config)` | 既存OTG_HS HCD、基板固有VBUSコールバック、明示期限、TIM7より低いIRQ優先度を照合 |
+
+実USB Hostの所有中は手動の報告通知を混在させない。NAK・異常長は連続入力を無効化、STALL・期限超過・切断は操作を切断扱いにする。列挙と停止回収は状態遷移で進め、ST HALのIRQ内部待機時間は実測待ち。詳細は[USB Host転送検証](../verification/f446-usb-host-transport.md)。
 
 ## 制御周期完了とウォッチドッグ更新
 
