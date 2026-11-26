@@ -88,7 +88,7 @@ for label, flags in [
 # Both Application tests now link the actual C++ control cycle and C11 math.
 app_source = F446_APP / "Src" / "balancing"
 app_math_cpp = [str(app_source / name) for name in (
-    "app/ControlCycle.cpp", "app/CycleHealthMonitor.cpp", "device/WatchdogPort.cpp", "device/UsbHostPort.cpp", "communication/usb/DualSenseHostClass.cpp", "app/PowerBoardService.cpp", "app/DualSenseService.cpp", "device/UsbHidInput.cpp", "communication/usb/DualSenseHidCodec.cpp", "app/RemoteControlService.cpp", "app/DiagnosticsService.cpp", "app/StatusIndicator.cpp", "device/StatusIndicatorPort.cpp", "control/controller/MotorCommand.cpp",
+    "app/ControlCycle.cpp", "app/CycleHealthMonitor.cpp", "device/UsbHostPort.cpp", "app/PowerBoardService.cpp", "app/DualSenseService.cpp", "communication/usb/DualSenseProtocol.cpp", "app/RemoteControlService.cpp", "app/DiagnosticsService.cpp", "app/StatusIndicator.cpp", "device/StatusIndicatorPort.cpp", "control/controller/MotorCommand.cpp",
     "control/controller/BalanceControl.cpp", "control/estimator/StateEstimator.cpp",
     "control/estimator/LegKinematics.cpp", "control/estimator/WheelOdometry.cpp")]
 power_codec_sources = [str(app_source / ("communication/can/" + name)) for name in
@@ -122,6 +122,9 @@ cpp_common = [
     str(F446_APP / "Src" / "balancing" / "app" / "application.cpp"),
     str(app_source / "app" / "DriveRuntime.cpp"),
     str(ROOT / "tests" / "test_cpp_app.cpp"),
+    "-I", str(ROOT / "tests" / "stubs_can1"),
+    str(app_source / "communication/can/CanPort.cpp"),
+    str(app_source / "communication/can/CanTxScheduler.cpp"),
     str(app_source / "app" / "RobotSequence.cpp"),
     *app_math_cpp, power_id_source,
 ]
@@ -359,8 +362,6 @@ can_dispatch_common = [
     str(rs06_source / "communication" / "can" / "CanRouter.cpp"),
     str(rs06_source / "communication" / "can" / "ProtocolId.cpp"),
     str(rs06_source / "communication" / "can" / "CanTxScheduler.cpp"),
-    str(rs06_source / "app" / "CanEventPoll.cpp"),
-    str(rs06_source / "app" / "Can2ServiceLinkTx.cpp"),
 ]
 for test, extra_sources in [
     ("test_f446_can1_runtime", rs06_service_sources + app_math_cpp + [str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "device" / "f446_can1_runtime.cpp"), str(rs06_source / "communication" / "can" / "Can2FilterPlan.cpp"), str(rs06_source / "app" / "application.cpp"), str(ROOT / "tests" / "sil" / "DriveCycle.cpp"), str(ROOT / "tests" / "sil" / "DriveRuntime.cpp"), str(rs06_source / "communication" / "can" / "MotorFramePlan.cpp")]),

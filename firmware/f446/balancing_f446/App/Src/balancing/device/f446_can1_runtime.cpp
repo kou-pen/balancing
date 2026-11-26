@@ -1,12 +1,11 @@
 #include "balancing_f446_can1_bridge.h"
 
-#include "balancing/app/CanEventPoll.hpp"
+#include "balancing/communication/can/CanRouter.hpp"
 #include "balancing/app/ApplicationObservation.hpp"
 #include "balancing/app/DriveRuntime.hpp"
 #include "balancing/app/MotorCanLink.hpp"
 #include "balancing/communication/can/CanPort.hpp"
 #include "balancing/communication/can/Can2FilterPlan.hpp"
-#include "balancing/communication/can/CanRouter.hpp"
 #include "balancing/communication/can/CanTxScheduler.hpp"
 
 #include <array>

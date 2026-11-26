@@ -10,7 +10,6 @@
 #include "balancing/device/StatusIndicatorPort.hpp"
 #include "balancing/device/UsbHostPort.hpp"
 #include "balancing/app/CycleHealthMonitor.hpp"
-#include "balancing/device/WatchdogPort.hpp"
 #include "balancing/device/MotorObservation.hpp"
 
 namespace balancing {
