@@ -297,3 +297,7 @@ RS06とC620は共通の `CanFrame` を直接使用する。旧C言語の `BMotor
 ## 姿勢フィルタのC++統合
 
 `Bno055.hpp` がセンサのSI値 `ImuSample` と元時刻付き `TimedImuSample` を定義する。I2cPortは前方宣言し、数学用ヘッダーからHALを要求しない。`ImuAttitudeSource.hpp/.cpp` に取付変換、静止バイアス学習、相補フィルタを統合し、製品のフィルタ状態をImuAttitudeSourceが単一所有する。`attitude_math` は同じ数値処理を単体試験でも検証する境界。実機静止証明、軸方向・係数は従来どおり未確定。[検証](../verification/f446-attitude-math-cpp.md)。
+
+## 試運転専用起動
+
+BenchDebugだけが `balancing_f446_bench_start` / `balancing_f446_bench_service(sequence)` / `balancing_f446_bench_capture_irq(bus)` を呼び出す。内部の `startCanBench` は起動時固定のMotorBenchConfigを受け取り、選択したCAN1またはCAN2を排他的に所有する。既定設定は無効、非ゼロ入力経路は未接続。 `CanClock` を通常CAN観測と共用するがインスタンスの所有権は別。詳細は[検証](../verification/f446-bench-startup.md)。

@@ -16,6 +16,7 @@ F446の設計上の呼び出し順と通信の流れを示します。現行C11�
 | 移行時の比較基準 | 6. 旧C11制御コアと周辺 |
 | 後続のジャンプ | 7. ジャンプ状態機械 |
 | 異常情報のPCへの配信 | 8. CAN診断 |
+| 試運転と通常運転の分離 | 9. 試運転専用起動 |
 
 通信ID・電気的な条件は [CAN総覧](can-id-table.md) と [F446](specs/boards/f446_control.md)・[F303](specs/boards/f303_power.md) の仕様書、状態遷移の条件は [動作仕様](specs/behavior/robot_operation.md) を参照してください。
 
@@ -678,3 +679,21 @@ flowchart TD
 ```
 
 IWDG実機起動は未実施。既存の6ms FAULT判断はControlCycleが保持する。
+
+## 9. 試運転専用起動
+
+<pre class="mermaid">
+flowchart TB
+    INIT["CubeMX初期化"] --> MODE{"コンパイル時ビルド構成"}
+    MODE -->|Debug / Release| APP["通常Application / CAN1とCAN2"]
+    MODE -->|BenchDebug| CFG{"起動時固定設定を検証"}
+    CFG -->|未検証| ERR["Error_Handler / CAN開始なし"]
+    CFG -->|検証済み| BENCH["MotorBench / 選択バスのみ開始"]
+    APP --> NORMAL["CAN IRQ / 通常CanPort"]
+    BENCH --> PORT["CAN IRQ / 試運転CanPort"]
+    TIMER["TIM7: 周期イベント"] --> APP
+    TIMER --> BENCH
+    PORT --> STOP["停止指令と新規フィードバック確認"]
+</pre>
+
+実行時のモード切替はない。チェックイン済み設定は無効であり、BenchDebugから非ゼロ要求関数を呼ばない。[起動・IRQ分離検証](verification/f446-bench-startup.md)。

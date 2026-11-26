@@ -113,3 +113,5 @@
 - [姿勢フィルタのC++統合](f446-attitude-math-cpp.md)
 
 - [F446 AppのC++移行統合検証](f446-all-cpp.md)
+
+- [BenchDebug専用起動とCAN IRQの排他検証](f446-bench-startup.md)
