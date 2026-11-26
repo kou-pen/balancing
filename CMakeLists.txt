@@ -127,6 +127,8 @@ add_executable(balancing_cpp_app_tests
     ${F446_APP}/Src/balancing/app/application.cpp
     ${F446_APP}/Src/balancing/device/UsbHostPort.cpp
     ${F446_APP}/Src/balancing/communication/usb/DualSenseHostClass.cpp
+    ${F446_APP}/Src/balancing/app/CycleHealthMonitor.cpp
+    ${F446_APP}/Src/balancing/device/WatchdogPort.cpp
     ${F446_APP}/Src/balancing/app/DualSenseService.cpp
     ${F446_APP}/Src/balancing/device/UsbHidInput.cpp
     ${F446_APP}/Src/balancing/communication/usb/DualSenseHidCodec.cpp
@@ -202,6 +204,8 @@ add_executable(balancing_f446_can1_runtime_tests
     ${F446_APP}/Src/balancing/app/application.cpp
     ${F446_APP}/Src/balancing/device/UsbHostPort.cpp
     ${F446_APP}/Src/balancing/communication/usb/DualSenseHostClass.cpp
+    ${F446_APP}/Src/balancing/app/CycleHealthMonitor.cpp
+    ${F446_APP}/Src/balancing/device/WatchdogPort.cpp
     ${F446_APP}/Src/balancing/app/DualSenseService.cpp
     ${F446_APP}/Src/balancing/device/UsbHidInput.cpp
     ${F446_APP}/Src/balancing/communication/usb/DualSenseHidCodec.cpp
@@ -229,6 +233,7 @@ add_test(NAME balancing_f446_motor_observation_tests COMMAND balancing_f446_can1
 add_test(NAME balancing_f446_can2_services_tests COMMAND balancing_f446_can1_runtime_tests --can2-services)
 add_test(NAME balancing_f446_usb_host_tests COMMAND balancing_f446_can1_runtime_tests --usb-host)
 add_test(NAME balancing_f446_drive_sil_usb_host_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-usb-host)
+add_test(NAME balancing_f446_watchdog_tests COMMAND balancing_f446_can1_runtime_tests --watchdog)
 add_test(NAME balancing_f446_drive_sil_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil)
 add_test(NAME balancing_f446_usb_input_tests COMMAND balancing_f446_can1_runtime_tests --usb-input)
 add_test(NAME balancing_f446_drive_sil_usb_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-usb)

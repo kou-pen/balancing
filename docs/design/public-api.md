@@ -265,3 +265,15 @@ USB受信完了通知は主ループに配送し、再読出し時刻で鮮度�
 | `startF446UsbHost(board, config)` | 既存OTG_HS HCD、基板固有VBUSコールバック、明示期限、TIM7より低いIRQ優先度を照合 |
 
 実USB Hostの所有中は手動の報告通知を混在させない。NAK・異常長は連続入力を無効化、STALL・期限超過・切断は操作を切断扱いにする。列挙と停止回収は状態遷移で進め、ST HALのIRQ内部待機時間は実測待ち。詳細は[USB Host転送検証](../verification/f446-usb-host-transport.md)。
+
+## 制御周期完了とウォッチドッグ更新
+
+| API | 責務 |
+|---|---|
+| CycleHealthMonitor::begin(ticket) | タイマ番号と共通単調時計で開始を照合 |
+| CycleHealthMonitor::complete(ticket, atUs, processed) | 一致した正常完了だけ新しい証跡を返す |
+| WatchdogPort::refresh(completion) | 明示済み更新コールバックを証跡ごとに一回だけ呼ぶ |
+| balancing_app_begin_control_tick(event_sequence) | CAN回収前の主ループ開始 |
+| ApplicationObservation::cycleHealth / watchdog | 欠落・完了・更新診断コピー |
+
+既存6ms FAULT判断はControlCycle/RobotSequenceに保持する。物理IWDGの開始と期限実測は未実施。[検証記録](../verification/f446-cycle-watchdog-host.md)。

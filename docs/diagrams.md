@@ -665,3 +665,16 @@ sequenceDiagram
 ```
 
 起動は明示設定のみ。接続安定待ち200 ms、reset assert 100 ms、reset後10 ms等は主ループで期限照合する。HCD IRQ内部の処理時間は実基板で別途測定する。
+
+## 制御周期完了とIWDG更新
+
+```mermaid
+flowchart TD
+    I["TIM7 ISR：pendingと番号"] --> A["Application：開始記録"]
+    A --> C["CAN回収・制御・診断・表示"]
+    C --> H["CycleHealthMonitor：完了照合"]
+    H -->|"健全な新規完了のみ"| W["WatchdogPort：明示設定時に更新"]
+    H -->|"欠落・未完了・逆行"| N["更新しない"]
+```
+
+IWDG実機起動は未実施。既存の6ms FAULT判断はControlCycleが保持する。

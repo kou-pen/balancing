@@ -769,6 +769,107 @@ int main(int argc, char** argv)
         return 0;
     }
 
+    if (argc == 2 && std::strcmp(argv[1], "--watchdog") == 0) {
+        using namespace balancing;
+        // 単体: 番号周回、欠落、古い完了、未完了、逆行、更新失敗を区別する。
+        CycleHealthMonitor monitor;
+        unsigned refreshCount=0;
+        const auto refresh=[](void* context) noexcept {
+            ++*static_cast<unsigned*>(context);
+            return true;
+        };
+        WatchdogPort disabled;
+        WatchdogPort port{{&refreshCount,refresh,true}};
+        const CycleTicket first{0xffffffffu,100};
+        assert(monitor.begin(first));
+        auto proof=monitor.complete(first,110,true);
+        assert(proof && !disabled.refresh(*proof) && refreshCount==0);
+        assert(port.refresh(*proof) && refreshCount==1);
+        assert(!port.refresh(*proof) && port.summary().rejected==1);
+        assert(!monitor.complete(first,120,true));
+        const CycleTicket wrap{0,2100};
+        assert(monitor.begin(wrap));
+        assert(!monitor.complete(first,2101,true) && monitor.summary().inProgress);
+        proof=monitor.complete(wrap,2110,true);
+        assert(proof && port.refresh(*proof) && refreshCount==2);
+        assert(!monitor.begin({0,2200}) && monitor.summary().duplicateEvents==1);
+        assert(!monitor.begin({0xffffffffu,2200}) && monitor.summary().oldEvents==1);
+        const CycleTicket gap{3,8100};
+        assert(monitor.begin(gap));
+        assert(!monitor.complete(gap,8110,true) && monitor.summary().missedEvents==2);
+        const CycleTicket unfinished{4,10100};
+        assert(monitor.begin(unfinished));
+        const CycleTicket next{5,12100};
+        assert(monitor.begin(next));
+        assert(!monitor.complete(next,12110,true) && monitor.summary().incompleteCycles==1);
+        assert(!monitor.begin({6,12000}) && monitor.summary().clockRegressions==1);
+        const CycleTicket failed{6,14100};
+        assert(monitor.begin(failed));
+        assert(!monitor.complete(failed,14110,false));
+        const CycleTicket reversed{7,16100};
+        assert(monitor.begin(reversed));
+        assert(!monitor.complete(reversed,16099,true));
+        const CycleTicket recovered{8,18100};
+        assert(monitor.begin(recovered));
+        proof=monitor.complete(recovered,18110,true);
+        assert(proof && port.refresh(*proof) && refreshCount==3);
+        WatchdogPort bad{{nullptr,[](void*) noexcept { return false; },true}};
+        assert(!bad.refresh(*proof) && bad.summary().failures==1);
+        assert(!bad.refresh(*proof) && bad.summary().rejected==1);
+        assert(!port.refresh({{9,18000},18001}));
+
+        // Application実行経路: CAN回収前の開始証跡と処理完了を照合。
+        refreshCount=0;
+        Can2ObservationProfile profile{};
+        profile.communication={200000,100000,20000,20,1000,4,0xCA2u,false};
+        profile.operatorConfig={100000,20000,2.0f,3.0f,0.01f,0.01f,1.0f,1.0f,true};
+        profile.watchdog={&refreshCount,refresh,true};
+        assert(initializeCan2Observation(profile));
+        balancing_app_begin_control_tick(1);
+        balancing_app_control_tick(); // CAN時計・観測が未成立
+        assert(refreshCount==0);
+        expectSelfDefinedCan2=true;
+        assert(startCanObservation(&handle,&handle2,{},true));
+        const auto cycle=[&](std::uint32_t seq,bool collect=true) {
+            DWT->CYCCNT+=168u*2000u;
+            balancing_app_begin_control_tick(seq);
+            if (collect) balancing_f446_can_service();
+            balancing_app_control_tick();
+        };
+        cycle(1); assert(refreshCount==1);
+        cycle(2); assert(refreshCount==2);
+        for (unsigned i=0;i<10;++i) balancing_app_poll();
+        assert(refreshCount==2);
+        cycle(2); assert(refreshCount==2);
+        cycle(5); assert(refreshCount==2);
+        assert(applicationObservation()->cycleHealth.missedEvents==2);
+        cycle(6,false); assert(refreshCount==2);
+        assert(applicationObservation()->cycleHealth.incompleteCycles==1);
+        cycle(7); assert(refreshCount==3);
+        // 番号なしの旧APIは診断試験には使えるが更新証跡を発行しない。
+        DWT->CYCCNT+=168u*2000u;
+        balancing_f446_can_service(); balancing_app_control_tick();
+        assert(refreshCount==3 && !applicationObservation()->cycleHealth.refreshEligible);
+        // 非常停止でFAULTに遷移しても停止処理が完了すれば更新を継続する。
+        can2.sFIFOMailBox[0]={(0x0004fc01u<<3u)|CAN_RI0R_IDE,0,0,0};
+        can2.RF0R.count=1;
+        assert(balancing_f446_can2_capture_irq());
+        cycle(8);
+        assert(applicationObservation()->fault->primaryCause==FaultFlags::EmergencyStop);
+        assert(refreshCount==4);
+        cycle(9); assert(refreshCount==5);
+        // 開始だけで停止した周期はpollを繰り返しても更新されない。
+        DWT->CYCCNT+=168u*2000u;
+        balancing_app_begin_control_tick(10);
+        for (unsigned i=0;i<10;++i) balancing_app_poll();
+        assert(refreshCount==5 && applicationObservation()->cycleHealth.inProgress);
+        cycle(11); assert(refreshCount==5);
+        cycle(12); assert(refreshCount==6);
+        assert(applicationObservation()->watchdog.successes==6);
+        std::puts("PASS: numbered control completion, watchdog gating, FAULT processing and no background refresh");
+        return 0;
+    }
+
     if (argc == 2 && std::strcmp(argv[1], "--can2-services") == 0) {
         using namespace balancing;
         using namespace balancing::protocol;
