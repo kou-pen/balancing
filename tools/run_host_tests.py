@@ -11,14 +11,7 @@ F446_APP = ROOT / "firmware" / "f446" / "balancing_f446" / "App"
 OUT.mkdir(parents=True, exist_ok=True)
 
 balance_controller = F446_APP / "Src/balancing/control/controller/BalanceControl.cpp"
-balance_geometry = F446_APP / "Src/balancing/control/estimator/balancing_leg_kinematics.c"
-balance_math_objects = {}
-for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"])]:
-    obj = OUT / f"balance_geometry{suffix}.o"
-    subprocess.run(["gcc","-std=c11","-Wall","-Wextra","-Werror","-pedantic",
-                    "-I",str(F446_APP / "Inc"),"-c",str(balance_geometry),*flags,"-o",str(obj)],
-                   check=True,cwd=ROOT,timeout=30)
-    balance_math_objects[suffix] = str(obj)
+balance_geometry = F446_APP / "Src/balancing/control/estimator/LegKinematics.cpp"
 
 common = [
     "g++",
@@ -29,7 +22,7 @@ common = [
     "-pedantic",
     "-I",
     str(F446_APP / "Inc"),
-    str(balance_controller),
+    str(balance_controller), str(balance_geometry),
     str(ROOT / "tests" / "test_core.cpp"),
     "-lm",
 ]
@@ -38,7 +31,7 @@ for label, flags in [
     ("未定義動作検査", ["-fsanitize=undefined", "-fno-sanitize-recover=all"]),
 ]:
     path = OUT / ("test_core_ubsan" if flags else "test_core")
-    command = common + flags + [balance_math_objects["_ubsan" if flags else ""], "-o", str(path)]
+    command = common + flags + ["-o", str(path)]
     print(f"[{label}] コンパイル", flush=True)
     subprocess.run(command, check=True, cwd=ROOT, timeout=30)
     print(f"[{label}] 実行", flush=True)
@@ -74,16 +67,6 @@ remote_codec_source = str(app_source / "communication/can/RemoteControlCodec.cpp
 app_math_cpp += power_codec_sources + [remote_codec_source,
     str(app_source / "communication/can/DiagnosticsCodec.cpp"),
     str(app_source / "app/Can2ServiceLink.cpp")]
-app_math_objects = {}
-for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"])]:
-    app_math_objects[suffix] = []
-    for index, source in enumerate(("control/estimator/balancing_leg_kinematics.c",)):
-        obj = OUT / f"app_math_{index}{suffix}.o"
-        subprocess.run(["gcc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
-            "-I", str(F446_APP / "Inc"), "-c", str(app_source / source), *flags,
-            "-o", str(obj)], check=True, cwd=ROOT, timeout=30)
-        app_math_objects[suffix].append(str(obj))
-
 cpp_common = [
     "g++",
     "-std=c++17",
@@ -108,21 +91,21 @@ for label, flags in [
 ]:
     path = OUT / ("test_cpp_app_ubsan" if flags else "test_cpp_app")
     print(f"[{label}] コンパイル", flush=True)
-    subprocess.run(cpp_common + flags + app_math_objects["_ubsan" if flags else ""] + ["-lm", "-o", str(path)], check=True, cwd=ROOT, timeout=30)
+    subprocess.run(cpp_common + flags + ["-lm", "-o", str(path)], check=True, cwd=ROOT, timeout=30)
     print(f"[{label}] 実行", flush=True)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 # The fixture is not the actual six-bar CAD mechanism. Test only mathematical properties.
 leg_common = [
-    "gcc",
-    "-std=c11",
+    "g++",
+    "-std=c++17",
     "-Wall",
     "-Wextra",
     "-Werror",
     "-pedantic",
     "-I",
     str(F446_APP / "Inc"),
-    str(F446_APP / "Src" / "balancing" / "control" / "estimator" / "balancing_leg_kinematics.c"),
-    str(ROOT / "tests" / "test_leg_kinematics.c"),
+    str(balance_geometry),
+    str(ROOT / "tests" / "test_leg_kinematics.cpp"),
     "-lm",
 ]
 for label, flags in [
@@ -181,7 +164,7 @@ for label, flags in [
 leg_pd_common = [
     "g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
     "-I", str(F446_APP / "Inc"),
-    str(balance_controller),
+    str(balance_controller), str(balance_geometry),
     str(ROOT / "tests" / "test_leg_pd.cpp"), "-lm",
 ]
 for label, flags in [
@@ -190,7 +173,7 @@ for label, flags in [
 ]:
     path = OUT / ("test_leg_pd_ubsan" if flags else "test_leg_pd")
     print(f"[{label}] コンパイル", flush=True)
-    subprocess.run(leg_pd_common + flags + [balance_math_objects["_ubsan" if flags else ""], "-o", str(path)], check=True, cwd=ROOT, timeout=30)
+    subprocess.run(leg_pd_common + flags + ["-o", str(path)], check=True, cwd=ROOT, timeout=30)
     print(f"[{label}] 実行", flush=True)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
@@ -198,7 +181,7 @@ for label, flags in [
 yaw_pi_common = [
     "g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
     "-I", str(F446_APP / "Inc"),
-    str(balance_controller),
+    str(balance_controller), str(balance_geometry),
     str(ROOT / "tests" / "test_yaw_pi.cpp"), "-lm",
 ]
 for label, flags in [
@@ -207,7 +190,7 @@ for label, flags in [
 ]:
     path = OUT / ("test_yaw_pi_ubsan" if flags else "test_yaw_pi")
     print(f"[{label}] コンパイル", flush=True)
-    subprocess.run(yaw_pi_common + flags + [balance_math_objects["_ubsan" if flags else ""], "-o", str(path)], check=True, cwd=ROOT, timeout=30)
+    subprocess.run(yaw_pi_common + flags + ["-o", str(path)], check=True, cwd=ROOT, timeout=30)
     print(f"[{label}] 実行", flush=True)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
@@ -298,7 +281,6 @@ for test, extra_sources in [
         link_libraries = []
         if test in ("test_f446_can_event_poll", "test_f446_can1_runtime"):
             link_libraries = ["-lm"]
-        link_libraries += app_math_objects[suffix]
         if test == "test_f446_can_event_poll":
             attitude = OUT / f"integrated_attitude{suffix}.o"
             subprocess.run(["gcc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic", "-I", str(F446_APP / "Inc"), "-c", str(app_source / "control/filter/balancing_attitude_filter.c"), *flags, "-o", str(attitude)], check=True, cwd=ROOT, timeout=30)
@@ -351,10 +333,8 @@ for suffix, flags in [
     ]
     # Use the same C11 math and attitude implementations already in the repo;
     # compile C11 with gcc instead of attempting to compile C as C++17.
-    c_math = OUT / f"estimator_c_math{suffix}.o"
     c_attitude = OUT / f"estimator_c_attitude{suffix}.o"
     for input_file, output_file in (
-        (rs06_source / "control" / "estimator" / "balancing_leg_kinematics.c", c_math),
         (rs06_source / "control" / "filter" / "balancing_attitude_filter.c", c_attitude),
     ):
         subprocess.run(
@@ -366,7 +346,7 @@ for suffix, flags in [
     print(f"[test_f446_state_estimator{suffix}] コンパイル", flush=True)
     subprocess.run(
         rs06_service_common + sources + flags +
-        [str(c_math), str(c_attitude), "-lm", "-o", str(path)],
+        [str(c_attitude), "-lm", "-o", str(path)],
         check=True, cwd=ROOT, timeout=30,
     )
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
@@ -387,12 +367,11 @@ for suffix, flags in [
         str(rs06_source / "control" / "estimator" / "WheelOdometry.cpp"),
         str(ROOT / "tests" / "test_f446_sil_control_cycle.cpp"),
     ]
-    c_math = OUT / f"estimator_c_math{suffix}.o"
     c_attitude = OUT / f"estimator_c_attitude{suffix}.o"
     print(f"[test_f446_sil_control_cycle{suffix}] コンパイル", flush=True)
     subprocess.run(
         rs06_service_common + sources + flags +
-        [str(c_math), str(c_attitude), "-lm", "-o", str(path)],
+        [str(c_attitude), "-lm", "-o", str(path)],
         check=True, cwd=ROOT, timeout=30,
     )
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
@@ -459,7 +438,7 @@ for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-saniti
     subprocess.run(["g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
         "-I", str(F446_APP / "Inc"), str(app_source / "app/RemoteControlService.cpp"),
         str(ROOT / "tests/test_f446_remote_control_service.cpp"), str(app_source / "app/RobotSequence.cpp"), remote_codec_source,
-        str(app_source / "communication/can/ProtocolPayload.cpp"), power_id_source, *app_math_objects[suffix],
+        str(app_source / "communication/can/ProtocolPayload.cpp"), power_id_source,
         *flags, "-lm", "-o", str(path)], check=True, cwd=ROOT, timeout=30)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
