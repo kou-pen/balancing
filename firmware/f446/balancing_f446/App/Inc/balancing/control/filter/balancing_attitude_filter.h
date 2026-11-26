@@ -1,14 +1,20 @@
 #ifndef BALANCING_ATTITUDE_FILTER_H
 #define BALANCING_ATTITUDE_FILTER_H
 
-#include "balancing/control/estimator/balancing_observation.h"
-
 #include <stdbool.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/** @brief 校正後のIMU物理値。軸向きとバイアスの適合は呼出元で検証する。
+ * @spec{CTRL-EST-001}
+ */
+typedef struct {
+    float accel_m_s2[3]; /**< X/Y/Z加速度 [m/s^2]。 */
+    float gyro_rad_s[3]; /**< X/Y/Z角速度 [rad/s]。 */
+} BImuSample;
 
 /** @brief センサxyzを機体xyzへ写す直交軸変換。 */
 typedef struct {

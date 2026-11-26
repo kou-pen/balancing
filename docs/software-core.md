@@ -1,7 +1,7 @@
 # 実機非依存の制御コア設計
 
 **作成日：** 2026-10-28／仕様との整合注記：2026-11-09  
-**位置付け：** STM32向けの旧C11ロジックと移行時の比較基準。ホスト試験済み、実機には未組込。[C++17公開API設計](design/public-api.md)に新しい型・呼び出し順を記載。  
+**位置付け：** 2026-10-28当時のC11ロジックと移行時の比較基準。旧状態機械・観測ストア・操作入力は後続C++実装に統合済み。本ページの旧状態機械の記述は履歴であり、現行の安全仕様ではない。[C++17公開API設計](design/public-api.md)に新しい型・呼び出し順を記載。  
 **対応仕様：** [F446](specs/boards/f446_control.md)、[状態推定](specs/control/state_estimation.md)、[LQR・VMC](specs/control/balance_vmc.md)、[動作・状態遷移](specs/behavior/robot_operation.md)。[図はこちら](diagrams.md)。
 
 ## ソフトウェアの境界
@@ -20,21 +20,21 @@
 
 ## データ構造の原則
 
-[構造体の関係と所有権](design/data-model.md)を正本とする。6状態は `BControlState`、抽象トルクは `BControlTorque` とし、LQRの数値計算内だけを添字付き配列にする。フィードバック鮮度は個別フィールドから `b_freshness_all` で導出し、冗長な集約フラグを保持しない。
+[構造体の関係と所有権](design/data-model.md)を正本とする。6状態は `BControlState`、抽象トルクは `BControlTorque` とし、LQRの数値計算内だけを添字付き配列にする。現行のフィードバック鮮度は各機器の所有者が評価し、RobotSequenceへ判定を渡す。
 
 ## 公開APIと単位
 
 | API | 主要入力 | 出力・動作 |
 |---|---|---|
-| `b_check_freshness` | 同一単調時計の更新時刻 [µs] | IMU 50 ms、RS06 30 ms、車輪20 ms、電源500 msの鮮度判定 |
-| `b_mode_step` | 電源・通信・校正・姿勢・検証済みパラメータと操作イベント | DISARMED／BALANCING／FAULT、駆動許可と停止要求 |
+| 各機器の鮮度判定（旧 `b_check_freshness` 廃止） | 同一単調時計の更新時刻 [µs] | IMU 50 ms、RS06 30 ms、車輪20 ms、電源500 msの鮮度判定 |
+| `RobotSequence::update`（旧 `b_mode_step` 廃止） | 電源・通信・校正・姿勢・検証済みパラメータと操作イベント | DISARMED／ARMING／BALANCING／FAULT、駆動要求 |
 | `RemoteControlService::update`（旧 `b_rate_limit` を内部に移行） | 前回目標、今回目標、最大変化率、dt [s] | 変化率を制限した目標 |
 | `b_wheel_allocate` | 合計倒立トルク、Yaw差動、左右上限 [N·m] | 左右車輪トルク [N·m] |
 | `b_lqr_compute` | `BLqrConfig`と名前付きの`BControlState`（状態・目標） | `BControlTorque`（車輪合計／仮想股関節合計 [N·m]） |
 
 各関数のC宣言には、対応仕様IDをDoxygenの`@spec`として記載した。通信フォーマットやトルクを電流に換算する処理は別の責務とする。
 
-## ARM許可の2段階処理
+## ARM許可の2段階処理（旧実装の履歴）
 
 **注意（MOTOR-151,159,197,198）：** この節は実装済みホストコアの現状を説明する。2026-11-09に再現監査を行い、ARMの姿勢範囲ゲートが仕様と不一致、脚長目標初期化と有効化失敗FAULTが未実装/未統合であることを確認した。詳細は[制御コア仕様差分監査](verification/core-mode-contract-audit.md)。**本文の現状説明を最新の確定仕様として誤読しない。**
 

@@ -1,5 +1,7 @@
 # 制御コア状態機械の仕様差分監査
 
+> 旧C11実装の設計・検証記録。現在の状態機械・観測・送信・試運転の契約は [F446公開API](../design/public-api.md) と [C++移行検証](../verification/f446-legacy-observation-retirement.md) を参照。旧コードを再現する場合は移行前のGit履歴を使用する。
+
 **検証日:** 2026-11-09  
 **対象:** `firmware/f446/balancing_f446/App/Inc/balancing/control/controller/balancing_core.h`、`firmware/f446/balancing_f446/App/Src/balancing/control/controller/balancing_core.c`、`tests/test_core.c`  
 **仕様:** `BEHAV-001`、`CTRL-LQR-001`、`CTRL-EST-001`。関連Issue #4。  

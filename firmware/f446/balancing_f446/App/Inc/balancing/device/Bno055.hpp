@@ -1,6 +1,6 @@
 #pragma once
 #include "balancing/device/I2cPort.hpp"
-#include "balancing/control/estimator/balancing_observation.h"
+#include "balancing/control/filter/balancing_attitude_filter.h"
 
 namespace balancing {
 struct Bno055Config {

@@ -351,7 +351,6 @@
 | フォルダ・ファイル | 内容 |
 |---|---|
 | <a href="balancing__leg__kinematics_8h_source.html">balancing_leg_kinematics.h</a> | 六節リンクの関節角、脚長、ヤコビアンの型とAPI |
-| <a href="balancing__observation_8h_source.html">balancing_observation.h</a> | センサ観測の格納、更新、スナップショットの宣言 |
 | <a href="WheelOdometry_8hpp_source.html">WheelOdometry.hpp</a> | C620左右の位置・速度換算と原点リセットの公開契約 |
 | <a href="LegKinematics_8hpp_source.html">LegKinematics.hpp</a> | 2入力閉リンクの脚状態と数学fixtureの公開契約 |
 | <a href="StateEstimator_8hpp_source.html">StateEstimator.hpp</a> | IMU・RS06・車輪の同一周期スナップショットAPI |
@@ -374,7 +373,6 @@
 | フォルダ・ファイル | 内容 |
 |---|---|
 | <a href="StateMachine_8hpp_source.html">StateMachine.hpp</a> | 状態機械で共用する型付きの状態保持 |
-| <a href="balancing__observation__time_8h_source.html">balancing_observation_time.h</a> | 観測の経過時間と鮮度判定で使う関数 |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_device device/
@@ -500,7 +498,6 @@
 | フォルダ・ファイル | 内容 |
 |---|---|
 | <a href="balancing__leg__kinematics_8c_source.html">balancing_leg_kinematics.c</a> | 閉リンクの幾何計算、脚長、ヤコビアン |
-| <a href="balancing__observation_8c_source.html">balancing_observation.c</a> | センサ値の取り込み、車輪角の折返し、観測コピー |
 | <a href="WheelOdometry_8cpp_source.html">WheelOdometry.cpp</a> | C620累積カウント・RPMの物理換算、受理番号と世代の照合 |
 | <a href="LegKinematics_8cpp_source.html">LegKinematics.cpp</a> | C11閉リンク数値演算をC++17に接続し脚長とJを求める |
 | <a href="StateEstimator_8cpp_source.html">StateEstimator.cpp</a> | 6軸とIMUを同期評価し制御状態かエラーを返す |
