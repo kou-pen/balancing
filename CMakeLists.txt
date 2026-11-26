@@ -16,7 +16,6 @@ add_library(balancing_core STATIC
     ${F446_APP}/Src/balancing/control/controller/balancing_yaw_pi.c
     ${F446_APP}/Src/balancing/communication/balancing_motor_can.c
     ${F446_APP}/Src/balancing/control/estimator/balancing_leg_kinematics.c
-    ${F446_APP}/Src/balancing/control/estimator/balancing_observation.c
     ${F446_APP}/Src/balancing/control/filter/balancing_attitude_filter.c
 )
 target_include_directories(balancing_core PUBLIC
@@ -53,12 +52,6 @@ target_link_libraries(balancing_leg_pd_tests PRIVATE balancing_core m)
 target_compile_options(balancing_leg_pd_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_leg_pd_tests COMMAND balancing_leg_pd_tests)
 
-# Timestamped IMU and C620 wheel snapshots, host-only without an ISR/RTOS.
-add_executable(balancing_observation_tests tests/test_observation.c)
-target_link_libraries(balancing_observation_tests PRIVATE balancing_core m)
-target_compile_options(balancing_observation_tests PRIVATE -Wall -Wextra -Wpedantic)
-add_test(NAME balancing_observation_tests COMMAND balancing_observation_tests)
-
 # Explicitly decoded USB/CAN operator targets; host fixtures only, no HID/CAN IDs.
 add_executable(balancing_operator_input_tests tests/test_operator_input.cpp
     ${F446_APP}/Src/balancing/app/RemoteControlService.cpp
@@ -74,12 +67,6 @@ add_executable(balancing_attitude_filter_tests tests/test_attitude_filter.c)
 target_link_libraries(balancing_attitude_filter_tests PRIVATE balancing_core m)
 target_compile_options(balancing_attitude_filter_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_attitude_filter_tests COMMAND balancing_attitude_filter_tests)
-
-# Integration across independently timestamped sensors, estimator and operator gate.
-add_executable(balancing_issue10_flow_tests tests/test_issue10_flow.c)
-target_link_libraries(balancing_issue10_flow_tests PRIVATE balancing_core m)
-target_compile_options(balancing_issue10_flow_tests PRIVATE -Wall -Wextra -Wpedantic)
-add_test(NAME balancing_issue10_flow_tests COMMAND balancing_issue10_flow_tests)
 
 # C++ entry bridge is kept outside CubeMX-owned Core/Src. Host test only.
 set(BALANCING_CONTROL_MATH_SOURCES

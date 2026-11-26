@@ -1,121 +1,12 @@
 #ifndef BALANCING_CORE_H
 #define BALANCING_CORE_H
 
-#include "balancing/core/balancing_observation_time.h"
-
 #include <stdbool.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/** @brief ロボットの外部公開状態。内部のARM待機は独立した状態としない。 */
-typedef enum {
-    B_MODE_DISARMED = 0,
-    B_MODE_BALANCING = 1,
-    B_MODE_FAULT = 2
-} BMode;
-
-/** @brief FAULTに遷移した主原因。数値はCAN通信に使用しない。 */
-typedef enum {
-    B_FAULT_NONE = 0,
-    B_FAULT_ESTOP,
-    B_FAULT_EXTERNAL,
-    B_FAULT_GUARD,
-    B_FAULT_SCHEDULER /**< 500 Hz制御更新が6 ms以上停止、または時計が逆行。 */
-} BFaultCause;
-
-/** @brief センサの有効性・更新鮮度。集約状態はb_freshness_allで求める。 */
-typedef struct {
-    bool imu;
-    bool rs[4];
-    bool wheel[2];
-    bool power;
-} BFreshness;
-
-/**
- * @brief センサの受信鮮度を判定する。時刻が未来なら無効。
- * @spec{BOARD-F446-001}
- * @spec{CTRL-EST-001}
- * @param[in] stamps それぞれの最後の新規・有効測定の時刻。
- * @param[in] now_us 同じ単調増加クロックの現在時刻 [us]。
- * @return IMU 50 ms、RS06各軸30 ms、車輪各軸20 ms、電源500 msの判定。
- * @warning 受信を繰り返しただけの古い測定に新しい時刻を与えないこと。
- */
-BFreshness b_check_freshness(const BObservedStamps *stamps, uint64_t now_us);
-
-/**
- * @brief 個別の測定鮮度から全体の有効性を導出する。
- * @spec{BOARD-F446-001}
- * @param[in] freshness 受信系ごとの鮮度判定。
- * @return すべての測定が有効であればtrue。
- * @note 集約フラグを構造体に重複保持しない。
- */
-bool b_freshness_all(BFreshness freshness);
-
-/** @brief 状態機械が保持する内部状態。 */
-typedef struct {
-    BMode mode;
-    BFaultCause fault_cause;
-    bool arm_pending;
-    uint64_t enable_request_us;
-    bool has_last_step; /**< 前回の制御更新時刻が有効か。 */
-    uint64_t last_step_us; /**< 同一単調増加時計の前回時刻 [us]。 */
-} BModeMachine;
-
-/** @brief 外部のアダプタが判定した安全条件と操作イベント。 */
-typedef struct {
-    BFreshness fresh;
-    bool power_on;
-    bool calibration_verified;
-    bool model_verified;
-    bool limits_verified;
-    bool posture_ok;
-    bool external_fault;
-    bool estop_active;
-    bool arm_edge;
-    bool disarm_edge;
-    bool clear_fault_edge;
-    bool clear_authorized;
-    bool rs_operational[4];
-    BSampleStamp rs_enable_sent[4]; /**< 各Type3指令を実際に送信した時刻。 */
-    BSampleStamp rs_reply[4]; /**< それぞれの有効化指令後の新規状態応答。 */
-} BModeInput;
-
-/** @brief 通信アダプタへ渡す一周期分の要求。CANの送信形式は含まない。 */
-typedef struct {
-    BMode mode;
-    BFaultCause fault_cause;
-    bool drive_allowed;
-    bool request_rs_enable;
-    bool request_rs_disable;
-    bool request_power_off;
-    bool arm_rejected;
-} BModeOutput;
-
-/**
- * @brief 状態機械をDISARMEDで初期化する。
- * @spec{BEHAV-001}
- * @param[out] machine 初期化対象。
- */
-void b_mode_init(BModeMachine *machine);
-
-/**
- * @brief 状態遷移とARM許可を1回評価する。実機入出力は行わない。
- * @spec{BEHAV-001}
- * @spec{BOARD-F446-001}
- * @pre 操作イベントは立上りで入力する。外部故障と非常停止は独立入力とする。
- * @param[in,out] machine 状態機械。ARM待機はDISARMED中にのみ保持する。
- * @param[in] input 電源・姿勢・検証済み値・最新の通信状態。
- * @param[in] now_us 単調増加時刻 [us]。
- * @return 駆動許可と通信アダプタへの要求。
- * @note RS06への各Type3送信完了時刻より後の正常応答を4台分確認するまでBALANCINGにしない。
- * @pre rs_enable_sentは送信を試みた時刻ではなく、送信元が送信を受理した実時刻を記録する。
- * @warning FAULT解除の許可は呼出し元で個別に検証する。自動復帰はしない。
- */
-BModeOutput b_mode_step(BModeMachine *machine, const BModeInput *input,
-                        uint64_t now_us);
 
 /** @brief 車輪左右のトルク配分結果。単位は全て[N·m]。 */
 typedef struct {
