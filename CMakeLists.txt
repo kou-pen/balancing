@@ -173,6 +173,24 @@ target_link_libraries(balancing_motor_bench_tests PRIVATE balancing_core balanci
 target_compile_options(balancing_motor_bench_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_motor_bench_tests COMMAND balancing_motor_bench_tests)
 
+# BenchDebug runtime with independent hardware mock; one boot per process.
+add_executable(balancing_f446_bench_runtime_tests
+    tests/test_f446_bench_runtime.cpp
+    ${F446_APP}/Src/balancing/bench/f446_motor_bench_runtime.cpp
+    ${F446_APP}/Src/balancing/bench/MotorBench.cpp
+    ${F446_APP}/Src/balancing/device/Rs06Motor.cpp
+    ${F446_APP}/Src/balancing/device/C620Motor.cpp
+    ${F446_APP}/Src/balancing/communication/can/CanPort.cpp
+    ${BALANCING_CAN_DISPATCH_SOURCES}
+)
+target_compile_definitions(balancing_f446_bench_runtime_tests PRIVATE BALANCING_BENCH_BUILD)
+target_include_directories(balancing_f446_bench_runtime_tests PRIVATE tests/stubs_can1)
+target_link_libraries(balancing_f446_bench_runtime_tests PRIVATE balancing_core balancing_motor_codecs m)
+target_compile_options(balancing_f446_bench_runtime_tests PRIVATE -Wall -Wextra -Wpedantic)
+foreach(mode rs wheel failures rollback gap)
+    add_test(NAME balancing_f446_bench_runtime_${mode}_tests COMMAND balancing_f446_bench_runtime_tests --${mode})
+endforeach()
+
 # Startup, RX observation and IRQ ownership at both STM32F446 CAN buses.
 add_executable(balancing_f446_can1_runtime_tests
     tests/test_f446_can1_runtime.cpp

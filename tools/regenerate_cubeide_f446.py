@@ -5,23 +5,24 @@ Use on the authorized development VM. No flashing, Git operations, or firmware
 runtime changes. An old manually patched makefile is never treated as proof of
 CubeIDE-generated metadata.
 
-The --dry-run mode prints the two exact commands without launching CubeIDE.
+The --dry-run mode prints the three exact commands without launching CubeIDE.
 """
 
 from __future__ import annotations
 
 import argparse
 import shlex
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-from verify_f446_build import app_sources, generated_makefile, verify_configuration
+from verify_f446_build import app_sources, generated_makefile, verify_configuration, verify_linked_mode
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT = ROOT / "firmware" / "f446" / "balancing_f446"
 DEFAULT_HEADLESS = Path("/opt/st/stm32cubeide_1.19.0/headless-build.sh")
-CONFIGURATIONS = ("Debug", "Release")
+CONFIGURATIONS = ("Debug", "Release", "BenchDebug")
 MANUAL_PATCH_MARKER = "Temporary additions to verify moved C sources"
 
 
@@ -81,6 +82,12 @@ def main() -> int:
         print("ERROR: .cproject/.project audit failed; no build attempted.", file=sys.stderr)
         return 1
 
+    nm_on_path = shutil.which("arm-none-eabi-nm")
+    nm = Path(nm_on_path) if nm_on_path else next(headless.parent.rglob("arm-none-eabi-nm"), None)
+    if nm is None:
+        print("ERROR: arm-none-eabi-nm not found; mode isolation cannot be verified.", file=sys.stderr)
+        return 1
+
     workspace_root.mkdir(parents=True, exist_ok=True)
     for config, command in commands:
         log = workspace_root / f"{config.lower()}.log"
@@ -113,13 +120,15 @@ def main() -> int:
                 return 1
 
         errors = verify_configuration(PROJECT, config)
+        if not errors:
+            errors = verify_linked_mode(PROJECT, config, nm)
         if errors:
             for error in errors:
                 print(f"NOT VERIFIED: {error}", file=sys.stderr)
             return 1
-        print(f"PASS: CubeIDE-generated {config} build has all App sources and fresh ARM ELF.")
+        print(f"PASS: CubeIDE-generated {config} build has all App sources, fresh ARM ELF and exclusive mode symbols.")
 
-    print("PASS: CubeIDE managed regeneration and both cross-builds completed.")
+    print("PASS: CubeIDE managed regeneration and all cross-builds completed.")
     print("This does not certify motor control behavior or physical safety.")
     return 0
 

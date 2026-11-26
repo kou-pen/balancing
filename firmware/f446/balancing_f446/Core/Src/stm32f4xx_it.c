@@ -22,7 +22,11 @@
 #include "stm32f4xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#ifdef BALANCING_BENCH_BUILD
+#include "../../App/Inc/balancing_f446_bench_bridge.h"
+#else
 #include "../../App/Inc/balancing_f446_can1_bridge.h"
+#endif
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -208,7 +212,11 @@ void CAN1_TX_IRQHandler(void)
 {
   /* USER CODE BEGIN CAN1_TX_IRQn 0 */
   /* CAN1ポートがフラグを取得した場合、HAL側の二重消費を避ける。 */
+#ifdef BALANCING_BENCH_BUILD
+  if (balancing_f446_bench_capture_irq(1u))
+#else
   if (balancing_f446_can1_capture_irq())
+#endif
   {
     return;
   }
@@ -227,7 +235,11 @@ void CAN1_RX0_IRQHandler(void)
 {
   /* USER CODE BEGIN CAN1_RX0_IRQn 0 */
   /* CAN1ポートがフラグを取得した場合、HAL側の二重消費を避ける。 */
+#ifdef BALANCING_BENCH_BUILD
+  if (balancing_f446_bench_capture_irq(1u))
+#else
   if (balancing_f446_can1_capture_irq())
+#endif
   {
     return;
   }
@@ -246,7 +258,11 @@ void CAN1_SCE_IRQHandler(void)
 {
   /* USER CODE BEGIN CAN1_SCE_IRQn 0 */
   /* CAN1ポートがフラグを取得した場合、HAL側の二重消費を避ける。 */
+#ifdef BALANCING_BENCH_BUILD
+  if (balancing_f446_bench_capture_irq(1u))
+#else
   if (balancing_f446_can1_capture_irq())
+#endif
   {
     return;
   }
@@ -279,7 +295,11 @@ void CAN2_TX_IRQHandler(void)
 {
   /* USER CODE BEGIN CAN2_TX_IRQn 0 */
   /* CAN2の受信・終端フラグを二重消費しない。 */
+#ifdef BALANCING_BENCH_BUILD
+  if (balancing_f446_bench_capture_irq(2u))
+#else
   if (balancing_f446_can2_capture_irq())
+#endif
   {
     return;
   }
@@ -298,7 +318,11 @@ void CAN2_RX0_IRQHandler(void)
 {
   /* USER CODE BEGIN CAN2_RX0_IRQn 0 */
   /* CAN2の受信・終端フラグを二重消費しない。 */
+#ifdef BALANCING_BENCH_BUILD
+  if (balancing_f446_bench_capture_irq(2u))
+#else
   if (balancing_f446_can2_capture_irq())
+#endif
   {
     return;
   }
@@ -317,7 +341,11 @@ void CAN2_SCE_IRQHandler(void)
 {
   /* USER CODE BEGIN CAN2_SCE_IRQn 0 */
   /* CAN2の受信・終端フラグを二重消費しない。 */
+#ifdef BALANCING_BENCH_BUILD
+  if (balancing_f446_bench_capture_irq(2u))
+#else
   if (balancing_f446_can2_capture_irq())
+#endif
   {
     return;
   }

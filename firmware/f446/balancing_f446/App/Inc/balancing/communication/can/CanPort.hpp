@@ -9,6 +9,36 @@
 #include <optional>
 
 namespace balancing {
+/** @brief CAN IRQと主ループで共有するDWT単調時計。32bit周回を差分で接続。
+ * @pre 1周回未満の間隔で読み出すこと。停止したDWTは時刻を進めない。
+ * @spec{BOARD-F446-001}
+ */
+class CanClock final {
+public:
+    static bool enable() noexcept {
+        if (!SystemCoreClock || SystemCoreClock%1000000u ||
+            (DWT->CTRL&DWT_CTRL_NOCYCCNT_Msk)) return false;
+        CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+        DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+        return (DWT->CTRL&DWT_CTRL_CYCCNTENA_Msk)!=0;
+    }
+    explicit CanClock(std::uint32_t cyclesPerUs) noexcept
+        : cyclesPerUs_{cyclesPerUs},lastCycle_{DWT->CYCCNT} {}
+    std::uint64_t sample() noexcept {
+        const auto mask=__get_PRIMASK();
+        __disable_irq();
+        const auto count=DWT->CYCCNT;
+        accumulated_+=static_cast<std::uint32_t>(count-lastCycle_);
+        lastCycle_=count;
+        const auto cycles=accumulated_;
+        __set_PRIMASK(mask);
+        return cycles/cyclesPerUs_;
+    }
+private:
+    std::uint32_t cyclesPerUs_,lastCycle_;
+    std::uint64_t accumulated_{};
+};
+
 
 /** @brief bxCANの1バス分のFIFO0、送信メールボックス、IRQイベントを所有する。
  *  @spec{BOARD-F446-001}

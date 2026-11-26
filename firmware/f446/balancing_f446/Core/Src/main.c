@@ -21,9 +21,13 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#ifdef BALANCING_BENCH_BUILD
+#include "../../App/Inc/balancing_f446_bench_bridge.h"
+#else
 #include "../../App/Inc/balancing_app_bridge.h"
 #include "../../App/Inc/balancing_f446_can1_bridge.h"
 #include "../../App/Inc/balancing_f446_imu_bridge.h"
+#endif
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -112,6 +116,13 @@ int main(void)
   MX_I2C1_Init();
   MX_USB_OTG_HS_HCD_Init();
   /* USER CODE BEGIN 2 */
+#ifdef BALANCING_BENCH_BUILD
+  /* 未検証の設定では開始せず、通常Applicationへフォールバックしない。 */
+  if (!balancing_f446_bench_start(&hcan1, &hcan2))
+  {
+    Error_Handler();
+  }
+#else
   balancing_app_init();
   /* CAN1/2を開始してRS06/C620の受信とバス異常を観測する。
    * 駆動設定の照合と状態機械の接続は後続のため、指令は送信しない。 */
@@ -121,6 +132,7 @@ int main(void)
   }
   /* 未検証IMU設定では観測未成立のままCAN監視を継続する。 */
   (void)balancing_f446_imu_start(&hi2c1);
+#endif
   if (HAL_TIM_Base_Start_IT(&htim7) != HAL_OK)
   {
     Error_Handler();
@@ -144,12 +156,18 @@ int main(void)
     __set_PRIMASK(primask);
     if (do_control != 0u)
     {
+#ifdef BALANCING_BENCH_BUILD
+      balancing_f446_bench_service(event_sequence);
+#else
       balancing_app_begin_control_tick(event_sequence);
       balancing_f446_can_service();
       balancing_app_control_tick();
+#endif
     }
+#ifndef BALANCING_BENCH_BUILD
     balancing_f446_imu_poll();
     balancing_app_poll();
+#endif
   }
   /* USER CODE END 3 */
 }

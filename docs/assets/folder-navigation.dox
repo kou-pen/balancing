@@ -250,6 +250,7 @@
 |---|---|
 | @subpage folder_firmware_f446_balancing_f446_App_Inc_balancing "balancing/" | 機能単位のフォルダ |
 | <a href="balancing__app__bridge_8h_source.html">balancing_app_bridge.h</a> | 生成Cコードからアプリに入る初期化・周期通知と周期診断API |
+| <a href="balancing__f446__bench__bridge_8h_source.html">balancing_f446_bench_bridge.h</a> | 試運転専用ビルドの起動・周期・IRQ入口 |
 | <a href="balancing__f446__can1__bridge_8h_source.html">balancing_f446_can1_bridge.h</a> | CAN1/2の起動、IRQ取り込み、共通イベント回収のC API |
 */
 
@@ -307,7 +308,7 @@
 
 | フォルダ・ファイル | 内容 |
 |---|---|
-| <a href="CanPort_8hpp_source.html">CanPort.hpp</a> | 1バスの送受信、IRQ、メールボックスを扱うAPI |
+| <a href="CanPort_8hpp_source.html">CanPort.hpp</a> | 1バスの送受信、IRQ、メールボックスと共通DWT時計のAPI |
 | <a href="CanRouter_8hpp_source.html">CanRouter.hpp</a> | CANイベントの交互回収と配送API・CAN2自作通信6分類 |
 | <a href="Can2FilterPlan_8hpp_source.html">Can2FilterPlan.hpp</a> | CAN2の32bit Listフィルタ構成と生成API |
 | <a href="CanTxScheduler_8hpp_source.html">CanTxScheduler.hpp</a> | 対象別の停止要求、通常FIFO、周期送信、受付と終端の照合API |
@@ -549,4 +550,5 @@
 | ファイル | 内容 |
 |---|---|
 | <a href="MotorBench_8cpp_source.html">MotorBench.cpp</a> | 単軸試運転のC++実装 |
+| <a href="f446__motor__bench__runtime_8cpp_source.html">f446_motor_bench_runtime.cpp</a> | 試運転専用CANの初期化・フィルタ・周期・IRQ |
 */

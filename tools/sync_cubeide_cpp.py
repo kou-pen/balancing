@@ -16,6 +16,68 @@ ROOT = Path(__file__).resolve().parents[1]
 PROJECT = ROOT / "firmware" / "f446" / "balancing_f446"
 
 
+BENCH_DEFINE = "BALANCING_BENCH_BUILD"
+CONFIG_NAMES = ("Debug", "Release", "BenchDebug")
+
+
+def bench_metadata(cproject: str) -> str:
+    # CubeMX may regenerate only the two ordinary configurations. Clone Debug
+    # with unique managed-build IDs, then put the mode macro in both compilers.
+    config_pattern = re.compile(r"<cconfiguration\b[^>]*>.*?</cconfiguration>", re.S)
+    configs = list(config_pattern.finditer(cproject))
+    by_name = {ET.fromstring(m.group()).find(".//configuration").get("name"): m
+               for m in configs}
+    if "BenchDebug" not in by_name:
+        debug = by_name["Debug"]
+        clone = debug.group()
+        ids = sorted(set(re.findall(r'(?<=id=")[^"]+', clone)))
+        # IDs of tools/options must be distinct, including derived IDs.
+        numbers = sorted({n for identifier in ids for n in re.findall(r"\.(\d+)(?=\.|$)", identifier)})
+        used = set(re.findall(r"\.(\d+)(?=\.|\")", cproject))
+        mapping = {}
+        candidate = 2100000000
+        for number in numbers:
+            while str(candidate) in used:
+                candidate += 1
+            mapping[number] = str(candidate)
+            used.add(str(candidate))
+            candidate += 1
+        clone = re.sub(r'(?<=id=")[^"]+',
+                       lambda m: re.sub(r"\.(\d+)(?=\.|$)",
+                           lambda n: "." + mapping.get(n[1], n[1]), m[0]), clone)
+        clone = clone.replace('name="Debug"', 'name="BenchDebug"')
+        clone = clone.replace("/Debug", "/BenchDebug")
+        clone = clone.replace('artifactName="${ProjName}"', 'artifactName="balancing_f446_bench"')
+        # Preserve the normal configurations byte-for-byte.
+        cproject = cproject[:debug.end()] + "\n\t\t" + clone + cproject[debug.end():]
+    for m in reversed(list(config_pattern.finditer(cproject))):
+        block = m.group()
+        name = ET.fromstring(block).find(".//configuration").get("name")
+        if name != "BenchDebug":
+            if BENCH_DEFINE in block:
+                raise ValueError("Bench build macro in normal configuration")
+            continue
+        for language in ("c", "cpp"):
+            key = ("com.st.stm32cube.ide.mcu.gnu.managedbuild.tool."
+                   + language + ".compiler.option.definedsymbols")
+            pattern = re.compile(r'<option\b(?=[^>]*superClass="' + re.escape(key)
+                                 + r'")[^>]*>.*?</option>', re.S)
+            match = pattern.search(block)
+            if match is None:
+                raise ValueError("Bench compiler symbol option missing")
+            option = match.group()
+            values = [x.get("value") for x in ET.fromstring(option)]
+            if values.count(BENCH_DEFINE)>1:
+                raise ValueError("Duplicate Bench build macro")
+            if BENCH_DEFINE not in values:
+                option = option.replace("</option>",
+                    '\t' * 9 + '<listOptionValue builtIn="false" value="' + BENCH_DEFINE
+                    + '"/>\n' + '\t' * 8 + "</option>")
+                block = block[:match.start()] + option + block[match.end():]
+        cproject = cproject[:m.start()] + block + cproject[m.end():]
+    return cproject
+
+
 def cxx_metadata(project: str, cproject: str) -> tuple[str, str]:
     c_nature = "<nature>org.eclipse.cdt.core.cnature</nature>"
     cpp_nature = "<nature>org.eclipse.cdt.core.ccnature</nature>"
@@ -24,13 +86,17 @@ def cxx_metadata(project: str, cproject: str) -> tuple[str, str]:
             raise ValueError("Missing Eclipse C nature; manual review required")
         project = project.replace(c_nature, c_nature + "\n\t\t" + cpp_nature, 1)
 
+    config_names = [c.get("name") for c in ET.fromstring(cproject).findall(".//cconfiguration//configuration")]
+    if set(config_names) not in ({"Debug","Release"},set(CONFIG_NAMES)) or len(config_names)!=len(set(config_names)):
+        raise ValueError("Unexpected build configurations")
+    count_configs=len(config_names)
     driver_entry = '<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Drivers"/>'
     app_entry = '<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="App"/>'
-    if cproject.count(driver_entry) != 2:
-        raise ValueError("Expected two project configurations (Debug and Release)")
+    if cproject.count(driver_entry) != count_configs:
+        raise ValueError("Missing source entries in build configurations")
     if cproject.count(app_entry) == 0:
         cproject = cproject.replace(driver_entry, driver_entry + "\n\t\t\t\t\t\t" + app_entry)
-    elif cproject.count(app_entry) != 2:
+    elif cproject.count(app_entry) != count_configs:
         raise ValueError("App source configuration is inconsistent")
 
     # CubeIDE keeps the C and G++ options independent. The CAN1 port includes
@@ -98,8 +164,8 @@ def cxx_metadata(project: str, cproject: str) -> tuple[str, str]:
             return match.group("open") + body + "</tool>"
 
         cproject, count = compiler_tool.subn(require_compiler_options, cproject)
-        if count != 2:
-            raise ValueError(f"Expected two {language} compiler configurations")
+        if count != count_configs:
+            raise ValueError(f"Missing {language} compiler configurations")
 
     linker = re.compile(
         r'<tool id="(com\.st\.stm32cube\.ide\.mcu\.gnu\.managedbuild\.tool\.cpp\.linker\.\d+)"'
@@ -124,9 +190,9 @@ def cxx_metadata(project: str, cproject: str) -> tuple[str, str]:
         cproject.count(
             'superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.linker.option.script"'
         )
-        != 2
+        != count_configs
     ):
-        raise ValueError("Both C++ linkers must explicitly use the FLASH linker script")
+        raise ValueError("All C++ linkers must explicitly use the FLASH linker script")
 
     # Without an explicit setting CubeIDE currently invokes GNU++14, even though
     # the application contract requires GNU++17. Keep both build configurations
@@ -179,8 +245,8 @@ def cxx_metadata(project: str, cproject: str) -> tuple[str, str]:
         return match.group("open") + body + "</tool>"
 
     cproject, compiler_count = compiler.subn(require_cpp17, cproject)
-    if compiler_count != 2 or cproject.count(f'value="{standard_value}"') != 2:
-        raise ValueError("Expected two C++ compiler configurations using GNU++17")
+    if compiler_count != count_configs or cproject.count(f'value="{standard_value}"') != count_configs:
+        raise ValueError("Expected all C++ compiler configurations using GNU++17")
     # The F446 C11 core now lives inside the CubeIDE App source path and uses
     # lround/lroundf/fminf/fmaxf from libm. Retain the library through regeneration.
     math_key = "com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.linker.option.libraries"
@@ -217,12 +283,12 @@ def cxx_metadata(project: str, cproject: str) -> tuple[str, str]:
         return match.group("open") + body + "</tool>"
 
     cproject, linker_count = cpp_linker.subn(require_cpp_math_link, cproject)
-    if linker_count != 2 or cproject.count(f'superClass="{math_key}"') != 2:
-        raise ValueError("Expected two C++ linkers explicitly linking libm")
-    if cproject.count(existing_math_lib) != 2:
-        raise ValueError("Missing C++ libm on Debug or Release")
+    if linker_count != count_configs or cproject.count(f'superClass="{math_key}"') != count_configs:
+        raise ValueError("Expected all C++ linkers explicitly linking libm")
+    if cproject.count(existing_math_lib) != count_configs:
+        raise ValueError("Missing C++ libm in build configurations")
 
-    return project, cproject
+    return project, bench_metadata(cproject)
 
 
 def audit() -> None:
@@ -252,6 +318,8 @@ def audit() -> None:
         "HAL_TIM_Base_Start_IT(&htim7)",
         "balancing_app_control_tick();",
         "balancing_app_poll();",
+        "balancing_f446_bench_start(&hcan1, &hcan2)",
+        "balancing_f446_bench_service(event_sequence);",
         "HAL_TIM_PeriodElapsedCallback(",
     ]
     missing += ["main.c: " + text for text in expected_main if text not in main]

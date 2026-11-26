@@ -23,12 +23,15 @@ MotorBench::MotorBench(CanPort& port,MotorBenchConfig config) noexcept
                   config.axis==BenchAxis::C620?&scheduler_:nullptr},
      rs06_{config.motorId,config.hostId}
 {
+    if (validConfig(config)) state_=BenchState::Stopping;
+}
+bool MotorBench::validConfig(const MotorBenchConfig& config) noexcept
+{
     const bool validAxis=config.axis==BenchAxis::Rs06 ||
                          (config.axis==BenchAxis::C620 && config.motorId<=4u);
-    if (config.verified && validAxis && config.motorId && std::isfinite(config.limit) &&
+    return (config.verified && validAxis && config.motorId && std::isfinite(config.limit) &&
         config.limit>0 && config.limit<=kHardLimit && config.pulseDurationMs &&
-        config.pulseDurationMs<=200u && config.txTimeoutUs)
-        state_=BenchState::Stopping;
+        config.pulseDurationMs<=200u && config.txTimeoutUs);
 }
 CanBus MotorBench::bus() const noexcept
 { return config_.axis==BenchAxis::Rs06?CanBus::Can1:CanBus::Can2; }
@@ -73,6 +76,7 @@ void MotorBench::stop(bool fault) noexcept
     else if (wasActive || !stopSent_) state_=BenchState::Stopping;
 }
 void MotorBench::cancel() noexcept { stop(false); }
+void MotorBench::fault() noexcept { stop(true); }
 
 void MotorBench::submitStop(std::uint64_t now) noexcept
 {

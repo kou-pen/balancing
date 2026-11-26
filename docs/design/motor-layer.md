@@ -1,124 +1,40 @@
 # モータ制御レイヤーと単軸試運転
 
-> 旧実装の記録を含む。現在のモータ通信型とCodecは [C++統合検証](../verification/f446-motor-codecs-cpp.md) を参照。
+**更新日：** 2026-11-26。対象仕様：[RS06](../specs/protocols/rs06_can1.md)、[C620](../specs/protocols/c620_can2.md)、[F446](../specs/boards/f446_control.md)、[安全・操作](../specs/behavior/robot_operation.md)。
 
-> 旧C11実装の設計・検証記録。現在の状態機械・観測・送信・試運転の契約は [F446公開API](../design/public-api.md) と [C++移行検証](../verification/f446-legacy-observation-retirement.md) を参照。旧コードを再現する場合は移行前のGit履歴を使用する。
+## 通常運転と単軸試運転
 
-**更新日：** 2026-11-09  
-**状態：** CANフレーム生成・受信解析・短時間試運転およびHALアダプタの**模擬ホスト試験は合格**。CubeIDEの非駆動C++骨組みはSTM32F446向けクロスビルドPASS（2026-11-09）。**HALモータCANアダプタのMCUビルド/実接続、CAN配線、書込み、実機回転は未実施。**
+通常運転はApplication / RobotSequence / MotorServiceが所有する。単軸試運転は独立したMotorBenchが所有し、実行中に両者を切り替えない。通信の符号化、機器の受信・送信完了管理、CANポートは共通化している。現在の通常起動は非駆動観測であり、試運転側も非ゼロ要求を接続していない。
 
-対象仕様：[RS06](../specs/protocols/rs06_can1.md)、[C620](../specs/protocols/c620_can2.md)、[F446](../specs/boards/f446_control.md)、[安全・操作](../specs/behavior/robot_operation.md)。
-
-通常運転向けのHAL非依存スケジューラは、単軸ベンチ試運転とは別の責務として [CAN送信スケジューラの設計・保守資料](can-scheduler.md) に記載する。Issue #5 のモデルは2/4 ms要求と送信完了監視をホストで検証するもので、実機向けCAN送信・ARM機構へは未接続。
-
-## ファイルと責務
-
-| ファイル | 役割 |
+| App内のファイル | 役割 |
 |---|---|
-| `firmware/f446/balancing_f446/App/Inc/balancing/communication/balancing_motor_can.h` | CANフレーム／フィードバックの名前付き型、公開API |
-| `firmware/f446/balancing_f446/App/Src/balancing/communication/balancing_motor_can.c` | RS06 Type 1/2/3/4、C620 0x200/0x201〜204の符号化・復号 |
-| `firmware/f446/balancing_f446/App/Inc/balancing/app/balancing_motor_bench.h` | 短時間・単軸試運転用の最小状態管理API |
-| `firmware/f446/balancing_f446/App/Src/balancing/app/balancing_motor_bench.c` | 有効化応答確認、試運転パルス期限、停止要求。受信タイムアウトの値と比較は持たない |
-| `firmware/f446/balancing_f446/App/Inc/balancing/device/balancing_f446_motor_bench_port.h` | F446/HAL向けの接続API |
-| `firmware/f446/balancing_f446/App/Src/balancing/device/balancing_f446_motor_bench_port.c` | bxCAN1/2の受信時刻・期限判定、送信完了メールボックスの連携 |
-| `tests/test_motor_can.c` | RS06/C620既知フレーム、入力拒否、故障・タイムアウトのホスト試験 |
+| `communication/Rs06Codec.hpp/.cpp`、`C620Codec.hpp/.cpp` | CAN指令とフィードバックの符号化・復号 |
+| `device/Rs06Motor.hpp/.cpp`、`C620Motor.hpp/.cpp` | 機器ごとの状態・鮮度・送信終端 |
+| `communication/can/CanPort.hpp/.cpp` | CANレジスタ、メールボックス、IRQと共通DWT時計 |
+| `communication/can/CanTxScheduler.hpp/.cpp`、`CanRouter.hpp/.cpp` | 送信調停と回収イベントの配送 |
+| `bench/MotorBench.hpp/.cpp` | 単軸試運転状態、停止処理 |
+| `bench/f446_motor_bench_runtime.cpp` | BenchDebug専用のCAN起動、周期処理、IRQ配送 |
+| `App/Inc/balancing_f446_bench_bridge.h` | 生成Cコードと試運転ランタイムの境界 |
 
-**正式な制御層との接続点：** 500 HzのLQR/VMCでモータ軸の物理トルク・車輪電流を求め、駆動許可・上限を確定させてから`b_rs06_torque_frame`／`b_c620_current_frame`へ渡す。安全状態機械自体は既存`BModeMachine`を使う。**試運転専用`BMotorBench`を通常バランシングの状態機械に組み込まない。**
+## 起動と停止確認
+
+CubeIDEのBenchDebugは通常Debug/Releaseとは別のELFを生成する。モードはコンパイル時固定。通常Application、USB・IMUのApplication入力処理を起動しない。CAN1/2の生成初期化は残すが、HAL_CAN_Startと通知有効化は明示設定により選択した1バスのみ。CAN2の依存CAN1クロックを維持し、共有フィルタバンクを14で分ける。対象軸だけを通すマスクを設定する。
+
+リポジトリの既定boardConfigは未検証・無効。CAN開始前に拒否され、生成mainはError_Handlerへ進み、通常運転にフォールバックしない。ホスト試験用の人工設定は製品へ混入しない。実機設定値や書込みを本PRで承認したことにはならない。
+
+試運転ランタイムはTIM7の番号付き2msイベントでMotorBenchを処理する。RS06はType4停止の送達とその後の新規Type2 Resetを確認、C620は0x200全チャネルゼロを送る。受信・送信終端はCanPortで採取する。CAN IRQから状態機械や制御演算を実行せず、同一IRQをHALに重複処理させない。
 
 ## 仕様上の注意
 
-- RS06：CAN1、拡張29bit、1 Mbit/s。Type 3は有効化、Type 4の全0データは通常停止。Type 1ではKp=Kd=0としてフィードフォワードトルクのみ使用する。
-- RS06のType 1トルクはCAN IDのbit23〜8に16bitの線形換算で格納。メーカー資料の版による速度やKp上限の差異があるため、**実機のRS06ファームウェアの換算値を確認してから使用**する。現在の実装はType 2角度±4π、角速度±50 rad/s、トルク±36 N·mの資料に合わせたもの。上限36 N·mは安全な出力値という意味ではない。
-- C620：CAN2、標準11bit、0x200で最大4台分。M3508のロータ角0〜8191、速度rpm。指令値±16384が±20 Aに対応する。ただし実機の許容電流上限とは別。
-- RS06の対象ID・主機ID・C620の対象ID、モータFW版、電源条件、低トルク／低電流試験上限は**未確定**。起動時に推測で埋めない。
-- 開発用`BMotorBench`は同時に複数モータへ非ゼロ指令を出さない。RS06はType3送信完了後の新規正常報告（mode=2、fault=0）を確認してからトルク指令を開始。C620は20 ms以内の正常形式フィードバック確認を要求する。
-- 試運転コードには**RS06最大0.5 N·m、C620最大0.5 A、最大200 ms**の保守的なハード上限を設ける。これらは機構安全を保証する数値ではなく、実機で確認する上限はさらに低く設定できる。RS06フィードバック30 ms切れ、C620フィードバック20 ms切れは**CANポートだけで**判定し、`BMotorBench`へ真偽を渡す。RS06有効化待ち150 msは独立したトランザクション期限として残す。運転中の異常では再起動要求を自動で発行しない。
-- 試運転の終了時はRS06停止Type4、C620の0 Aを送信する。ただしCANバスオフ・MCU停止・無通電では送達できない。**これだけでは安全停止ではない**。独立した物理非常停止を必須とする。
+RS06はCAN1拡張29bit、C620はCAN2標準11bit、各1 Mbps。RS06の角度±4π、速度±50 rad/s、トルク±36 N·m、C620の±16384＝±20 Aは通信表現範囲であり機械的な許容出力ではない。実機FW・主機ID・軸ID・電源・設定値の確認が必要。
 
-## HAL実装へ接続する条件
+既存MotorBenchには単軸パルス用の0.5 N·m/A・200 ms上限、RS06有効化150 ms、受信鮮度30/20 msがある。現行BenchDebugからパルス要求関数を呼ばない。実機通電・非ゼロ要求の接続は別承認。停止フレームの送達は物理停止を保証しない。独立した物理非常停止と支持治具、実機IWDGの確認は残件。
 
-実際のSTM32CubeIDEプロジェクトは firmware/f446/balancing_f446/ にあり、IOC・main.c・スタートアップコードとHALを含む。2026-11-09にCubeIDE 1.19.0のヘッドレスF446クロスビルドで非駆動C++アプリ骨組みのELF生成はPASS。**PR #16で5ソースのCubeIDE Debug/ReleaseクロスビルドはPASS。Issue #5追加のCAN送信モデルを含む6ソース新配置のCubeIDE再生成は未検証で、CAN初期化・送受信callbackは未接続。**モータを駆動できる完成ファームウェアではなく、実機へは書き込まない。
+## 確認
 
-CubeMX等で、F446のCAN1とCAN2を1 Mbit/sに設定し、CAN1拡張ID（RS06）、CAN2標準ID（C620）のフィルタ、CAN Rx FIFO0、Tx mailbox complete IRQ、2 msの時刻基準、IWDG、物理非常停止入力を準備する。CAN2使用時にはCAN1側のクロックとフィルタバンク分割に注意。ピンは基板回路図と照合する。
+- [単軸試運転のC++統合時の検証](../verification/f446-motor-bench-cpp.md)
+- [BenchDebug起動・IRQ分離検証](../verification/f446-bench-startup.md)
+- [モータ通信コーデック](../verification/f446-motor-codecs-cpp.md)
+- [F446 TODO](../todo/f446.md)
 
-### 主ループの接続例（概念・そのままでは書込み不可）
-
-```c
-/* CANフィルタ、クロック、HAL_CAN_Start、Rx/Tx割り込み設定は別に行う。 */
-BF446MotorBenchPort motor_port;
-BMotorBenchConfig cfg = {
-    .rs06_motor_id = /* 実機で確認した値 */,
-    .rs06_host_id = /* 実機で確認した値 */,
-    .c620_motor_id = /* 実機で確認した値 */,
-    .rs06_limit_nm = /* 実機の安全な微小トルク */,
-    .c620_limit_a = /* 実機の安全な微小電流 */,
-    .pulse_duration_ms = /* 例えば100 ms以下から開始 */
-};
-b_f446_motor_port_init(&motor_port, &hcan1, &hcan2, &cfg);
-
-/* 500 Hzのメインループから毎回呼ぶ（時刻は単調増加us）。 */
-b_f446_motor_port_tick_2ms(&motor_port, now_us);
-
-/* CAN割り込みから、該当ポートへ中継する。 */
-b_f446_motor_port_on_rx0(&motor_port, hcan, now_us);
-b_f446_motor_port_on_tx_done(&motor_port, hcan, mailbox_index, now_us);
-
-/* 必ずモータ固定・車輪浮上・非常停止の確認後、明示的操作で1回だけ呼ぶ。 */
-b_f446_motor_port_pulse_rs06(&motor_port, test_torque_nm, now_us);
-/* C620は別試験。 */
-b_f446_motor_port_pulse_c620(&motor_port, test_current_a, now_us);
-
-/* 中止操作／非常停止検出時。別途ハードウェアの電源遮断も必要。 */
-b_f446_motor_port_cancel(&motor_port);
-```
-
-**注意：** 上記は呼び出し順を示す接続図であり、未定義の実測値をそのまま貼り付けてコンパイルできるコードではない。実際のCAN HAL callbackではmailbox0/1/2の正しい番号を渡し、**HAL送信受付時ではなく送信完了時**に`on_tx_done`を呼ぶ。時刻`now_us`はHAL_GetTick()のミリ秒値をそのまま代入しない。
-
-### HAL callbackの接続例
-
-```c
-/* 500 Hz処理とCAN callbackが共通に参照するインスタンス。 */
-extern BF446MotorBenchPort motor_port;
-extern uint64_t monotonic_us(void); /* ボード固有の単調増加us時計 */
-
-void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
-{
-    b_f446_motor_port_on_rx0(&motor_port, hcan, monotonic_us());
-}
-void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan)
-{
-    b_f446_motor_port_on_tx_done(&motor_port, hcan, 0u, monotonic_us());
-}
-void HAL_CAN_TxMailbox1CompleteCallback(CAN_HandleTypeDef *hcan)
-{
-    b_f446_motor_port_on_tx_done(&motor_port, hcan, 1u, monotonic_us());
-}
-void HAL_CAN_TxMailbox2CompleteCallback(CAN_HandleTypeDef *hcan)
-{
-    b_f446_motor_port_on_tx_done(&motor_port, hcan, 2u, monotonic_us());
-}
-```
-
-実際のCubeMXプロジェクトに既存HAL callbackがある場合は、**二重定義せずその中から上記関数を呼ぶ**。CAN2のゼロ指令を送信し続けるにはCAN2のTX mailbox完了通知も必要。送信遅延が継続しTX割り込みが欠落すると出力の安全停止を保証できないため、Bus-off／IWDG／独立した物理非常停止を必ず結合する。
-
-## 実機検証の順序
-
-1. 基板のピン割当、CAN終端120 Ω、共有GND、RS06主機ID/全ID、C620 ID、モータFW版、24 V供給、非常停止の独立動作を確認する。
-2. 車輪・脚が空転可能な治具で、**非ゼロ出力なし**のCAN受信を先に確認。RS06のType2応答とC620の0x201/0x202のID・温度・RPMを記録する。
-3. RS06一台だけType3→新規Type2正常応答→短い低トルクType1→Type4停止。可動限界やガスシリンダの反力に注意。機構に取り付けた状態では出力方向が未検証のため、最初は極力単体で試す。
-4. C620一台でID1/ID2の符号と極小電流の短時間パルスを確認。DISARMED相当では0 Aを500 Hzで継続する。
-5. 各台の受信断・送信障害を試験し、停止指令が届く場合と届かない場合を区別して記録する。条件を満たしてから4台RS06・2台M3508の同期出力層へ進む。
-
-## 検証コマンド
-
-```sh
-cd /home/dev-admin/chatgpt-workspace/balancing
-python3 tools/run_host_tests.py
-cmake -S . -B build/host-cmake
-cmake --build build/host-cmake
-python3 tools/validate_specs.py
-```
-
-統合前の結果：**RS06/C620のホスト試験合格、非駆動C++アプリ骨組みのF446向けクロスビルドPASS**。統合後のMCUビルド・HAL接続・書込み・実機回転は未検証（Issue #3）。
-
-**関連TODO：** [通信](../todo/protocols.md)、[F446](../todo/f446.md)、[検証](../todo/verification.md)。
+旧C11の接続例はGit履歴（master 0cc9e7b以前）に残す。
