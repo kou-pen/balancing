@@ -281,6 +281,7 @@
 | <a href="RemoteControlService_8hpp_source.html">RemoteControlService.hpp</a> | 復号済み操作・切替・復帰管理 |
 | <a href="DiagnosticsService_8hpp_source.html">DiagnosticsService.hpp</a> | 診断イベント・固定領域・送信進捗 |
 | <a href="StatusIndicator_8hpp_source.html">StatusIndicator.hpp</a> | 状態別の論理表示パターン |
+| <a href="StatusIndicatorPort_8hpp_source.html">StatusIndicatorPort.hpp</a> | RGB・ブザー出力と出力失敗診断 |
 | <a href="MotorService_8hpp_source.html">MotorService.hpp</a> | RS06のARM・停止と、脚・車輪6軸の周期観測をまとめるAPI |
 | <a href="MotorCanLink_8hpp_source.html">MotorCanLink.hpp</a> | CAN1・CAN2の機器報告の配送、RS06の送信・終端接続 |
 | <a href="RobotSequence_8hpp_source.html">RobotSequence.hpp</a> | 運転状態、FAULT、要求と結果の公開型 |
@@ -435,6 +436,8 @@
 | <a href="RemoteControlService_8cpp_source.html">RemoteControlService.cpp</a> | C11操作数学とC++状態の接続 |
 | <a href="DiagnosticsService_8cpp_source.html">DiagnosticsService.cpp</a> | 重要通常FIFO、3部分の終端照合 |
 | <a href="StatusIndicator_8cpp_source.html">StatusIndicator.cpp</a> | FAULT優先と時刻差による点滅・鳴動 |
+| <a href="StatusIndicatorPort_8cpp_source.html">StatusIndicatorPort.cpp</a> | 極性変換・変更時書込み・失敗時OFF |
+| <a href="f446__indicator__output_8cpp_source.html">f446_indicator_output.cpp</a> | 生成GPIO割当と出力ラッチ照合 |
 | <a href="balancing__motor__bench_8c_source.html">balancing_motor_bench.c</a> | 単軸試運転のコマンド、状態遷移、停止条件 |
 | <a href="balancing__operator__input_8c_source.html">balancing_operator_input.c</a> | 操作元選択、通信断、ニュートラル確認、指令値の整形 |
 */

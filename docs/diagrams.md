@@ -613,3 +613,17 @@ flowchart TD
 ```
 
 ホスト専用。ARMバイナリの通常駆動経路にはしない。未受付の旧周期は破棄、受付済みは中止を要求し終端を照合する。
+
+
+## 状態表示の出力境界
+
+```mermaid
+flowchart LR
+    S["RobotSequence / FaultRecord"] --> P["StatusIndicator：論理パターン"]
+    P --> O["StatusIndicatorPort：検証済み極性"]
+    O --> R["RGB / BUZZER"]
+    O --> D["表示診断コピー：失敗・回数"]
+    S --> C["既存DiagnosticsService / CAN2"]
+```
+
+F446のRGB/BUZZERは生成main.hの定義を利用する。明示設定なしではGPIOに書き込まない。実機のパターン・極性・ブザー方式は未検証。

@@ -226,3 +226,18 @@ ApplicationはMotorObservationSnapshotとImuAttitudeを同じ周期時刻で固�
 `BALANCING_HOST_SIL` かつ非ARM/ThumbビルドでのみDriveCycleとApplication結合入口が存在する。C ABIの既定起動は非駆動のまま。実機にfixtureを昇格させない。送信中止は終端が来るまで物理的な取消を意味しない。
 
 [検証記録](../verification/f446-drive-cycle-sil.md)。
+
+
+## 状態表示出力
+
+| API | 責務 |
+|---|---|
+| `StatusIndicator::update(state, fault, nowUs)` | 既存論理パターンと点滅・鳴動期限 |
+| `StatusIndicatorPort::apply(state)` | RGBとブザーの論理状態を検証済み極性で出力。変更時のみ書込み |
+| `StatusIndicatorPort::disable()` | 観測欠損、時刻逆行、再初期化時のOFF要求 |
+| `StatusIndicatorPort::summary()` | 設定有効性、失敗ラッチ、失敗回数、適用済み表示のコピー |
+| `makeF446IndicatorOutput(activeHigh, verified)` | ARMビルド限定の生成main.hピン割当。構築ではGPIOを書かない |
+
+論理表示と物理出力の両方が明示検証済みの設定だけApplicationに結合する。GPIOラッチ照合は物理発光・鳴動を保証しない。未設定の既定起動は出力しない。PWMやLED1〜5の用途・色・極性を新規に決めない。表示異常は診断コピーに保持しRobotSequenceやCAN契約の意味を変えない。
+
+[検証記録](../verification/f446-indicator-output-host.md)。
