@@ -22,6 +22,12 @@ void balancing_app_init(void);
  */
 void balancing_app_control_tick(void);
 
+/** @brief TIM7番号を回収した主ループからCAN回収前に呼ぶ。
+ * @note これを伴わない制御呼出しはウォッチドッグ更新証跡を作らない。
+ * @spec{BOARD-F446-001}
+ */
+void balancing_app_begin_control_tick(uint32_t event_sequence);
+
 /**
  * @brief メインループの余剰時間に呼ぶ。ブロックしない。
  * @spec{BOARD-F446-001}
