@@ -44,7 +44,6 @@ motor_common = [
     "-I",
     str(F446_APP / "Inc"),
     str(F446_APP / "Src" / "balancing" / "communication" / "balancing_motor_can.c"),
-    str(F446_APP / "Src" / "balancing" / "app" / "balancing_motor_bench.c"),
     str(ROOT / "tests" / "test_motor_can.c"),
     "-lm",
 ]
@@ -55,33 +54,6 @@ for label, flags in [
     path = OUT / ("test_motor_can_ubsan" if flags else "test_motor_can")
     print(f"[{label}] コンパイル", flush=True)
     subprocess.run(motor_common + flags + ["-o", str(path)], check=True, cwd=ROOT, timeout=30)
-    print(f"[{label}] 実行", flush=True)
-    subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
-
-hal_common = [
-    "gcc",
-    "-std=c11",
-    "-Wall",
-    "-Wextra",
-    "-Werror",
-    "-pedantic",
-    "-I",
-    str(ROOT / "tests" / "stubs"),
-    "-I",
-    str(F446_APP / "Inc"),
-    str(F446_APP / "Src" / "balancing" / "communication" / "balancing_motor_can.c"),
-    str(F446_APP / "Src" / "balancing" / "app" / "balancing_motor_bench.c"),
-    str(F446_APP / "Src" / "balancing" / "device" / "balancing_f446_motor_bench_port.c"),
-    str(ROOT / "tests" / "test_motor_hal_port.c"),
-    "-lm",
-]
-for label, flags in [
-    ("HAL模擬通常ビルド", []),
-    ("HAL模擬未定義動作検査", ["-fsanitize=undefined", "-fno-sanitize-recover=all"]),
-]:
-    path = OUT / ("test_motor_hal_port_ubsan" if flags else "test_motor_hal_port")
-    print(f"[{label}] コンパイル", flush=True)
-    subprocess.run(hal_common + flags + ["-o", str(path)], check=True, cwd=ROOT, timeout=30)
     print(f"[{label}] 実行", flush=True)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
@@ -363,6 +335,23 @@ can_dispatch_common = [
     str(rs06_source / "communication" / "can" / "ProtocolId.cpp"),
     str(rs06_source / "communication" / "can" / "CanTxScheduler.cpp"),
 ]
+for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"])]:
+    executable=OUT / f"test_motor_bench{suffix}"
+    subprocess.run(["g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
+        "-I", str(ROOT / "tests" / "stubs_can1"), "-I", str(F446_APP / "Inc")] + [
+        str(rs06_source / "communication/can/CanPort.cpp"),
+        str(rs06_source / "communication/can/CanRouter.cpp"),
+        str(rs06_source / "communication/can/ProtocolId.cpp"),
+        str(rs06_source / "communication/can/CanTxScheduler.cpp"),
+        str(rs06_source / "communication/Rs06Codec.cpp"),
+        str(rs06_source / "device/Rs06Motor.cpp"),
+        str(rs06_source / "device/C620Motor.cpp"),
+        str(rs06_source / "bench/MotorBench.cpp"),
+        str(ROOT / "tests/test_motor_bench.cpp"),
+        str(OUT / f"motor_service_rs06_codec{suffix}.o"), "-lm",
+    ] + flags + ["-o", str(executable)], check=True, cwd=ROOT, timeout=30)
+    subprocess.run([str(executable)], check=True, cwd=ROOT, timeout=30)
+
 for test, extra_sources in [
     ("test_f446_can1_runtime", rs06_service_sources + app_math_cpp + [str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "device" / "f446_can1_runtime.cpp"), str(rs06_source / "communication" / "can" / "Can2FilterPlan.cpp"), str(rs06_source / "app" / "application.cpp"), str(ROOT / "tests" / "sil" / "DriveCycle.cpp"), str(ROOT / "tests" / "sil" / "DriveRuntime.cpp"), str(rs06_source / "communication" / "can" / "MotorFramePlan.cpp")]),
     ("test_f446_can_event_poll", rs06_service_sources + app_math_cpp + [str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "communication" / "can" / "MotorFramePlan.cpp"), str(rs06_source / "control" / "filter" / "ImuAttitudeSource.cpp")]),

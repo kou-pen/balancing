@@ -15,7 +15,6 @@ add_library(balancing_core STATIC
     ${F446_APP}/Src/balancing/control/controller/balancing_leg_pd.c
     ${F446_APP}/Src/balancing/control/controller/balancing_yaw_pi.c
     ${F446_APP}/Src/balancing/communication/balancing_motor_can.c
-    ${F446_APP}/Src/balancing/app/balancing_motor_bench.c
     ${F446_APP}/Src/balancing/control/estimator/balancing_leg_kinematics.c
     ${F446_APP}/Src/balancing/control/estimator/balancing_observation.c
     ${F446_APP}/Src/balancing/app/balancing_operator_input.c
@@ -79,19 +78,6 @@ target_link_libraries(balancing_issue10_flow_tests PRIVATE balancing_core m)
 target_compile_options(balancing_issue10_flow_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_issue10_flow_tests COMMAND balancing_issue10_flow_tests)
 
-# F446 HAL adapter is host-compiled with an explicit test-only HAL shim.
-# This does not replace a real STM32CubeMX build or an MCU hardware test.
-add_executable(balancing_motor_hal_port_tests
-    tests/test_motor_hal_port.c
-    ${F446_APP}/Src/balancing/device/balancing_f446_motor_bench_port.c
-)
-target_include_directories(balancing_motor_hal_port_tests PRIVATE
-    tests/stubs
-    ${F446_APP}/Inc
-)
-target_link_libraries(balancing_motor_hal_port_tests PRIVATE balancing_core m)
-target_compile_options(balancing_motor_hal_port_tests PRIVATE -Wall -Wextra -Wpedantic)
-add_test(NAME balancing_motor_hal_port_tests COMMAND balancing_motor_hal_port_tests)
 # C++ entry bridge is kept outside CubeMX-owned Core/Src. Host test only.
 set(BALANCING_CONTROL_MATH_SOURCES
     ${F446_APP}/Src/balancing/app/ControlCycle.cpp
@@ -181,6 +167,21 @@ set(BALANCING_CAN_DISPATCH_SOURCES
     ${F446_APP}/Src/balancing/communication/can/ProtocolId.cpp
     ${F446_APP}/Src/balancing/communication/can/CanTxScheduler.cpp
 )
+
+# Dedicated single-axis bench shares the actual CAN register abstraction, not a second HAL port.
+add_executable(balancing_motor_bench_tests
+    tests/test_motor_bench.cpp
+    ${F446_APP}/Src/balancing/bench/MotorBench.cpp
+    ${F446_APP}/Src/balancing/device/Rs06Motor.cpp
+    ${F446_APP}/Src/balancing/device/C620Motor.cpp
+    ${F446_APP}/Src/balancing/communication/Rs06Codec.cpp
+    ${F446_APP}/Src/balancing/communication/can/CanPort.cpp
+    ${BALANCING_CAN_DISPATCH_SOURCES}
+)
+target_include_directories(balancing_motor_bench_tests PRIVATE tests/stubs_can1)
+target_link_libraries(balancing_motor_bench_tests PRIVATE balancing_core m)
+target_compile_options(balancing_motor_bench_tests PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME balancing_motor_bench_tests COMMAND balancing_motor_bench_tests)
 
 # Startup, RX observation and IRQ ownership at both STM32F446 CAN buses.
 add_executable(balancing_f446_can1_runtime_tests

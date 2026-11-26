@@ -17,11 +17,10 @@ PROJECT = Path(__file__).resolve().parents[1] / "firmware" / "f446" / "balancing
 # are discovered recursively so later additions cannot silently be skipped.
 SOURCES = (
     "balancing/app/application.cpp",
-    "balancing/app/balancing_motor_bench.c",
+    "balancing/bench/MotorBench.cpp",
     "balancing/communication/balancing_motor_can.c",
     "balancing/communication/can/CanTxScheduler.cpp",
     "balancing/control/controller/balancing_core.c",
-    "balancing/device/balancing_f446_motor_bench_port.c",
 )
 
 
