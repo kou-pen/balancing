@@ -1,6 +1,6 @@
 # ソフトウェア構成
 
-**基準：PR #88のコード cb3abed（停止専用送信を含むレビュー版）。** masterに未マージの場合、その機能はレビュー版のみです。このページは目標構成ではなく実際のコードを中心に記述します。要求は [仕様](spec-index.md)、実装根拠は [検証記録](verification/index.md)。
+**基準：停止専用送信 #88とARM準備診断の実装。** ARM準備診断はレビュー中です。このページは目標構成ではなく実際のコードを中心に記述します。要求は [仕様](spec-index.md)、実装根拠は [検証記録](verification/index.md)。
 
 ## 1. ロボット全体
 
@@ -70,4 +70,4 @@ flowchart TB
 
 ## 5. 安全境界
 
-運転状態は DISARMED / ARMING / BALANCING / FAULT。`RobotSequence` が状態を決定し、`ControlCycle` の数学結果だけではモータ送信を許可しません。通常運転の非ゼロ出力はまだ未接続です。物理非常停止、支持治具、原点・極性・ゲイン・物理上限、実時間・実機動作は未検証。 [動作仕様](specs/behavior/robot_operation.md) と [基板仕様](specs/boards/f446_control.md) が要求の正本です。
+運転状態は DISARMED / ARMING / BALANCING / FAULT。起動時固定設定の不足と周期観測の不成立は ApplicationObservation::armReadiness に別々に記録する。これは読み取り専用の診断で、許可判定を代替しない。数学fixtureが形式検査を通っても実機駆動未接続・機構安全未検証は解消しない。`RobotSequence` が状態を決定し、`ControlCycle` の数学結果だけではモータ送信を許可しません。通常運転の非ゼロ出力はまだ未接続です。物理非常停止、支持治具、原点・極性・ゲイン・物理上限、実時間・実機動作は未検証。 [動作仕様](specs/behavior/robot_operation.md) と [基板仕様](specs/boards/f446_control.md) が要求の正本です。
