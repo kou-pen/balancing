@@ -277,3 +277,7 @@ USB受信完了通知は主ループに配送し、再読出し時刻で鮮度�
 | ApplicationObservation::cycleHealth / watchdog | 欠落・完了・更新診断コピー |
 
 既存6ms FAULT判断はControlCycle/RobotSequenceに保持する。物理IWDGの開始と期限実測は未実施。[検証記録](../verification/f446-cycle-watchdog-host.md)。
+
+## 独立単軸試運転
+
+`bench/MotorBench.hpp` の `MotorBench` は専用CanPortを借用し、`requestPulse(output, nowUs)`、`poll(nowUs)`、`cancel()`、`summary(nowUs)` を提供する。通常Applicationとは排他的に使用し、実機起動経路には未接続。詳細は [検証契約](../verification/f446-motor-bench-cpp.md) を参照。
