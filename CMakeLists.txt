@@ -14,7 +14,6 @@ add_library(balancing_core STATIC
     ${F446_APP}/Src/balancing/control/controller/balancing_core.c
     ${F446_APP}/Src/balancing/control/controller/balancing_leg_pd.c
     ${F446_APP}/Src/balancing/control/controller/balancing_yaw_pi.c
-    ${F446_APP}/Src/balancing/communication/balancing_motor_can.c
     ${F446_APP}/Src/balancing/control/estimator/balancing_leg_kinematics.c
     ${F446_APP}/Src/balancing/control/filter/balancing_attitude_filter.c
 )
@@ -29,8 +28,14 @@ enable_testing()
 add_executable(balancing_core_tests tests/test_core.c)
 target_link_libraries(balancing_core_tests PRIVATE balancing_core m)
 add_test(NAME balancing_core_tests COMMAND balancing_core_tests)
-add_executable(balancing_motor_can_tests tests/test_motor_can.c)
-target_link_libraries(balancing_motor_can_tests PRIVATE balancing_core m)
+# Motor codecs share CanFrame and are independent of legacy C mathematics.
+add_library(balancing_motor_codecs STATIC
+    ${F446_APP}/Src/balancing/communication/Rs06Codec.cpp
+    ${F446_APP}/Src/balancing/communication/C620Codec.cpp)
+target_include_directories(balancing_motor_codecs PUBLIC ${F446_APP}/Inc)
+target_compile_options(balancing_motor_codecs PRIVATE -Wall -Wextra -Wpedantic)
+add_executable(balancing_motor_can_tests tests/test_motor_can.cpp)
+target_link_libraries(balancing_motor_can_tests PRIVATE balancing_core balancing_motor_codecs m)
 target_compile_options(balancing_motor_can_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_motor_can_tests COMMAND balancing_motor_can_tests)
 
@@ -130,14 +135,14 @@ set(BALANCING_RS06_SERVICE_SOURCES
     ${F446_APP}/Src/balancing/app/MotorService.cpp
     ${F446_APP}/Src/balancing/device/Rs06Motor.cpp
     ${F446_APP}/Src/balancing/device/C620Motor.cpp
-    ${F446_APP}/Src/balancing/communication/Rs06Codec.cpp
+
 )
 # Four-axis RS06 handshake, bound to RobotSequence through simulated CAN events.
 add_executable(balancing_motor_service_rs06_tests
     tests/test_motor_service_rs06.cpp
     ${BALANCING_RS06_SERVICE_SOURCES}
 )
-target_link_libraries(balancing_motor_service_rs06_tests PRIVATE balancing_core m)
+target_link_libraries(balancing_motor_service_rs06_tests PRIVATE balancing_core balancing_motor_codecs m)
 target_compile_options(balancing_motor_service_rs06_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_motor_service_rs06_tests COMMAND balancing_motor_service_rs06_tests)
 
@@ -148,7 +153,7 @@ add_executable(balancing_f446_can_port_tests
     ${F446_APP}/Src/balancing/communication/can/CanPort.cpp
 )
 target_include_directories(balancing_f446_can_port_tests PRIVATE tests/stubs_can1)
-target_link_libraries(balancing_f446_can_port_tests PRIVATE balancing_core m)
+target_link_libraries(balancing_f446_can_port_tests PRIVATE balancing_core balancing_motor_codecs m)
 target_compile_options(balancing_f446_can_port_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_can_port_tests COMMAND balancing_f446_can_port_tests)
 
@@ -164,12 +169,11 @@ add_executable(balancing_motor_bench_tests
     ${F446_APP}/Src/balancing/bench/MotorBench.cpp
     ${F446_APP}/Src/balancing/device/Rs06Motor.cpp
     ${F446_APP}/Src/balancing/device/C620Motor.cpp
-    ${F446_APP}/Src/balancing/communication/Rs06Codec.cpp
     ${F446_APP}/Src/balancing/communication/can/CanPort.cpp
     ${BALANCING_CAN_DISPATCH_SOURCES}
 )
 target_include_directories(balancing_motor_bench_tests PRIVATE tests/stubs_can1)
-target_link_libraries(balancing_motor_bench_tests PRIVATE balancing_core m)
+target_link_libraries(balancing_motor_bench_tests PRIVATE balancing_core balancing_motor_codecs m)
 target_compile_options(balancing_motor_bench_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_motor_bench_tests COMMAND balancing_motor_bench_tests)
 
@@ -203,7 +207,7 @@ target_include_directories(balancing_f446_can1_runtime_tests PRIVATE
     tests/stubs_can1
     ${F446_APP}/Inc
 )
-target_link_libraries(balancing_f446_can1_runtime_tests PRIVATE balancing_core m)
+target_link_libraries(balancing_f446_can1_runtime_tests PRIVATE balancing_core balancing_motor_codecs m)
 target_compile_options(balancing_f446_can1_runtime_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_can1_runtime_tests COMMAND balancing_f446_can1_runtime_tests)
 add_test(NAME balancing_f446_can_rollback_failure_tests COMMAND balancing_f446_can1_runtime_tests --rollback-failure)
@@ -247,18 +251,18 @@ target_include_directories(balancing_f446_can_event_poll_tests PRIVATE
     tests/stubs_can1
     ${F446_APP}/Inc
 )
-target_link_libraries(balancing_f446_can_event_poll_tests PRIVATE balancing_core m)
+target_link_libraries(balancing_f446_can_event_poll_tests PRIVATE balancing_core balancing_motor_codecs m)
 target_compile_options(balancing_f446_can_event_poll_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_can_event_poll_tests COMMAND balancing_f446_can_event_poll_tests)
 
-# C11 C620 decoder -> MotorService snapshot -> C++17 wheel displacement/velocity.
+# C++ C620 decoder -> MotorService snapshot -> C++17 wheel displacement/velocity.
 # Mathematical fixture only; it does not authorize the real motor outputs.
 add_executable(balancing_f446_wheel_odometry_tests
     tests/test_f446_wheel_odometry.cpp
     ${F446_APP}/Src/balancing/control/estimator/WheelOdometry.cpp
     ${BALANCING_RS06_SERVICE_SOURCES}
 )
-target_link_libraries(balancing_f446_wheel_odometry_tests PRIVATE balancing_core m)
+target_link_libraries(balancing_f446_wheel_odometry_tests PRIVATE balancing_core balancing_motor_codecs m)
 target_compile_options(balancing_f446_wheel_odometry_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_wheel_odometry_tests COMMAND balancing_f446_wheel_odometry_tests)
 
@@ -271,7 +275,7 @@ add_executable(balancing_f446_state_estimator_tests
     ${F446_APP}/Src/balancing/control/estimator/WheelOdometry.cpp
     ${BALANCING_RS06_SERVICE_SOURCES}
 )
-target_link_libraries(balancing_f446_state_estimator_tests PRIVATE balancing_core m)
+target_link_libraries(balancing_f446_state_estimator_tests PRIVATE balancing_core balancing_motor_codecs m)
 target_compile_options(balancing_f446_state_estimator_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_state_estimator_tests COMMAND balancing_f446_state_estimator_tests)
 
@@ -287,7 +291,7 @@ add_executable(balancing_f446_sil_control_cycle_tests
     ${F446_APP}/Src/balancing/control/estimator/WheelOdometry.cpp
     ${BALANCING_RS06_SERVICE_SOURCES}
 )
-target_link_libraries(balancing_f446_sil_control_cycle_tests PRIVATE balancing_core m)
+target_link_libraries(balancing_f446_sil_control_cycle_tests PRIVATE balancing_core balancing_motor_codecs m)
 target_compile_options(balancing_f446_sil_control_cycle_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_sil_control_cycle_tests COMMAND balancing_f446_sil_control_cycle_tests)
 
@@ -301,14 +305,14 @@ target_include_directories(balancing_f446_motor_command_tests PRIVATE ${F446_APP
 target_compile_options(balancing_f446_motor_command_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_motor_command_tests COMMAND balancing_f446_motor_command_tests)
 
-# Reuse the C11 RS06/C620 codecs to build a five-frame output plan without
+# Reuse the C++ RS06/C620 codecs to build a five-frame output plan without
 # connecting any of the resulting byte arrays to the F446 runtime.
 add_executable(balancing_f446_motor_frame_plan_tests
     tests/test_f446_motor_frame_plan.cpp
     ${F446_APP}/Src/balancing/communication/can/MotorFramePlan.cpp
     ${F446_APP}/Src/balancing/control/controller/MotorCommand.cpp
 )
-target_link_libraries(balancing_f446_motor_frame_plan_tests PRIVATE balancing_core m)
+target_link_libraries(balancing_f446_motor_frame_plan_tests PRIVATE balancing_core balancing_motor_codecs m)
 target_compile_options(balancing_f446_motor_frame_plan_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_motor_frame_plan_tests COMMAND balancing_f446_motor_frame_plan_tests)
 

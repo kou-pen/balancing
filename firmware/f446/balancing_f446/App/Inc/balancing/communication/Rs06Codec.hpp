@@ -1,6 +1,6 @@
 #pragma once
 
-#include "balancing/communication/balancing_motor_can.h"
+#include "balancing/communication/can/CanTypes.hpp"
 
 #include <cstdint>
 #include <optional>
@@ -30,7 +30,7 @@ public:
      *  @return 解析結果。予約モードや不正フレームはnullopt。
      *  @spec{PROTO-RS06-001}
      */
-    static std::optional<Rs06StateReport> decodeFeedback(const BMotorCanFrame& frame) noexcept;
+    static std::optional<Rs06StateReport> decodeFeedback(const CanFrame& frame) noexcept;
 
     /** @brief Type 3有効化またはType 4通常停止を構築する。
      *  @param[in] command 有効化または通常停止。
@@ -40,8 +40,13 @@ public:
      *  @note 通常停止では故障解除のビットを立てない。
      *  @spec{PROTO-RS06-001}
      */
-    static std::optional<BMotorCanFrame> encodeControl(
+    static std::optional<CanFrame> encodeControl(
         Rs06Command command, std::uint8_t motorId, std::uint8_t hostId) noexcept;
+    /** @brief 純トルクType1。通信表現範囲外または非有限値ならnullopt。
+     * @spec{PROTO-RS06-001}
+     * @warning 駆動許可・物理上限は上位の責務。
+     */
+    static std::optional<CanFrame> encodeTorque(std::uint8_t motorId,float torqueNm) noexcept;
 };
 
 } // namespace balancing

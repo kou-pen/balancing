@@ -73,7 +73,7 @@ private:
     bool fresh(std::uint64_t nowUs) const noexcept;
     void stop(bool fault) noexcept;
     void submitStop(std::uint64_t nowUs) noexcept;
-    void submitDrive(const BMotorCanFrame&,TxKind,std::optional<Rs06TxToken>,
+    void submitDrive(const CanFrame&,TxKind,std::optional<Rs06TxToken>,
                      std::uint64_t nowUs) noexcept;
     void onCanReceive(CanBus,CanRxTarget,const CanFrame&,std::uint64_t) noexcept override;
     void onCanTransmit(CanBus,TxToken,CanTxOutcome,std::uint64_t) noexcept override;

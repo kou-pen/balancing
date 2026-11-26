@@ -65,14 +65,14 @@ public:
      *  @param[in] receivedAtUs CAN受信時の単調時刻 [us]。処理時刻とは区別する。
      *  @spec{PROTO-RS06-001}
      */
-    void onRs06Frame(const BMotorCanFrame& frame, std::uint64_t receivedAtUs) noexcept;
+    void onRs06Frame(const CanFrame& frame, std::uint64_t receivedAtUs) noexcept;
 
     /** @brief CAN2のC620報告を復号し、ID1・ID2に対応する車輪へ配送する。
      *  @param[in] frame CAN2で受信した状態報告。
      *  @param[in] receivedAtUs CANで採取した単調時刻 [us]。
      *  @spec{PROTO-C620-001}
      */
-    void onC620Frame(const BMotorCanFrame& frame, std::uint64_t receivedAtUs) noexcept;
+    void onC620Frame(const CanFrame& frame, std::uint64_t receivedAtUs) noexcept;
 
     /** @brief 6軸の観測値と鮮度を単一の制御周期のコピーとして返す。
      *  @param[in] nowUs 制御周期で固定した単調時刻 [us]。

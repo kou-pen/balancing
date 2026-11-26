@@ -58,13 +58,13 @@ WheelUpdateResult WheelOdometry::accept(
         (last_[axis] && sample.receivedAtUs < last_[axis]->receivedAtUs)) {
         return WheelUpdateResult::InvalidTimestamp;
     }
-    if (raw.encoder_raw >= kEncoderCounts) {
+    if (raw.encoderRaw >= kEncoderCounts) {
         return WheelUpdateResult::InvalidValue;
     }
     if (last_[axis] && sample.sequence == lastSequence_[axis]) {
         // 同じ受理番号のコピーを再読しただけなら、時刻や値を変更しない。
         if (sample.receivedAtUs != last_[axis]->receivedAtUs ||
-            raw.encoder_raw != last_[axis]->encoderRaw || position.counts != lastCounts_[axis]) {
+            raw.encoderRaw != last_[axis]->encoderRaw || position.counts != lastCounts_[axis]) {
             return WheelUpdateResult::InvalidSequence;
         }
         return WheelUpdateResult::NoNewSample;
@@ -87,7 +87,7 @@ WheelUpdateResult WheelOdometry::accept(
 
     last_[axis] = WheelMotion{static_cast<float>(positionM),
                               static_cast<float>(velocityMps),
-                              raw.encoder_raw, sample.receivedAtUs};
+                              raw.encoderRaw, sample.receivedAtUs};
     lastSequence_[axis] = sample.sequence;
     lastCounts_[axis] = position.counts;
     return WheelUpdateResult::Updated;
