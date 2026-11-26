@@ -245,6 +245,106 @@ int main(int argc, char** argv)
         return 0;
     }
 
+    using namespace balancing;
+    struct MockUsbHost {
+        UsbHostEvent event{};
+        UsbTransferToken token{};
+        unsigned starts{},polls{},submits{};
+        bool pending{};
+        bool failSubmit{};
+        UsbHostBackend backend() noexcept {
+            return {this,
+                [](void* c,const UsbHostConfig&) noexcept {
+                    ++static_cast<MockUsbHost*>(c)->starts; return true;
+                },
+                [](void* c,std::uint64_t) noexcept {
+                    auto& b=*static_cast<MockUsbHost*>(c); ++b.polls;
+                    auto result=b.event; b.event={};
+                    if (result.kind==UsbHostEventKind::Detached ||
+                        (result.token.generation==b.token.generation &&
+                         result.token.serial==b.token.serial &&
+                         result.kind!=UsbHostEventKind::None &&
+                         result.kind!=UsbHostEventKind::Ready)) b.pending=false;
+                    return result;
+                },
+                [](void* c,UsbTransferToken token,std::uint8_t) noexcept {
+                    auto& b=*static_cast<MockUsbHost*>(c);
+                    if (b.failSubmit || b.pending) return false;
+                    b.token=token; b.pending=true; ++b.submits; return true;
+                }};
+        }
+    };
+    const UsbHostConfig hostConfig{0x1234,0x5678,3,0x81,64,1,4,10000,true};
+    const UsbHostInterface hostInterface{0x1234,0x5678,3,0,3,0,0,0x81,3,1,64,true};
+    if (argc==2 && std::strcmp(argv[1],"--usb-host")==0) {
+        // 人工descriptor。音声などの別interfaceより後ろにあるHIDを明示選択。
+        const std::array<std::uint8_t,34> descriptor{
+            9,2,34,0,2,1,0,0x80,50,
+            9,4,0,0,0,1,1,0,0,
+            9,4,3,0,1,3,0,0,0,
+            7,5,0x81,3,64,0,1};
+        auto parsed=findDualSenseInterface(hostConfig,0x1234,0x5678,true,descriptor.data(),descriptor.size());
+        assert(parsed && matchesDualSenseInterface(hostConfig,*parsed));
+        auto bad=descriptor; bad[18]=0;
+        assert(!findDualSenseInterface(hostConfig,0x1234,0x5678,true,bad.data(),bad.size()));
+        bad=descriptor; bad[24]=1; // Boot subclass
+        assert(!findDualSenseInterface(hostConfig,0x1234,0x5678,true,bad.data(),bad.size()));
+        bad=descriptor; bad[31]=65;
+        assert(!findDualSenseInterface(hostConfig,0x1234,0x5678,true,bad.data(),bad.size()));
+        bad=descriptor; bad[29]=0x01;
+        assert(!findDualSenseInterface(hostConfig,0x1234,0x5678,true,bad.data(),bad.size()));
+        assert(!findDualSenseInterface(hostConfig,0x1234,0x5678,true,descriptor.data(),33));
+        assert(!findDualSenseInterface(hostConfig,0x1234,0x9999,true,descriptor.data(),descriptor.size()));
+        assert(!findDualSenseInterface(hostConfig,0x1234,0x5678,false,descriptor.data(),descriptor.size()));
+
+        MockUsbHost mock;
+        UsbHostPort port;
+        auto unverified=hostConfig; unverified.verified=false;
+        assert(!port.start(unverified,mock.backend()) && mock.starts==0);
+        assert(port.start(hostConfig,mock.backend()) && mock.starts==1);
+        // 列挙が終わらない期間にも毎回即時に戻り、報告を発行しない。
+        for (std::uint64_t t=0;t<=400000;t+=2000) port.poll(t);
+        assert(mock.polls==201 && !mock.submits && !port.takeReport());
+        mock.event={UsbHostEventKind::Ready,1,402000,hostInterface};
+        port.poll(402000);
+        auto conn=port.takeConnectionEvent(); assert(conn && conn->connected && conn->generation==1);
+        assert(!port.takeConnectionEvent());
+        port.poll(402001); assert(mock.submits==1 && mock.token.generation==1 && mock.token.serial==1);
+        auto first=mock.token;
+        mock.event={UsbHostEventKind::Done,1,402010,{},first,4,{1,128,128,0}};
+        port.poll(402020);
+        auto report=port.takeReport();
+        assert(report && report->receivedAtUs==402010 && report->length==4 && report->data[0]==1);
+        assert(!port.takeReport());
+        port.poll(402500); assert(mock.submits==1);
+        port.poll(403001); assert(mock.submits==2);
+        mock.event={UsbHostEventKind::Nak,1,403010,{},mock.token};
+        port.poll(403020); report=port.takeReport();
+        assert(report && report->length==0 && report->token.serial==2 && port.summary().naks==1);
+        port.poll(404001); assert(mock.submits==3);
+        mock.event={UsbHostEventKind::Done,1,404010,{},first,4,{1,128,128,1}};
+        port.poll(404020); assert(!port.takeReport() && port.summary().inFlight);
+        mock.event={UsbHostEventKind::Done,1,404030,{},mock.token,65};
+        port.poll(404040); report=port.takeReport();
+        assert(report && report->length==0 && port.summary().invalidReports==1);
+        port.poll(405001); assert(mock.submits==4);
+        mock.event={UsbHostEventKind::Stall,1,405010,{},mock.token};
+        port.poll(405020); conn=port.takeConnectionEvent();
+        assert(conn && !conn->connected && conn->generation==1 && !port.takeReport());
+        mock.event={UsbHostEventKind::Ready,1,406000,hostInterface};
+        port.poll(406000); assert(!port.takeConnectionEvent());
+        mock.event={UsbHostEventKind::Ready,2,407000,hostInterface};
+        port.poll(407000); conn=port.takeConnectionEvent();
+        assert(conn && conn->connected && conn->generation==2);
+        port.poll(407001); assert(mock.submits==5 && mock.token.generation==2 && mock.token.serial==1);
+        mock.event={UsbHostEventKind::Done,1,407010,{},first,4};
+        port.poll(407020); assert(!port.takeReport() && port.summary().inFlight);
+        port.poll(417001); conn=port.takeConnectionEvent();
+        assert(conn && !conn->connected && !port.summary().inFlight);
+        assert(port.summary().reports==1 && port.summary().faults==2);
+        std::puts("PASS: USB HID descriptors, finite polling, generation/serial, NAK, stall, timeout");
+        return 0;
+    }
     if (argc==2 && std::strcmp(argv[1],"--usb-input")==0) {
         using namespace balancing;
         // 人工の4バイト形式。実DualSenseの配置を表さない。
@@ -313,7 +413,8 @@ int main(int argc, char** argv)
     if (argc==2 && std::strncmp(argv[1],"--drive-sil",11)==0) {
         using namespace balancing;
         using namespace balancing::protocol;
-        const bool usbMode=std::strcmp(argv[1],"--drive-sil-usb")==0;
+        const bool usbHostMode=std::strcmp(argv[1],"--drive-sil-usb-host")==0;
+        const bool usbMode=std::strcmp(argv[1],"--drive-sil-usb")==0 || usbHostMode;
         const bool timeout=std::strcmp(argv[1],"--drive-sil-timeout")==0;
         const bool stale=std::strcmp(argv[1],"--drive-sil-stale")==0;
         const bool rsTimeout=std::strcmp(argv[1],"--drive-sil-rs-timeout")==0;
@@ -430,11 +531,31 @@ int main(int argc, char** argv)
         };
         if (usbMode) {
             auto* usb=applicationDualSense();
-            assert(usb && usb->connect(1,0));
+            assert(usb);
+            MockUsbHost host;
+            if (usbHostMode) {
+                assert(startApplicationUsbHost(hostConfig,host.backend()));
+                host.event={UsbHostEventKind::Ready,1,0,hostInterface};
+                balancing_app_poll();
+                assert(applicationObservation()->usbHost.connected);
+            } else assert(usb->connect(1,0));
             std::uint64_t serial=0;
+            std::uint64_t attachment=1;
+            const auto deliver=[&](std::uint64_t at,const std::array<std::uint8_t,4>& d) {
+                if (!usbHostMode) {
+                    assert(usb->receive(attachment,++serial,d.data(),d.size(),at,at));
+                    return;
+                }
+                balancing_app_poll(); // 必要なら新しい受信を一件だけ受付
+                assert(host.pending);
+                host.event={UsbHostEventKind::Done,attachment,at,{},host.token,d.size()};
+                for (std::size_t i=0;i<d.size();++i) host.event.data[i]=d[i];
+                balancing_app_poll(); // 完了配送
+                assert(applicationObservation()->usbHost.connected && !host.pending);
+            };
             auto report=[&](std::uint64_t at,unsigned buttons,unsigned speed=128) {
                 std::array<std::uint8_t,4> d{1,static_cast<std::uint8_t>(speed),128,static_cast<std::uint8_t>(buttons)};
-                assert(usb->receive(1,++serial,d.data(),d.size(),at-20,at-20));
+                deliver(at-20,d);
             };
             pre(2000,false); report(2000,0); auto res=tick(2000); drain();
             pre(4000,false); report(4000,0); res=tick(4000); drain();
@@ -450,14 +571,25 @@ int main(int argc, char** argv)
             pre(16000,true); report(16000,0,150); res=tick(16000); drain();
             assert(res.control.appliedReference->forwardVelocityMps>0);
             // USB切断はDISARMではなく、既存操作目標の減速を使う。
-            assert(usb->disconnect(1,17000));
+            if (usbHostMode) {
+                DWT->CYCCNT=17000u*168u;
+                host.event={UsbHostEventKind::Detached,1,17000};
+                balancing_app_poll();
+                assert(!applicationObservation()->usbHost.connected);
+            } else assert(usb->disconnect(1,17000));
             pre(18000,true); res=tick(18000); drain();
             assert(res.control.sequence.state==RobotState::Balancing &&
                    res.control.appliedReference->forwardVelocityMps==0);
-            assert(usb->connect(2,19000)); serial=0;
+            attachment=2; serial=0;
+            if (usbHostMode) {
+                DWT->CYCCNT=19000u*168u;
+                host.event={UsbHostEventKind::Ready,2,19000,hostInterface};
+                balancing_app_poll();
+                assert(applicationObservation()->usbHost.connected);
+            } else assert(usb->connect(2,19000));
             auto second=[&](std::uint64_t at,unsigned buttons) {
                 std::array<std::uint8_t,4> d{1,128,128,static_cast<std::uint8_t>(buttons)};
-                assert(usb->receive(2,++serial,d.data(),4,at-20,at-20));
+                deliver(at-20,d);
             };
             pre(20000,true); second(20000,0); res=tick(20000); drain();
             pre(22000,true); second(22000,2); res=tick(22000); drain();
