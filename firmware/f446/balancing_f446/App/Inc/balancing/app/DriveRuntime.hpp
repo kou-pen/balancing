@@ -17,7 +17,7 @@ struct DriveControlConfig {
 };
 
 /** @brief 制御周期の実行境界。リンクする実装をビルド対象ごとに選ぶ。
- * @note 本番側は非駆動のControlCycleのみを実行。実装は静的に一つ。
+ * @note 本番側は非駆動のControlCycleと明示設定済みの停止専用送信を実行。実装は静的に一つ。
  * @spec{BOARD-F446-001}
  */
 namespace drive_runtime {
@@ -43,11 +43,16 @@ ControlTickResult step(ControlCycle&,RobotSequence&,RemoteControlService&,
  */
 void finishCycle(RobotSequence&,RemoteControlService&,ApplicationObservation&,
                  std::uint64_t nowUs) noexcept;
-/** @brief 起動済みCANの所有者を借用する。非駆動実装は何もしない。
+/** @brief CAN開始前に停止専用設定と内部トークンの衝突を検査する。
+ * @spec{BOARD-F446-001}
+ */
+bool validateStopOutput(const MotorObservationConfig&,bool selfDefinedCan2,
+                        std::uint32_t diagnosticOrigin) noexcept;
+/** @brief 起動済みCANの所有者を借用する。設定は起動時固定。
  * @spec{BOARD-F446-001}
  */
 void bind(ControlCycle&,RobotSequence&,MotorService&,MotorCanLink&,
-          CanTxScheduler&,CanTxScheduler&) noexcept;
+          CanTxScheduler&,CanTxScheduler&,StopOutputConfig) noexcept;
 /** @brief 有限回の背景処理。
  * @spec{BOARD-F446-001}
  */
@@ -64,5 +69,5 @@ bool initializeApplicationRuntime(const Can2ObservationProfile&) noexcept;
 /** @brief Applicationの制御所有者を起動済みCAN実行境界へ結合する。
  * @spec{BOARD-F446-001}
  */
-void bindApplicationRuntime(MotorService&,MotorCanLink&,CanTxScheduler&,CanTxScheduler&) noexcept;
+void bindApplicationRuntime(MotorService&,MotorCanLink&,CanTxScheduler&,CanTxScheduler&,StopOutputConfig) noexcept;
 }

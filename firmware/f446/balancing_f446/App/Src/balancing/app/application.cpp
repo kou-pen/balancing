@@ -92,9 +92,9 @@ public:
     }
 
     void bindRuntime(MotorService& motors,MotorCanLink& link,CanTxScheduler& tx1,
-                     CanTxScheduler& tx2) noexcept
+                     CanTxScheduler& tx2,StopOutputConfig stop) noexcept
     {
-        if (control_) drive_runtime::bind(*control_->cycle,control_->sequence,motors,link,tx1,tx2);
+        if (control_) drive_runtime::bind(*control_->cycle,control_->sequence,motors,link,tx1,tx2,stop);
     }
     DualSenseService* usbLink() noexcept
     { return control_ && control_->usb.enabled()? &control_->usb:nullptr; }
@@ -363,9 +363,9 @@ bool initializeApplicationRuntime(const Can2ObservationProfile& profile) noexcep
 }
 
 void bindApplicationRuntime(MotorService& motors,MotorCanLink& link,CanTxScheduler& tx1,
-                            CanTxScheduler& tx2) noexcept
+                            CanTxScheduler& tx2,StopOutputConfig stop) noexcept
 {
-    application.bindRuntime(motors,link,tx1,tx2);
+    application.bindRuntime(motors,link,tx1,tx2,stop);
 }
 
 bool initializeCan2Observation(const Can2ObservationProfile& profile) noexcept

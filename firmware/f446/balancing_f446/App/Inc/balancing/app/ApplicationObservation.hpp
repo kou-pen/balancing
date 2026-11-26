@@ -13,6 +13,18 @@
 #include "balancing/device/MotorObservation.hpp"
 
 namespace balancing {
+/** @brief 停止専用送信の診断。送達と物理停止は別。
+ * @spec{BEHAV-001}
+ * @spec{BOARD-F446-001}
+ */
+struct StopOutputSummary {
+    bool enabled{};
+    std::array<Rs06MotorStatus,4> rs06{};
+    std::uint64_t zeroQueued{},zeroAccepted{},zeroSent{},zeroDropped{},zeroFailed{};
+    std::optional<std::uint64_t> lastZeroSentUs{};
+    FaultFlags outputFaults{FaultFlags::None};
+};
+
 /** @brief 非駆動Applicationの一周期分の観測・推定結果。古い結果を再公開しない。
  * @spec{BOARD-F446-001}
  * @spec{CTRL-EST-001}
@@ -32,6 +44,7 @@ struct ApplicationObservation {
     UsbHostSummary usbHost{};
     CycleHealthSnapshot cycleHealth{};
     WatchdogSummary watchdog{};
+    StopOutputSummary stopOutput{};
 };
 
 /** @brief 主ループで最後の周期診断を取得。初期化前は空。

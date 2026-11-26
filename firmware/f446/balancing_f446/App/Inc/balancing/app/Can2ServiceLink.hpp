@@ -44,6 +44,10 @@ public:
      * @spec{BOARD-F446-001}
      */
     bool enabled() const noexcept { return enabled_; }
+    /** @brief CAN2内部送信トークンの発行元。ワイヤIDではない。
+     * @spec{BOARD-F446-001}
+     */
+    std::uint32_t tokenOrigin() const noexcept { return config_.tokenOrigin; }
     /** @brief Routerの主ループ配送。受信時刻と評価時刻は共通時計[us]。
      * @spec{PROTO-REMOTE-001}
      */

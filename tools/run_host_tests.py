@@ -78,6 +78,8 @@ cpp_common = [
     str(F446_APP / "Inc"),
     str(F446_APP / "Src" / "balancing" / "app" / "application.cpp"),
     str(app_source / "app" / "DriveRuntime.cpp"),
+    *motor_codec_sources,
+    *[str(app_source / n) for n in ("app/MotorCanLink.cpp","app/MotorService.cpp","device/Rs06Motor.cpp","device/C620Motor.cpp")],
     str(ROOT / "tests" / "test_cpp_app.cpp"),
     "-I", str(ROOT / "tests" / "stubs_can1"),
     str(app_source / "communication/can/CanPort.cpp"),
@@ -304,6 +306,14 @@ for test, extra_sources in [
                        check=True, cwd=ROOT, timeout=30)
         subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
         if test == "test_f446_can1_runtime":
+            # Reuse the runtime source list but never compile/link the SIL implementation.
+            production=[x for x in extra_sources if "/tests/sil/" not in x and not x.endswith("/MotorFramePlan.cpp")]
+            stop_path=OUT / f"test_f446_stop_output{suffix}"
+            subprocess.run(can_dispatch_common + production +
+                [str(rs06_source / "app/DriveRuntime.cpp"),str(ROOT / "tests/test_f446_stop_output.cpp")] +
+                flags + ["-lm","-o",str(stop_path)],check=True,cwd=ROOT,timeout=30)
+            for mode in ("default","collision","normal","timing","faults","retry"):
+                subprocess.run([str(stop_path),"--"+mode],check=True,cwd=ROOT,timeout=30)
             subprocess.run([str(path), "--rollback-failure"], check=True, cwd=ROOT, timeout=30)
             subprocess.run([str(path), "--motor-observation"], check=True, cwd=ROOT, timeout=30)
             subprocess.run([str(path), "--can2-services"], check=True, cwd=ROOT, timeout=30)

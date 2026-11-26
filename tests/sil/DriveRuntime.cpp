@@ -57,8 +57,9 @@ void finishCycle(RobotSequence& sequence,RemoteControlService& remote,
 {
     if (!drive) observation.operatorTarget=remote.update(sequence.state(),nowUs);
 }
+bool validateStopOutput(const MotorObservationConfig& c,bool,std::uint32_t) noexcept { return !c.stopOutput.enabled; }
 void bind(ControlCycle& cycle,RobotSequence& sequence,MotorService& motors,MotorCanLink& link,
-          CanTxScheduler& tx1,CanTxScheduler& tx2) noexcept
+          CanTxScheduler& tx1,CanTxScheduler& tx2,StopOutputConfig) noexcept
 {
     if (profile && !drive) drive.emplace(cycle,sequence,motors,link,tx1,tx2,profile->tx);
 }

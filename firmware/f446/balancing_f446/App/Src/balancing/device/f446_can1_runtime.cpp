@@ -78,7 +78,7 @@ public:
           motors_{config.rs06MappingVerified ? config.rs06 : balancing::Rs06BusConfig{},
                   config.wheelContinuity},
           link_{motors_, tx1_}, mappingVerified_{config.rs06MappingVerified && motors_.hasRs06Configuration()},
-          selfDefinedCan2_{selfDefinedCan2}, clock_{cyclesPerUs}
+          selfDefinedCan2_{selfDefinedCan2}, stopOutput_{config.stopOutput}, clock_{cyclesPerUs}
     {
     }
 
@@ -107,9 +107,10 @@ public:
 
     void bindApplication() noexcept
     {
-        if (selfDefinedCan2_) balancing::bindApplicationRuntime(motors_,link_,tx1_,tx2_);
+        if (selfDefinedCan2_) balancing::bindApplicationRuntime(motors_,link_,tx1_,tx2_,stopOutput_);
     }
     bool selfDefinedCan2() const noexcept { return selfDefinedCan2_; }
+    bool stopOutputEnabled() const noexcept { return stopOutput_.enabled; }
 
     void serviceCan2Tx() noexcept
     {
@@ -209,6 +210,7 @@ private:
     balancing::MotorCanLink link_;
     bool mappingVerified_;
     bool selfDefinedCan2_;
+    balancing::StopOutputConfig stopOutput_;
     std::uint64_t observationGeneration_{0};
     balancing::FaultFlags pendingFaults_{balancing::FaultFlags::None};
     balancing::CanClock clock_;
@@ -232,10 +234,13 @@ bool balancing::startCanObservation(CAN_HandleTypeDef* can1, CAN_HandleTypeDef* 
                                     const MotorObservationConfig& config,bool selfDefinedCan2) noexcept
 {
     if (started) {
+        if (config.stopOutput.enabled || runtime->stopOutputEnabled()) return false;
         return &runtime->handle1 == can1 && &runtime->handle2 == can2 &&
                runtime->selfDefinedCan2()==selfDefinedCan2;
     }
-    if ((selfDefinedCan2 && !applicationCan2Link()) || rollbackFailed || runtime || can1 == nullptr || can2 == nullptr ||
+    const auto* can2Link=applicationCan2Link();
+    if (!drive_runtime::validateStopOutput(config,selfDefinedCan2,can2Link?can2Link->tokenOrigin():0u)) return false;
+    if ((selfDefinedCan2 && !can2Link) || rollbackFailed || runtime || can1 == nullptr || can2 == nullptr ||
         can1->Instance != CAN1 || can2->Instance != CAN2 ||
         HAL_CAN_GetState(can1) != HAL_CAN_STATE_READY ||
         HAL_CAN_GetState(can2) != HAL_CAN_STATE_READY ||
