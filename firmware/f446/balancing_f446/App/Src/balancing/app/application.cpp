@@ -3,6 +3,8 @@
 #include "balancing/app/DriveRuntime.hpp"
 #include "balancing/device/ImuObservation.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <optional>
 
@@ -12,6 +14,90 @@
  * いかなるモータ送信・ARM処理も開始しない。
  */
 namespace balancing {
+namespace {
+using Issue=ArmReadinessIssue;
+constexpr auto missingCan=Issue::Rs06Mapping|Issue::LeftWheelContinuity|
+    Issue::RightWheelContinuity|Issue::Can2NotConfigured;
+constexpr auto missingObservation=Issue::NoCycleObservation|Issue::ImuUnavailable|
+    Issue::MotorsUnavailable|Issue::PowerUnavailable|Issue::EstimateUnavailable|
+    Issue::MechanismUnverified;
+
+void require(Issue& issues,bool valid,Issue reason) noexcept
+{
+    if (!valid) issues=issues|reason;
+}
+}
+
+ArmReadinessIssue inspectArmConfiguration(const DriveControlConfig& cfg) noexcept
+{
+    // 数学モデルと非ゼロ出力の接続が未完成。人工値が形式検査を通っても
+    // この理由は消えない。RobotSequenceへの許可をここで作らない。
+    auto issues=Issue::DrivePathUnavailable;
+    require(issues,cfg.arm.verified && cfg.arm.durationUs!=0,Issue::ArmDeadline);
+    for (unsigned i=0;i<2;++i) {
+        require(issues,LegKinematics::validCalibration(cfg.estimator.legs[i].motor),
+                i==0?Issue::LeftLegCalibration:Issue::RightLegCalibration);
+        require(issues,LegKinematics::validFixtureGeometry(cfg.estimator.legs[i].fixture),
+                i==0?Issue::LeftLegGeometry:Issue::RightLegGeometry);
+        require(issues,WheelOdometry::validConfig(cfg.estimator.wheels[i]),
+                i==0?Issue::LeftWheelCalibration:Issue::RightWheelCalibration);
+    }
+    // 既存の数学関数を局所値で検査。ゼロ誤差で数値の形式を確認するだけで、
+    // 実機ゲインや可動範囲を認定しない。実行中のPI積分器には触れない。
+    LqrTorque lqr{};
+    require(issues,balance_math::computeLqr(cfg.controller.lqr,{},{},lqr),Issue::Lqr);
+    LegPdOutput leg{};
+    require(issues,balance_math::computeLegSupport({1.0f,0.0f,true},cfg.controller.legPd,
+                  {1.0f,1.0f,0,0,0,0},leg),Issue::LegPd);
+    YawPiState state{};YawPiOutput yaw{};
+    require(issues,balance_math::stepYaw(state,cfg.controller.yawPi,{0,0,1,0,true},yaw),Issue::YawPi);
+    WheelAllocation wheels{};
+    require(issues,balance_math::allocateWheels(0,0,cfg.controller.wheelTorqueLimitNm[0],
+                    cfg.controller.wheelTorqueLimitNm[1],wheels),Issue::WheelTorqueLimits);
+    constexpr std::array<Issue,4> rsIssues{Issue::LeftLegAConversion,Issue::LeftLegBConversion,
+        Issue::RightLegAConversion,Issue::RightLegBConversion};
+    for (unsigned i=0;i<4;++i)
+        require(issues,MotorCommand::valid(cfg.converter.rs06[i]),rsIssues[i]);
+    for (unsigned i=0;i<2;++i)
+        require(issues,MotorCommand::valid(cfg.converter.c620[i]),
+                i==0?Issue::LeftWheelConversion:Issue::RightWheelConversion);
+    return issues;
+}
+
+ArmReadinessIssue inspectArmMotorConfiguration(const MotorObservationConfig& cfg,bool can2Configured) noexcept
+{
+    auto issues=Issue::None;
+    require(issues,cfg.rs06MappingVerified && MotorService::validRs06Ids(cfg.rs06.motorIds),Issue::Rs06Mapping);
+    require(issues,C620Motor::validConfig(cfg.wheelContinuity[0]),Issue::LeftWheelContinuity);
+    require(issues,C620Motor::validConfig(cfg.wheelContinuity[1]),Issue::RightWheelContinuity);
+    require(issues,can2Configured,Issue::Can2NotConfigured);
+    return issues;
+}
+
+ArmReadinessIssue inspectArmObservations(const ApplicationObservation& obs) noexcept
+{
+    // 実機の関節可動範囲・干渉判定は未接続。初期姿勢や脚長の範囲を
+    // ARM条件として新設しない。ここは診断のみ。
+    auto issues=Issue::MechanismUnverified;
+    if (!obs.cycle || !obs.motors || !obs.timing.sample_valid) {
+        issues=missingObservation;
+    } else {
+        require(issues,obs.imu.valid && obs.imu.fresh,Issue::ImuUnavailable);
+        const auto& m=*obs.motors;
+        const bool rs=std::all_of(m.motors.rs06.begin(),m.motors.rs06.end(),
+            [](const auto& a){return a.fresh && a.latest.has_value();});
+        const bool wheel=std::all_of(m.motors.c620.begin(),m.motors.c620.end(),
+            [](const auto& a){return a.fresh && a.latest && a.position &&
+                a.continuity==C620ContinuityStatus::Continuous;});
+        require(issues,rs && wheel && m.rs06MappingVerified && !m.can1BusOff && !m.can2BusOff,
+                Issue::MotorsUnavailable);
+        require(issues,obs.power.ready,Issue::PowerUnavailable);
+        require(issues,obs.cycle->estimate.has_value(),Issue::EstimateUnavailable);
+        require(issues,obs.cycle->sequence.state==RobotState::Disarmed,Issue::NotDisarmed);
+    }
+    require(issues,!obs.fault && (!obs.cycle || obs.cycle->observedFaults==FaultFlags::None),Issue::FaultActive);
+    return issues;
+}
 
 // 起動時固定の非駆動プロファイル。CAD・校正・ゲイン・上限・ARM期限の
 // 未検証値を人工fixtureで埋めない。所有者の寿命はControlCycleより長い。
@@ -72,13 +158,23 @@ public:
         ticket_.reset();
         watchdog_=WatchdogPort{profile.watchdog};
         observation_.watchdog=watchdog_.summary();
-        control_.emplace(profile,drive_runtime::configuration());
+        const auto driveConfig=drive_runtime::configuration();
+        control_.emplace(profile,driveConfig);
+        driveIssues_=inspectArmConfiguration(driveConfig);
+        observation_.armReadiness={driveIssues_|motorIssues_,missingObservation};
         if (requireCan2 && !control_->can2.enabled()) {
             control_.reset();
             return false;
         }
         initialized_ = true;
         return true;
+    }
+
+    void recordMotorConfiguration(const MotorObservationConfig& cfg,bool can2Configured) noexcept
+    {
+        // CANが成功した起動の固定値だけを保存。拒否した設定で診断を上書きしない。
+        motorIssues_=inspectArmMotorConfiguration(cfg,can2Configured);
+        observation_.armReadiness.configuration=driveIssues_|motorIssues_;
     }
 
     bool bindWatchdog(WatchdogConfig config) noexcept
@@ -150,6 +246,7 @@ public:
         }
         observation_.cycleHealth=health_.summary();
         observation_.watchdog=watchdog_.summary();
+        observation_.armReadiness.observation=inspectArmObservations(observation_);
     }
 
     bool controlTick() noexcept
@@ -340,6 +437,8 @@ private:
         control_->can2.publishTelemetry(frames,nowUs);
     }
 
+    Issue driveIssues_{Issue::DrivePathUnavailable};
+    Issue motorIssues_{missingCan};
     CycleHealthMonitor health_{};
     WatchdogPort watchdog_{};
     std::optional<CycleTicket> ticket_{};
@@ -376,6 +475,9 @@ bool initializeCan2Observation(const Can2ObservationProfile& profile) noexcept
     application.init(profile);
     return application.can2Link()!=nullptr;
 }
+
+void recordApplicationMotorConfiguration(const MotorObservationConfig& cfg,bool can2Configured) noexcept
+{ application.recordMotorConfiguration(cfg,can2Configured); }
 
 bool bindApplicationWatchdog(WatchdogConfig config) noexcept { return application.bindWatchdog(config); }
 

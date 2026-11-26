@@ -3,16 +3,12 @@
 #include <algorithm>
 
 namespace balancing {
-namespace {
-
-bool validMotorIds(const std::array<std::uint8_t, 4>& ids) noexcept
+bool MotorService::validRs06Ids(const std::array<std::uint8_t, 4>& ids) noexcept
 {
     auto sorted = ids;
     std::sort(sorted.begin(), sorted.end());
     return sorted.front() != 0 && std::adjacent_find(sorted.begin(), sorted.end()) == sorted.end();
 }
-
-} // namespace
 
 MotorService::MotorService(const Rs06BusConfig& config,
                            const std::array<C620ContinuityConfig, 2>& wheelContinuity) noexcept
@@ -20,7 +16,7 @@ MotorService::MotorService(const Rs06BusConfig& config,
       rs06_{{{config.motorIds[0], config.hostId}, {config.motorIds[1], config.hostId},
              {config.motorIds[2], config.hostId}, {config.motorIds[3], config.hostId}}},
       c620_{{C620Motor{wheelContinuity[0]}, C620Motor{wheelContinuity[1]}}},
-      configured_{validMotorIds(config.motorIds)}
+      configured_{validRs06Ids(config.motorIds)}
 {
 }
 

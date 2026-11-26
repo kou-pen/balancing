@@ -2,7 +2,6 @@
 #include "balancing/app/MotorCanLink.hpp"
 #include "balancing/communication/can/CanTxScheduler.hpp"
 #include "balancing/communication/C620Codec.hpp"
-#include <algorithm>
 #include <limits>
 
 namespace balancing::drive_runtime {
@@ -101,9 +100,7 @@ bool validateStopOutput(const MotorObservationConfig& config,bool selfDefinedCan
     if (!config.stopOutput.verified || !config.rs06MappingVerified ||
         !selfDefinedCan2 || !diagnosticOrigin || diagnosticOrigin==kZeroOrigin || stop) return false;
     // ID1/2の車輪割当と他チャネル未使用はverifiedの対象。RS06は同一バス内で重複不可。
-    auto ids=config.rs06.motorIds;
-    std::sort(ids.begin(),ids.end());
-    return ids.front()!=0 && std::adjacent_find(ids.begin(),ids.end())==ids.end();
+    return MotorService::validRs06Ids(config.rs06.motorIds);
 }
 
 ControlTickResult step(ControlCycle& cycle,RobotSequence&,RemoteControlService&,

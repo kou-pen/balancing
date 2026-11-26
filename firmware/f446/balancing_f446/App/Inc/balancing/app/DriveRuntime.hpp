@@ -16,6 +16,24 @@ struct DriveControlConfig {
     MotorCommandConfig converter{};
 };
 
+/** @brief 固定数学設定の形式検査。人工設定でも実機駆動未接続を必ず報告する。
+ * @spec{BEHAV-001}
+ * @spec{BOARD-F446-001}
+ */
+ArmReadinessIssue inspectArmConfiguration(const DriveControlConfig&) noexcept;
+/** @brief 起動済みCANの固定設定の不足を報告。ハードウェアにアクセスしない。
+ * @spec{BOARD-F446-001}
+ */
+ArmReadinessIssue inspectArmMotorConfiguration(const MotorObservationConfig&,bool can2Configured) noexcept;
+/** @brief 当該周期の観測の不足を診断。状態機械・送信許可は変更しない。
+ * @spec{BEHAV-001}
+ */
+ArmReadinessIssue inspectArmObservations(const ApplicationObservation&) noexcept;
+/** @brief CAN起動成功後の設定診断を保存。受信専用起動でも呼ぶ。
+ * @spec{BOARD-F446-001}
+ */
+void recordApplicationMotorConfiguration(const MotorObservationConfig&,bool can2Configured) noexcept;
+
 /** @brief 制御周期の実行境界。リンクする実装をビルド対象ごとに選ぶ。
  * @note 本番側は非駆動のControlCycleと明示設定済みの停止専用送信を実行。実装は静的に一つ。
  * @spec{BOARD-F446-001}

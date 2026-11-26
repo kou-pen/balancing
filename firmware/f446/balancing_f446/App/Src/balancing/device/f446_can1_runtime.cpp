@@ -289,6 +289,7 @@ bool balancing::startCanObservation(CAN_HandleTypeDef* can1, CAN_HandleTypeDef* 
     }
     started = true;
     runtime->bindApplication();
+    recordApplicationMotorConfiguration(config,selfDefinedCan2);
     return true;
 }
 
