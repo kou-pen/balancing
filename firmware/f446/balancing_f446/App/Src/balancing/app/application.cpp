@@ -95,7 +95,7 @@ public:
         observation_.usbHost=control_->usbHost.summary();
         return started;
     }
-    bool selectUsb(BOperatorSource target,std::uint64_t now) noexcept
+    bool selectUsb(OperatorSource target,std::uint64_t now) noexcept
     { return usbLink() && usbLink()->selectSource(target,control_->sequence.state(),now); }
     Can2ServiceLink* can2Link() noexcept
     {
@@ -366,7 +366,7 @@ bool initializeCan2Observation(const Can2ObservationProfile& profile) noexcept
 DualSenseService* applicationDualSense() noexcept { return application.usbLink(); }
 bool startApplicationUsbHost(UsbHostConfig config,UsbHostBackend backend) noexcept
 { return application.startUsbHost(config,backend); }
-bool selectApplicationUsbSource(BOperatorSource target,std::uint64_t now) noexcept
+bool selectApplicationUsbSource(OperatorSource target,std::uint64_t now) noexcept
 { return application.selectUsb(target,now); }
 
 Can2ServiceLink* applicationCan2Link() noexcept

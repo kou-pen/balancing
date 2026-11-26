@@ -150,7 +150,7 @@ Can2CycleInput Can2ServiceLink::takeCycleInput(std::uint64_t nowUs,RobotState st
     switch(request->value.kind) {
     case RemoteRequestKind::SelectSource: {
         const auto source=*request->value.source==WireInputSource::UsbDualSense
-            ? B_OPERATOR_USB_DUALSENSE : B_OPERATOR_CAN_REMOTE;
+            ? OperatorSource::UsbDualSense : OperatorSource::CanRemote;
         const auto old=remote_.selectedSource();
         const bool accepted=remote_.selectSource(source,state);
         // 切替前に採取された未回収フレームを新しい操作元の入力として扱わない。
@@ -160,7 +160,7 @@ Can2CycleInput Can2ServiceLink::takeCycleInput(std::uint64_t nowUs,RobotState st
         break;
     }
     case RemoteRequestKind::Arm:
-        if (remote_.selectedSource()!=B_OPERATOR_CAN_REMOTE) {
+        if (remote_.selectedSource()!=OperatorSource::CanRemote) {
             remoteResult(*request,ResultCode::Unauthorized,state,nowUs);
         } else {
             input.operations.arm=true;

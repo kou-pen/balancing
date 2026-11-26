@@ -22,7 +22,7 @@ struct ApplicationObservation {
     std::optional<MotorObservationSnapshot> motors{};
     ImuAttitude imu{};
     PowerBoardSnapshot power{};
-    std::optional<BOperatorTarget> operatorTarget{};
+    std::optional<OperatorTarget> operatorTarget{};
     std::optional<ControlTickResult> cycle{};
     std::optional<FaultRecord> fault{};
     DiagnosticSummary diagnostics{};
@@ -45,7 +45,7 @@ std::optional<ApplicationObservation> applicationObservation() noexcept;
  */
 struct Can2ObservationProfile {
     Can2ServiceConfig communication{};
-    BOperatorInputConfig operatorConfig{};
+    OperatorInputConfig operatorConfig{};
     DiagnosticSlot* faultSlots{};
     std::size_t faultCapacity{};
     DualSenseConfig usb{};
@@ -72,7 +72,7 @@ bool startApplicationUsbHost(UsbHostConfig,UsbHostBackend) noexcept;
 /** @brief USB側の明示操作元選択。状態判断はApplicationの現在状態を用いる。
  * @spec{PROTO-PS5-001}
  */
-bool selectApplicationUsbSource(BOperatorSource target,std::uint64_t nowUs) noexcept;
+bool selectApplicationUsbSource(OperatorSource target,std::uint64_t nowUs) noexcept;
 /** @brief CANランタイムの背景送信を一度進める。既定起動では何もしない。
  * @spec{BOARD-F446-001}
  */

@@ -58,7 +58,7 @@ public:
     /** @brief USB側の明示選択要求。ボタン割当は未確定。
      * @spec{PROTO-PS5-001}
      */
-    bool selectSource(BOperatorSource target,RobotState state,std::uint64_t nowUs) noexcept;
+    bool selectSource(OperatorSource target,RobotState state,std::uint64_t nowUs) noexcept;
     bool enabled() const noexcept { return input_.enabled() && config_.armHoldUs && config_.disarmHoldUs; }
 private:
     struct Hold {
@@ -72,7 +72,7 @@ private:
     DualSenseConfig config_;
     UsbHidInput input_;
     Hold arm_{},disarm_{};
-    std::optional<BOperatorSource> source_{};
+    std::optional<OperatorSource> source_{};
     bool pendingArm_{},pendingDisarm_{};
 };
 }

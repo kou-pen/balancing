@@ -1,7 +1,7 @@
 #pragma once
 
 #include "balancing/app/RobotSequence.hpp"
-#include "balancing/app/balancing_operator_input.h"
+#include "balancing/app/RemoteControlService.hpp"
 #include "balancing/control/controller/BalanceControl.hpp"
 #include "balancing/control/controller/MotorCommand.hpp"
 #include "balancing/control/estimator/StateEstimator.hpp"
@@ -25,7 +25,7 @@ struct ControlTickInput {
     FaultFlags observedFaults{FaultFlags::None};
     BalanceReference target{};
     // 明示SIL時のみ使用。実測推定から移動位置基準を生成する候補則。
-    std::optional<BOperatorTarget> movingTarget{};
+    std::optional<OperatorTarget> movingTarget{};
     // 初回のみ使用。TIM7の単なるカウントから実測時刻を捏造しない。
     std::chrono::microseconds firstElapsed{0};
 };

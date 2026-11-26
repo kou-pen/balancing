@@ -38,8 +38,8 @@ bool DualSenseService::receive(std::uint64_t g,std::uint64_t serial,const std::u
     if (!decoded) return false;
     // DISARMは速度設定や選択元の制約に従属させない。
     pendingDisarm_ |= disarm_.update(decoded->circle,at,config_.disarmHoldUs);
-    if (source_==B_OPERATOR_USB_DUALSENSE) {
-        if (remote_.acceptDecoded(B_OPERATOR_USB_DUALSENSE,{true,at,decoded->speedMps,decoded->yawRadS},true,now))
+    if (source_==OperatorSource::UsbDualSense) {
+        if (remote_.acceptDecoded(OperatorSource::UsbDualSense,{true,at,decoded->speedMps,decoded->yawRadS},true,now))
             pendingArm_ |= arm_.update(decoded->options,at,config_.armHoldUs);
         else { arm_={}; pendingArm_=false; }
     }
@@ -52,11 +52,11 @@ OperatorEvents DualSenseService::takeEvents(std::uint64_t now) noexcept {
     if (!input_.fresh(now)) resetInput();
     OperatorEvents out{};
     out.disarm=pendingDisarm_;
-    out.arm=pendingArm_ && !out.disarm && source_==B_OPERATOR_USB_DUALSENSE;
+    out.arm=pendingArm_ && !out.disarm && source_==OperatorSource::UsbDualSense;
     pendingArm_=pendingDisarm_=false;
     return out;
 }
-bool DualSenseService::selectSource(BOperatorSource target,RobotState state,std::uint64_t now) noexcept {
+bool DualSenseService::selectSource(OperatorSource target,RobotState state,std::uint64_t now) noexcept {
     if (!enabled() || !input_.fresh(now) || !remote_.selectSource(target,state)) return false;
     syncSource(); return true;
 }
