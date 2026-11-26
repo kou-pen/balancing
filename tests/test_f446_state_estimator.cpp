@@ -1,5 +1,5 @@
 #include "balancing/control/estimator/StateEstimator.hpp"
-#include "balancing/control/filter/balancing_attitude_filter.h"
+#include "balancing/control/filter/ImuAttitudeSource.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -34,29 +34,29 @@ void near(float actual, float expected, float tolerance = 1.0e-5f)
     assert(std::isfinite(actual) && std::fabs(actual - expected) <= tolerance);
 }
 
-ImuAttitude filteredAttitude(BAttitudeFilter& filter, std::uint64_t atUs)
+ImuAttitude filteredAttitude(AttitudeFilterState& filter, std::uint64_t atUs)
 {
     // 旧C11の実際のバイアス学習と相補フィルタを通してからC++へ渡す。
-    const BImuSample level{{0.0f, 0.0f, 9.81f}, {0.1f, -0.2f, 0.05f}};
-    BAttitudeEstimate output{};
-    assert(b_attitude_update(&filter, &level, true, atUs, atUs, &output));
+    const ImuSample level{{0.0f, 0.0f, 9.81f}, {0.1f, -0.2f, 0.05f}};
+    AttitudeEstimate output{};
+    assert(attitude_math::update(filter, level, true, atUs, atUs, output));
     assert(output.valid);
     return {output.stamp_us, output.pitch_rad, output.roll_rad,
             output.pitch_rate_rad_s, output.roll_rate_rad_s, output.yaw_rate_rad_s,
             output.valid, true};
 }
 
-BAttitudeFilter calibratedFilter()
+AttitudeFilterState calibratedFilter()
 {
-    BAttitudeFilter filter{};
-    const BAttitudeFilterConfig config{
+    AttitudeFilterState filter{};
+    const AttitudeFilterConfig config{
         {{0u, 1u, 2u}, {1, 1, 1}, true},
         2u, 8.0f, 11.0f, 0.9f, 0.01f, true
     };
-    const BImuSample level{{0.0f, 0.0f, 9.81f}, {0.1f, -0.2f, 0.05f}};
-    assert(b_attitude_init(&filter, &config));
-    assert(b_attitude_add_static_sample(&filter, &level, true, true, 1000, 1000));
-    assert(b_attitude_add_static_sample(&filter, &level, true, true, 2000, 2000));
+    const ImuSample level{{0.0f, 0.0f, 9.81f}, {0.1f, -0.2f, 0.05f}};
+    assert(attitude_math::initialize(filter, config));
+    assert(attitude_math::addStaticSample(filter, level, true, true, 1000, 1000));
+    assert(attitude_math::addStaticSample(filter, level, true, true, 2000, 2000));
     return filter;
 }
 
@@ -96,7 +96,7 @@ void testSixAxisAndImuOneTick()
     motors.onC620Frame(kLeft, 7000);
     motors.onC620Frame(kRight, 7001);
 
-    BAttitudeFilter filter = calibratedFilter();
+    AttitudeFilterState filter = calibratedFilter();
     StateEstimator estimator{fixtureConfig()};
     StateEstimatorInput input{};
     input.imu = filteredAttitude(filter, 7000);
