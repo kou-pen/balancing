@@ -62,6 +62,10 @@ public:
         if (control_) control_->indicatorOutput.disable();
         observation_ = {};
         previousUs_.reset();
+        health_={};
+        ticket_.reset();
+        watchdog_=WatchdogPort{profile.watchdog};
+        observation_.watchdog=watchdog_.summary();
         control_.emplace(profile,drive_runtime::configuration());
         if (requireCan2 && !control_->can2.enabled()) {
             control_.reset();
@@ -89,10 +93,43 @@ public:
      * 既存mainが両CANイベントを回収した直後の非駆動周期。
      * 実測時刻を採用し、TIM7の呼出し回数から2msを仮定しない。
      */
-    void controlTick() noexcept
+    void beginScheduledTick(std::uint32_t eventSequence) noexcept
+    {
+        if (!initialized_) return;
+        ticket_.reset();
+        if (const auto now=observationClockUs()) {
+            const CycleTicket ticket{eventSequence,*now};
+            if (health_.begin(ticket)) ticket_=ticket;
+        } else {
+            health_.abandon();
+        }
+        observation_.cycleHealth=health_.summary();
+    }
+
+    void runTick() noexcept
+    {
+        if (!initialized_) return;
+        const bool processed=controlTick();
+        if (ticket_) {
+            // CAN回収から診断・表示まで戻った後にだけ証跡を確定する。
+            if (const auto now=observationClockUs()) {
+                if (const auto completion=health_.complete(*ticket_,*now,processed))
+                    (void)watchdog_.refresh(*completion);
+            } else {
+                health_.abandon();
+            }
+            ticket_.reset();
+        } else {
+            health_.abandon();
+        }
+        observation_.cycleHealth=health_.summary();
+        observation_.watchdog=watchdog_.summary();
+    }
+
+    bool controlTick() noexcept
     {
         if (!initialized_) {
-            return;
+            return false;
         }
 
         auto& timing_ = observation_.timing;
@@ -118,14 +155,15 @@ public:
             // 取得不能区間をまたいだ差分は一周期の実測値として公開しない。
             previousUs_.reset();
             if (!drive_runtime::handlesInvalidTiming()) control_->breakTiming();
-            return;
+            return false;
         }
         const auto nowUs = motors->motors.sampledAtUs;
+        const bool monotonicSample=!previousUs_ || nowUs>*previousUs_;
         if (previousUs_) {
             if (nowUs == *previousUs_) {
                 control_->can2.publishTelemetry({},nowUs);
                 ++timing_.duplicate_samples;
-                if (!drive_runtime::handlesInvalidTiming()) return;
+                if (!drive_runtime::handlesInvalidTiming()) return false;
             }
             if (nowUs < *previousUs_) {
                 // 逆行した時計で正常な基準を巻き戻さない。
@@ -136,7 +174,7 @@ public:
                     control_->sequence.currentFault(),nowUs);
                 control_->indicatorOutput.disable();
                 observation_.indicatorOutput=control_->indicatorOutput.summary();
-                if (!drive_runtime::handlesInvalidTiming()) return;
+                if (!drive_runtime::handlesInvalidTiming()) return false;
             }
             if (nowUs>*previousUs_) {
                 timing_.elapsed_us = nowUs - *previousUs_;
@@ -183,8 +221,9 @@ public:
         observation_.indicatorOutput=control_->indicatorOutput.summary();
         // 最新コピーを周期で消費してからのみ、受信側の異常を解除する。
         // 受信側のfault消費は実機FAULT解除ではない。
-        (void)acknowledgeMotorObservation(motors->generation);
-        // 駆動送信の有無はリンクした実行境界が所有する。Applicationから直接は呼ばない。
+        const bool consumed=acknowledgeMotorObservation(motors->generation);
+        // FAULTの停止処理も一周期の完了。重複/逆行/未消費では更新しない。
+        return consumed && monotonicSample && (!ticket_ || nowUs>=ticket_->startedAtUs);
     }
 
     /*
@@ -261,6 +300,9 @@ private:
         control_->can2.publishTelemetry(frames,nowUs);
     }
 
+    CycleHealthMonitor health_{};
+    WatchdogPort watchdog_{};
+    std::optional<CycleTicket> ticket_{};
     ApplicationObservation observation_{};
     std::optional<ObservationCycle> control_{};
     std::optional<std::uint64_t> previousUs_{};
@@ -319,10 +361,16 @@ void balancing_app_init(void)
     if (!balancing::applicationCan2Link()) balancing::application.init();
 }
 
+/* タイマ番号をCAN回収前に記録。主ループからだけ呼ぶ。 */
+void balancing_app_begin_control_tick(uint32_t event_sequence)
+{
+    balancing::application.beginScheduledTick(event_sequence);
+}
+
 /* メインのタイマ側から呼ぶC ABI。制御ロジックはC++内に閉じる。 */
 void balancing_app_control_tick(void)
 {
-    balancing::application.controlTick();
+    balancing::application.runTick();
 }
 
 /* 低優先度のポーリング入口。ISR内のブロッキング動作を増やさない。 */

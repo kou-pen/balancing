@@ -645,3 +645,16 @@ flowchart LR
 ```
 
 F446のRGB/BUZZERは生成main.hの定義を利用する。明示設定なしではGPIOに書き込まない。実機のパターン・極性・ブザー方式は未検証。
+
+## 制御周期完了とIWDG更新
+
+```mermaid
+flowchart TD
+    I["TIM7 ISR：pendingと番号"] --> A["Application：開始記録"]
+    A --> C["CAN回収・制御・診断・表示"]
+    C --> H["CycleHealthMonitor：完了照合"]
+    H -->|"健全な新規完了のみ"| W["WatchdogPort：明示設定時に更新"]
+    H -->|"欠落・未完了・逆行"| N["更新しない"]
+```
+
+IWDG実機起動は未実施。既存の6ms FAULT判断はControlCycleが保持する。

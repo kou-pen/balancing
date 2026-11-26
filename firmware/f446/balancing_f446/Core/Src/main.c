@@ -55,6 +55,7 @@ HCD_HandleTypeDef hhcd_USB_OTG_HS;
 /* TIM7 ISRが生成する500 Hzイベント。制御計算は必ずmain側で実行する。 */
 static volatile uint8_t control_tick_pending = 0u;
 static volatile uint32_t control_tick_overruns = 0u;
+static volatile uint32_t control_tick_sequence = 0u;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -134,13 +135,16 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     uint8_t do_control;
+    uint32_t event_sequence;
     uint32_t primask = __get_PRIMASK();
     __disable_irq();
     do_control = control_tick_pending;
+    event_sequence = control_tick_sequence;
     control_tick_pending = 0u;
     __set_PRIMASK(primask);
     if (do_control != 0u)
     {
+      balancing_app_begin_control_tick(event_sequence);
       balancing_f446_can_service();
       balancing_app_control_tick();
     }
@@ -493,6 +497,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
       /* 2 ms以内に前回のイベントを処理できなかった回数。 */
       ++control_tick_overruns;
     }
+    ++control_tick_sequence;
     control_tick_pending = 1u;
   }
 }

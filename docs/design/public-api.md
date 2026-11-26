@@ -253,3 +253,15 @@ USB受信完了通知は主ループに配送し、再読出し時刻で鮮度�
 論理表示と物理出力の両方が明示検証済みの設定だけApplicationに結合する。GPIOラッチ照合は物理発光・鳴動を保証しない。未設定の既定起動は出力しない。PWMやLED1〜5の用途・色・極性を新規に決めない。表示異常は診断コピーに保持しRobotSequenceやCAN契約の意味を変えない。
 
 [検証記録](../verification/f446-indicator-output-host.md)。
+
+## 制御周期完了とウォッチドッグ更新
+
+| API | 責務 |
+|---|---|
+| CycleHealthMonitor::begin(ticket) | タイマ番号と共通単調時計で開始を照合 |
+| CycleHealthMonitor::complete(ticket, atUs, processed) | 一致した正常完了だけ新しい証跡を返す |
+| WatchdogPort::refresh(completion) | 明示済み更新コールバックを証跡ごとに一回だけ呼ぶ |
+| balancing_app_begin_control_tick(event_sequence) | CAN回収前の主ループ開始 |
+| ApplicationObservation::cycleHealth / watchdog | 欠落・完了・更新診断コピー |
+
+既存6ms FAULT判断はControlCycle/RobotSequenceに保持する。物理IWDGの開始と期限実測は未実施。[検証記録](../verification/f446-cycle-watchdog-host.md)。
