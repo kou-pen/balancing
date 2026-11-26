@@ -305,3 +305,9 @@ BenchDebugだけが `balancing_f446_bench_start` / `balancing_f446_bench_service
 ## F446 IWDGの実機用境界
 
 `F446Watchdog.hpp/.cpp` がHALハンドル、起動判断、RCC CSRのコピーを所有する。起動時固定設定は既定無効。通常起動は `bindApplicationWatchdog`、BenchDebugは `bindBenchWatchdog` に一度だけ結合し、最初の周期開始後は再結合しない。既存 `CycleHealthMonitor` と `WatchdogPort` を経由する完了証跡だけで更新する。HAL初期化は開始キー発行を含む不可逆操作。失敗後は再試行せず、HAL更新異常後も更新を停止する。診断は `f446WatchdogSummary` で取得するが、起動間のFAULT保持や物理停止の証明ではない。[検証](../verification/f446-iwdg-adapter.md)。
+
+## 通常運転の停止専用経路
+
+`MotorObservationConfig::stopOutput` は起動時固定で、既定無効。verifiedは4軸のRS06宛先・主機ID、C620 ID1/2と未使用ID3/4、配線の照合を意味する。実機値を既定で補完しない。CAN開始前に軸IDの重複/ゼロ、自作CAN2設定、内部送信元キーの衝突を検査し、起動後の設定変更を拒否する。
+
+`DriveRuntime.cpp` は既存の `MotorService::applySequence(StopAll)` と `MotorCanLink` にRS06停止を依頼し、C620Codecの全ゼロフレームだけをCAN2周期枠へ登録する。番号付き新規周期と新規CAN回収だけで世代を生成する。背景pollでは生成済み要求を有限回進める。既存の周期完了監視やSIL用fixtureOnlyを変更しない。 `ApplicationObservation::stopOutput` は軸別状態、ゼロの予約/受付/送達/欠落/失敗、最後の送達時刻、送信故障履歴をコピーする。送達・新規Reset報告は機械停止の証明ではない。[検証](../verification/f446-stop-output.md)。
