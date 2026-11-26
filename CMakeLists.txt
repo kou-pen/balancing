@@ -11,7 +11,7 @@ set(CMAKE_C_EXTENSIONS OFF)
 set(F446_APP firmware/f446/balancing_f446/App)
 
 add_library(balancing_core STATIC
-    ${F446_APP}/Src/balancing/control/estimator/balancing_leg_kinematics.c
+    ${F446_APP}/Src/balancing/control/estimator/LegKinematics.cpp
     ${F446_APP}/Src/balancing/control/filter/balancing_attitude_filter.c
 )
 target_include_directories(balancing_core PUBLIC
@@ -43,7 +43,7 @@ target_compile_options(balancing_yaw_pi_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_yaw_pi_tests COMMAND balancing_yaw_pi_tests)
 
 # CAD-unverified mathematical 2-input closed-chain fixture (Issue #7).
-add_executable(balancing_leg_kinematics_tests tests/test_leg_kinematics.c)
+add_executable(balancing_leg_kinematics_tests tests/test_leg_kinematics.cpp)
 target_link_libraries(balancing_leg_kinematics_tests PRIVATE balancing_core m)
 target_compile_options(balancing_leg_kinematics_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_leg_kinematics_tests COMMAND balancing_leg_kinematics_tests)
@@ -76,7 +76,6 @@ set(BALANCING_CONTROL_MATH_SOURCES
     ${F446_APP}/Src/balancing/control/controller/MotorCommand.cpp
     ${F446_APP}/Src/balancing/control/controller/BalanceControl.cpp
     ${F446_APP}/Src/balancing/control/estimator/StateEstimator.cpp
-    ${F446_APP}/Src/balancing/control/estimator/LegKinematics.cpp
     ${F446_APP}/Src/balancing/control/estimator/WheelOdometry.cpp
 )
 set(BALANCING_POWER_CODEC_SOURCES
@@ -268,7 +267,6 @@ add_test(NAME balancing_f446_wheel_odometry_tests COMMAND balancing_f446_wheel_o
 add_executable(balancing_f446_state_estimator_tests
     tests/test_f446_state_estimator.cpp
     ${F446_APP}/Src/balancing/control/estimator/StateEstimator.cpp
-    ${F446_APP}/Src/balancing/control/estimator/LegKinematics.cpp
     ${F446_APP}/Src/balancing/control/estimator/WheelOdometry.cpp
     ${BALANCING_RS06_SERVICE_SOURCES}
 )
@@ -284,7 +282,6 @@ add_executable(balancing_f446_sil_control_cycle_tests
     ${F446_APP}/Src/balancing/control/controller/MotorCommand.cpp
     ${F446_APP}/Src/balancing/control/controller/BalanceControl.cpp
     ${F446_APP}/Src/balancing/control/estimator/StateEstimator.cpp
-    ${F446_APP}/Src/balancing/control/estimator/LegKinematics.cpp
     ${F446_APP}/Src/balancing/control/estimator/WheelOdometry.cpp
     ${BALANCING_RS06_SERVICE_SOURCES}
 )

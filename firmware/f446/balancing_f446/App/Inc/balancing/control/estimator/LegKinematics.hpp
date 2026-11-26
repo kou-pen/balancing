@@ -19,7 +19,7 @@ struct LegMotorTransform {
     bool calibrated{false};
 };
 
-/** @brief 既存C11閉リンクの数学fixture。実機六節リンクCADの幾何ではない。
+/** @brief 閉リンクの数学fixture。実機六節リンクCADの幾何ではない。
  *  @spec{CTRL-EST-001}
  */
 struct LegFixtureGeometry {
@@ -45,6 +45,8 @@ struct LegEstimate {
     float thetaRateRadS{0.0f};
     std::array<float, 2> lengthJacobianM{};
     std::array<float, 2> thetaJacobian{};
+    float footXM{}; // 固定軸中点からの水平位置
+    float footYM{}; // 固定軸中点からの上向き位置
 };
 
 enum class LegSolveError : std::uint8_t {
@@ -60,8 +62,14 @@ struct LegSolveResult {
     LegSolveError error{LegSolveError::None};
 };
 
+/** @brief 2入力機構軸の角度と速度（SI、モータ側ではない）。 */
+struct LegJointState {
+    std::array<float,2> angleRad{};
+    std::array<float,2> velocityRadS{};
+};
+
 /** @brief 二つのRS06軸角から閉リンクの脚長・角度・ヤコビアンを解く数学境界。
- *  @warning 現段階では旧C11の人工幾何を再利用。実機のリンク構成・原点・符号
+ *  @warning 現段階では人工幾何を使用。実機のリンク構成・原点・符号
  *           がCADと照合されるまで、制御出力を許可するモデルではない。
  *  @spec{CTRL-EST-001}
  */
@@ -77,6 +85,34 @@ public:
     static LegSolveResult solve(const LegKinematicsConfig& config,
                                 const std::array<float, 2>& angleRad,
                                 const std::array<float, 2>& velocityRadS) noexcept;
+
+    /** @brief 校正済み歯数比・原点・方向を適用。失敗時は両軸ゼロ。
+     * @spec{CTRL-EST-001}
+     */
+    static bool motorToJoint(const LegMotorTransform& map,
+                             const std::array<float,2>& angleRad,
+                             const std::array<float,2>& velocityRadS,
+                             LegJointState& joint) noexcept;
+
+    /** @brief 指定分岐の円交点と解析ヤコビアンを計算。失敗時はゼロ。
+     * @spec{CTRL-EST-001}
+     */
+    static LegSolveError forward(const LegFixtureGeometry& geometry,
+                                 const LegJointState& joint, LegEstimate& out) noexcept;
+
+    /** @brief 仮想仕事 J^T により軸力[N]と脚角トルク[Nm]を機構軸へ変換。
+     * @spec{CTRL-EST-001}
+     * @warning 摩擦・ガスシリンダ・モータ上限は別層。
+     */
+    static bool virtualToJointTorque(const LegEstimate& state,float axialForceN,
+                                     float pitchTorqueNm,std::array<float,2>& torqueNm) noexcept;
+
+    /** @brief 理想歯車の仕事率保存。実機効率や電流制限の保証ではない。
+     * @spec{CTRL-EST-001}
+     */
+    static bool jointToIdealMotorTorque(const LegMotorTransform& map,
+                                        const std::array<float,2>& jointTorqueNm,
+                                        std::array<float,2>& motorTorqueNm) noexcept;
 };
 
 } // namespace balancing

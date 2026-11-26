@@ -101,7 +101,7 @@ C++オブジェクトの構築後、CubeMX／HALの周辺初期化が完了し�
 
 ## C++17 BalanceControlと500 HzのSIL経路（実機未接続）
 
-`BalanceControl` は共通C++の純粋な数学演算（一部VMCはC11移行中） `balance_math::computeLqr` → `balance_math::computeLegSupport` → `b_leg_virtual_to_joint_torque`、および `balance_math::stepYaw` と `balance_math::allocateWheels` を順序付きで呼ぶ。6状態は `ControlSnapshot` から作り、左右脚の仮想トルクはLQRの両脚合計を左右へ等分し、脚別PD支持力とヤコビアンで4関節軸トルクへ変換する。車輪倒立トルクを優先して残った容量だけをYaw PIへ渡す。**飽和診断にはYaw PIによる事前制限と最後の車輪配分の両方を含める。**
+`BalanceControl` は共通C++の純粋な数学演算 `balance_math::computeLqr` → `balance_math::computeLegSupport` → `LegKinematics::virtualToJointTorque`、および `balance_math::stepYaw` と `balance_math::allocateWheels` を順序付きで呼ぶ。6状態は `ControlSnapshot` から作り、左右脚の仮想トルクはLQRの両脚合計を左右へ等分し、脚別PD支持力とヤコビアンで4関節軸トルクへ変換する。車輪倒立トルクを優先して残った容量だけをYaw PIへ渡す。**飽和診断にはYaw PIによる事前制限と最後の車輪配分の両方を含める。**
 
 公開 `BalanceReference` は位置基準 [m]、速度基準 [m/s]、Yaw角速度基準 [rad/s] を**上流が明示**する。位置目標の自動生成規則、操作者の変化率制限を先回りして実装しない。固定脚長目標は `initialize()` 時点の現在左右脚長から取得し、`reset()` でYaw積分と初期脚長目標を破棄する。未検証ゲイン・数値異常があれば `std::nullopt` を返し、古い指令を流用しない。
 
@@ -289,3 +289,7 @@ USB受信完了通知は主ループに配送し、再読出し時刻で鮮度�
 ## モータ通信コーデックのC++統合
 
 RS06とC620は共通の `CanFrame` を直接使用する。旧C言語の `BMotorCanFrame` と変換関数は廃止。通信の符号化は `Rs06Codec::encodeControl/encodeTorque`、`C620Codec::encodeCurrent` に、復号は各 `decodeFeedback` に一元化する。結果は `std::optional` で返し、無効な入力で部分フレームを公開しない。RS06の運転可否・停止完了、C620の連続角度・軸割当、実機の物理上限は従来どおり機器・上位制御側が所有する。通常経路と独立試運転は同じCodecを使用する。[検証記録](../verification/f446-motor-codecs-cpp.md)。
+
+## 脚運動学とVMCのC++統合
+
+`LegKinematics::motorToJoint` が原点・軸方向・歯数比を適用し、`forward` が指定分岐の閉リンクと解析ヤコビアンを算出する。`solve` は両者を結合し、従来のエラー分類を維持する。BalanceControlは `LegEstimate` を直接 `virtualToJointTorque` に渡す。理想モータ軸換算の検証用関数も同じファイルに保持し、MotorCommandの実機用効率・制限と混同しない。[検証](../verification/f446-leg-math-cpp.md)。
