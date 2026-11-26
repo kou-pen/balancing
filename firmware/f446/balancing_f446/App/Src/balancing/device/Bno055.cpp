@@ -1,4 +1,5 @@
 #include "balancing/device/Bno055.hpp"
+#include "balancing/device/I2cPort.hpp"
 
 namespace balancing {
 namespace {

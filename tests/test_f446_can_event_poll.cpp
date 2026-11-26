@@ -1593,7 +1593,7 @@ void testIntegratedObservationAndFrameScheduling()
     MotorCommand converter{motorConfig};
     ControlCycle cycle{estimator,sequence,control,converter};
     MotorFramePlan planner{{11,12,13,14}};
-    BAttitudeFilterConfig imuConfig{};
+    AttitudeFilterConfig imuConfig{};
     imuConfig.mount={{0,1,2},{1,1,1},true};
     imuConfig.bias_samples_required=2;
     imuConfig.gravity_min_m_s2=9;

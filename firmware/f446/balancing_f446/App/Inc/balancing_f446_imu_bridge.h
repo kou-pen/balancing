@@ -16,11 +16,12 @@ void balancing_f446_imu_poll(void);
 #ifdef __cplusplus
 }
 #include "balancing/control/filter/ImuAttitudeSource.hpp"
+#include "balancing/device/I2cPort.hpp"
 namespace balancing {
 struct ImuRuntimeConfig {
     I2cPortConfig port{};
     Bno055Config sensor{};
-    BAttitudeFilterConfig filter{};
+    AttitudeFilterConfig filter{};
 };
 /** @brief 起動時の固定設定でI2C観測を構築。静止証明は本番未接続。
  * @spec{BOARD-F446-001}

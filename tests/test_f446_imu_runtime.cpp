@@ -85,9 +85,9 @@ HAL_StatusTypeDef begin(I2C_HandleTypeDef* h,std::uint16_t address,std::uint16_t
     h->State=HAL_I2C_STATE_BUSY;
     return HAL_OK;
 }
-BAttitudeFilterConfig filterConfig()
+AttitudeFilterConfig filterConfig()
 {
-    BAttitudeFilterConfig config{};
+    AttitudeFilterConfig config{};
     config.mount={{0,1,2},{1,1,1},true};
     config.bias_samples_required=2;
     config.gravity_min_m_s2=9;

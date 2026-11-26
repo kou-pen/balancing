@@ -34,7 +34,7 @@ routing:
     - docs/design/attitude-filter.md
     - docs/verification/issue10-observation-host.md
     - firmware/f446/balancing_f446/App/Src/balancing/app/RemoteControlService.cpp
-    - firmware/f446/balancing_f446/App/Src/balancing/control/filter/balancing_attitude_filter.c
+    - firmware/f446/balancing_f446/App/Src/balancing/control/filter/ImuAttitudeSource.cpp
   can:
     - docs/specs/protocols/
     - docs/design/motor-layer.md

@@ -293,3 +293,7 @@ RS06とC620は共通の `CanFrame` を直接使用する。旧C言語の `BMotor
 ## 脚運動学とVMCのC++統合
 
 `LegKinematics::motorToJoint` が原点・軸方向・歯数比を適用し、`forward` が指定分岐の閉リンクと解析ヤコビアンを算出する。`solve` は両者を結合し、従来のエラー分類を維持する。BalanceControlは `LegEstimate` を直接 `virtualToJointTorque` に渡す。理想モータ軸換算の検証用関数も同じファイルに保持し、MotorCommandの実機用効率・制限と混同しない。[検証](../verification/f446-leg-math-cpp.md)。
+
+## 姿勢フィルタのC++統合
+
+`Bno055.hpp` がセンサのSI値 `ImuSample` と元時刻付き `TimedImuSample` を定義する。I2cPortは前方宣言し、数学用ヘッダーからHALを要求しない。`ImuAttitudeSource.hpp/.cpp` に取付変換、静止バイアス学習、相補フィルタを統合し、製品のフィルタ状態をImuAttitudeSourceが単一所有する。`attitude_math` は同じ数値処理を単体試験でも検証する境界。実機静止証明、軸方向・係数は従来どおり未確定。[検証](../verification/f446-attitude-math-cpp.md)。

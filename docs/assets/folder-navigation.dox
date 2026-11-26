@@ -358,7 +358,6 @@
 
 | フォルダ・ファイル | 内容 |
 |---|---|
-| <a href="balancing__attitude__filter_8h_source.html">balancing_attitude_filter.h</a> | 加速度とジャイロを使う姿勢フィルタの型とAPI |
 | <a href="ImuAttitudeSource_8hpp_source.html">ImuAttitudeSource.hpp</a> | 新規IMU測定と姿勢フィルタ |
 */
 
@@ -501,7 +500,6 @@
 
 | フォルダ・ファイル | 内容 |
 |---|---|
-| <a href="balancing__attitude__filter_8c_source.html">balancing_attitude_filter.c</a> | 加速度とジャイロの相補フィルタ、座標変換、バイアス |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Src_balancing_device device/

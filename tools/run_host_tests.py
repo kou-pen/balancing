@@ -54,7 +54,7 @@ for label, flags in [
     print(f"[{label}] 実行", flush=True)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
-# Both Application tests now link the actual C++ control cycle and C11 math.
+# Both Application tests link the same C++ control cycle and mathematics.
 app_source = F446_APP / "Src" / "balancing"
 app_math_cpp = [str(app_source / name) for name in (
     "app/ControlCycle.cpp", "app/CycleHealthMonitor.cpp", "device/UsbHostPort.cpp", "app/PowerBoardService.cpp", "app/DualSenseService.cpp", "communication/usb/DualSenseProtocol.cpp", "app/RemoteControlService.cpp", "app/DiagnosticsService.cpp", "app/StatusIndicator.cpp", "device/StatusIndicatorPort.cpp", "control/controller/MotorCommand.cpp",
@@ -138,16 +138,16 @@ for label, flags in [
 
 # BNO055 mock: 静止ジャイロ校正・取付軸変換・相補フィルタの境界を検証。
 attitude_common = [
-    "gcc",
-    "-std=c11",
+    "g++",
+    "-std=c++17",
     "-Wall",
     "-Wextra",
     "-Werror",
     "-pedantic",
     "-I",
     str(F446_APP / "Inc"),
-    str(F446_APP / "Src" / "balancing" / "control" / "filter" / "balancing_attitude_filter.c"),
-    str(ROOT / "tests" / "test_attitude_filter.c"),
+    str(F446_APP / "Src" / "balancing" / "control" / "filter" / "ImuAttitudeSource.cpp"),
+    str(ROOT / "tests" / "test_attitude_filter.cpp"),
     "-lm",
 ]
 for label, flags in [
@@ -160,7 +160,7 @@ for label, flags in [
     print(f"[{label}] 実行", flush=True)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
-# ARM前固定脚長目標とRoll差動をC11単体で検証。実機ゲインは使用しない。
+# ARM前固定脚長目標とRoll差動をC++単体で検証。実機ゲインは使用しない。
 leg_pd_common = [
     "g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
     "-I", str(F446_APP / "Inc"),
@@ -281,10 +281,6 @@ for test, extra_sources in [
         link_libraries = []
         if test in ("test_f446_can_event_poll", "test_f446_can1_runtime"):
             link_libraries = ["-lm"]
-        if test == "test_f446_can_event_poll":
-            attitude = OUT / f"integrated_attitude{suffix}.o"
-            subprocess.run(["gcc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic", "-I", str(F446_APP / "Inc"), "-c", str(app_source / "control/filter/balancing_attitude_filter.c"), *flags, "-o", str(attitude)], check=True, cwd=ROOT, timeout=30)
-            link_libraries.append(str(attitude))
         print(f"[{test}{suffix}] コンパイル", flush=True)
         subprocess.run(can_dispatch_common + extra_sources + flags +
                        [str(source)] + link_libraries + ["-o", str(path)],
@@ -329,24 +325,13 @@ for suffix, flags in [
         str(rs06_source / "control" / "estimator" / "StateEstimator.cpp"),
         str(rs06_source / "control" / "estimator" / "LegKinematics.cpp"),
         str(rs06_source / "control" / "estimator" / "WheelOdometry.cpp"),
+        str(rs06_source / "control/filter/ImuAttitudeSource.cpp"),
         str(ROOT / "tests" / "test_f446_state_estimator.cpp"),
     ]
-    # Use the same C11 math and attitude implementations already in the repo;
-    # compile C11 with gcc instead of attempting to compile C as C++17.
-    c_attitude = OUT / f"estimator_c_attitude{suffix}.o"
-    for input_file, output_file in (
-        (rs06_source / "control" / "filter" / "balancing_attitude_filter.c", c_attitude),
-    ):
-        subprocess.run(
-            ["gcc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
-             "-I", str(F446_APP / "Inc"), "-c", str(input_file),
-             *flags, "-o", str(output_file)],
-            check=True, cwd=ROOT, timeout=30,
-        )
     print(f"[test_f446_state_estimator{suffix}] コンパイル", flush=True)
     subprocess.run(
         rs06_service_common + sources + flags +
-        [str(c_attitude), "-lm", "-o", str(path)],
+        ["-lm", "-o", str(path)],
         check=True, cwd=ROOT, timeout=30,
     )
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
@@ -367,11 +352,10 @@ for suffix, flags in [
         str(rs06_source / "control" / "estimator" / "WheelOdometry.cpp"),
         str(ROOT / "tests" / "test_f446_sil_control_cycle.cpp"),
     ]
-    c_attitude = OUT / f"estimator_c_attitude{suffix}.o"
     print(f"[test_f446_sil_control_cycle{suffix}] コンパイル", flush=True)
     subprocess.run(
         rs06_service_common + sources + flags +
-        [str(c_attitude), "-lm", "-o", str(path)],
+        ["-lm", "-o", str(path)],
         check=True, cwd=ROOT, timeout=30,
     )
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
@@ -420,7 +404,7 @@ for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-saniti
         *[str(rs06_source / name) for name in ("device/I2cPort.cpp", "device/Bno055.cpp",
            "device/f446_imu_runtime.cpp", "control/filter/ImuAttitudeSource.cpp")],
         str(ROOT / "tests" / "test_f446_imu_runtime.cpp"),
-        str(OUT / f"estimator_c_attitude{suffix}.o"), *flags, "-lm", "-o", str(path)],
+        *flags, "-lm", "-o", str(path)],
         check=True, cwd=ROOT, timeout=30)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
