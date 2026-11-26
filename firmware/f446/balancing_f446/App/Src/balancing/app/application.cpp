@@ -17,6 +17,7 @@ namespace balancing {
 struct ObservationCycle {
     PowerBoardService power{};
     RemoteControlService remote;
+    DualSenseService usb;
     // 実機FIFO容量・配信仕様は未確定。ゼロ容量で最新状態と欠落数だけ記録。
     DiagnosticsService diagnostics;
     Can2ServiceLink can2;
@@ -28,7 +29,7 @@ struct ObservationCycle {
     std::optional<ControlCycle> cycle{std::in_place, estimator, sequence, controller, converter};
 
     explicit ObservationCycle(const Can2ObservationProfile& profile={}) noexcept
-        : remote{profile.operatorConfig},
+        : remote{profile.operatorConfig},usb{remote,profile.usb},
           diagnostics{profile.faultSlots,profile.faultCapacity,nullptr,0,
                       profile.communication.tokenOrigin},
           can2{power,remote,diagnostics,profile.communication}
@@ -36,7 +37,7 @@ struct ObservationCycle {
 
 #if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
     explicit ObservationCycle(const DriveSilProfile& p) noexcept
-        : remote{p.communication.operatorConfig},
+        : remote{p.communication.operatorConfig},usb{remote,p.communication.usb},
           diagnostics{p.communication.faultSlots,p.communication.faultCapacity,nullptr,0,
                       p.communication.communication.tokenOrigin},
           can2{power,remote,diagnostics,p.communication.communication},
@@ -90,6 +91,10 @@ public:
         if (drive_) drive_->onTxTerminal(b,t,r,at);
     }
 #endif
+    DualSenseService* usbLink() noexcept
+    { return control_ && control_->usb.enabled()? &control_->usb:nullptr; }
+    bool selectUsb(BOperatorSource target,std::uint64_t now) noexcept
+    { return usbLink() && usbLink()->selectSource(target,control_->sequence.state(),now); }
     Can2ServiceLink* can2Link() noexcept
     {
         return control_ && control_->can2.enabled() ? &control_->can2 : nullptr;
@@ -172,6 +177,12 @@ public:
         input.interlocks.powerReady = observation_.power.ready;
         const auto can2Input=control_->can2.takeCycleInput(nowUs,control_->sequence.state());
         input.operations=can2Input.operations;
+        // CAN側の選択要求を確定した後でUSBイベントを回収する。
+        // 停止と非常停止はどちらのARMより優先し、状態判断を二重化しない。
+        const auto usb=control_->usb.takeEvents(nowUs);
+        input.operations.disarm |= usb.disarm;
+        input.operations.arm = (input.operations.arm || usb.arm) &&
+            !input.operations.disarm && can2Input.faults==FaultFlags::None;
         input.observedFaults = motors->observedFaults | control_->power.takeObservedFaults(nowUs)
                                | can2Input.faults;
         // 電源・PS5・機構・校正・ゲイン・限界が未検証なので、既定の
@@ -318,6 +329,10 @@ bool initializeCan2Observation(const Can2ObservationProfile& profile) noexcept
     application.init(profile);
     return application.can2Link()!=nullptr;
 }
+
+DualSenseService* applicationDualSense() noexcept { return application.usbLink(); }
+bool selectApplicationUsbSource(BOperatorSource target,std::uint64_t now) noexcept
+{ return application.selectUsb(target,now); }
 
 Can2ServiceLink* applicationCan2Link() noexcept
 {
