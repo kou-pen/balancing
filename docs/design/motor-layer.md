@@ -1,5 +1,7 @@
 # モータ制御レイヤーと単軸試運転
 
+> 旧実装の記録を含む。現在のモータ通信型とCodecは [C++統合検証](../verification/f446-motor-codecs-cpp.md) を参照。
+
 > 旧C11実装の設計・検証記録。現在の状態機械・観測・送信・試運転の契約は [F446公開API](../design/public-api.md) と [C++移行検証](../verification/f446-legacy-observation-retirement.md) を参照。旧コードを再現する場合は移行前のGit履歴を使用する。
 
 **更新日：** 2026-11-09  

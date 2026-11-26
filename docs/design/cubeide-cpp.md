@@ -1,5 +1,7 @@
 # STM32CubeIDEでC++を使用する（自動コード再生成対応）
 
+> 旧実装の記録を含む。現在のモータ通信型とCodecは [C++統合検証](../verification/f446-motor-codecs-cpp.md) を参照。
+
 **更新日：** 2026-11-10  
 **適用：** F446制御基板、`firmware/f446/balancing_f446`。  
 **状態：** CubeMX管理のmain.cからC++入口・TIM7 500 Hzイベントを受ける骨組みを維持。PR #16の旧App直下5ソース構成はCubeIDE 1.19.0によるDebug/Release管理ビルドPASS。**機能別ディレクトリへ一括再配置した6ソース構成も2026-11-10にCubeIDE本体のDebug/Release管理ビルドを行い、0エラー・0警告でPASS**。実機書込み・CAN通常運転への接続は未実施。

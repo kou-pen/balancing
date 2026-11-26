@@ -285,3 +285,7 @@ USB受信完了通知は主ループに配送し、再読出し時刻で鮮度�
 ## 操作入力のC++統合
 
 `RemoteControlService.hpp/.cpp` が `OperatorSource`、`OperatorInputConfig`、`OperatorSample`、`OperatorTarget` と全操作入力状態を所有する。CAN/USBの復号後に `acceptDecoded`、DISARMED中の明示切替に `selectSource`、周期ごとに `update(RobotState, nowUs)` を使用する。旧C状態を介さず、ARMING/DISARMED/FAULTの目標はゼロ、BALANCINGの通信断は設定変化率で減速する。ARMイベントは生成しない。既存SI値フィールド名は維持。詳細は [C++操作入力検証](../verification/f446-operator-cpp.md)。
+
+## モータ通信コーデックのC++統合
+
+RS06とC620は共通の `CanFrame` を直接使用する。旧C言語の `BMotorCanFrame` と変換関数は廃止。通信の符号化は `Rs06Codec::encodeControl/encodeTorque`、`C620Codec::encodeCurrent` に、復号は各 `decodeFeedback` に一元化する。結果は `std::optional` で返し、無効な入力で部分フレームを公開しない。RS06の運転可否・停止完了、C620の連続角度・軸割当、実機の物理上限は従来どおり機器・上位制御側が所有する。通常経路と独立試運転は同じCodecを使用する。[検証記録](../verification/f446-motor-codecs-cpp.md)。
