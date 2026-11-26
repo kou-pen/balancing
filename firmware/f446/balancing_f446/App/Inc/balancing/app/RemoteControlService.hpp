@@ -36,6 +36,10 @@ public:
      * @spec{BEHAV-001}
      */
     void invalidateCanInput() noexcept;
+    /** @brief USB切断・転送欠落時の旧入力無効化。減速は既存周期処理に委ねる。
+     * @spec{PROTO-PS5-001}
+     */
+    void invalidateUsbInput() noexcept;
     /** @brief 操作量の周期コピー。ARM要求は生成しない。
      * @spec{BEHAV-001}
      */

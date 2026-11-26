@@ -215,7 +215,7 @@ ApplicationはMotorObservationSnapshotとImuAttitudeを同じ周期時刻で固�
 | API | 責務 |
 |---|---|
 | `initializeDriveSil(profile)` | 人工の推定・制御・換算・ARM期限・送信期限・CAN2設定を起動前に一回注入 |
-| `bindDriveSilRuntime(motors, link, tx1, tx2)` | 起動済み模擬CANの既存所有者をApplicationへ結合 |
+| `bindApplicationRuntime(motors, link, tx1, tx2)` | 共通入口から起動済みCAN所有者をリンク済み実行境界へ配送。本番側は非駆動 |
 | `DriveCycle::step(input)` | 実際の4軸ARM応答・送信完了監視を集約し、ControlCycleを一度実行、状態に応じたフレームを予約 |
 | `DriveCycle::poll(nowUs)` | 有限回のCAN受付、異常時の旧予約破棄と停止方向のみの抑止 |
 | `DriveCycle::onTxTerminal(bus, token, outcome, atUs)` | 最新世代の送信完了だけ鮮度更新。バス・軸・世代を混同しない |
@@ -223,10 +223,22 @@ ApplicationはMotorObservationSnapshotとImuAttitudeを同じ周期時刻で固�
 
 `ControlTickInput::movingTarget` の候補則は走行時に実測dtで目標位置を移動させ、速度0では現在位置へ戻す。物理モデルに対する制御性能の比較は後続。通常指令はCAN1 4ms / CAN2 2ms、ARMINGと非駆動は車輪ゼロ、停止は既存MotorServiceが軸別に管理する。
 
-`BALANCING_HOST_SIL` かつ非ARM/ThumbビルドでのみDriveCycleとApplication結合入口が存在する。C ABIの既定起動は非駆動のまま。実機にfixtureを昇格させない。送信中止は終端が来るまで物理的な取消を意味しない。
+共通の `drive_runtime` はビルド対象ごとに別の実装をリンクする。F446側は `App/Src/balancing/app/DriveRuntime.cpp` の非駆動観測、SIL側は `tests/sil/DriveRuntime.cpp` と `tests/sil/DriveCycle.cpp` を選択する。`initializeDriveSil` と `driveSilObservation()` は試験側だけに存在する。試験用ヘッダーはARM/Thumbコンパイルをエラーにする。C ABIの既定起動は非駆動のまま。実機にfixtureを昇格させない。送信中止は終端が来るまで物理的な取消を意味しない。
 
 [検証記録](../verification/f446-drive-cycle-sil.md)。
 
+
+## DualSense USB入力境界
+
+| API | 責務 |
+|---|---|
+| `DualSenseHidCodec::decode(data, length)` | 明示したID・長さ・軸・ボタン配置を検査、SI操作量に復号 |
+| `UsbHidInput::connect/disconnect/receive` | 主ループで転送完了を世代・連番・採取時刻で確認。欠落時は連続性無効 |
+| `DualSenseService::takeEvents(nowUs)` | 新規報告で成立した長押しを一度だけ回収。ARMは選択元に限定、DISARM優先 |
+| `applicationDualSense()` | 明示設定済みの入力入口、既定は空 |
+| `selectApplicationUsbSource(target, nowUs)` | USB側からの明示選択要求を現在のRobotSequenceで評価。割当は未確定 |
+
+USB受信完了通知は主ループに配送し、再読出し時刻で鮮度を更新しない。既存RemoteControlServiceに速度目標・中立復帰・変化率を委ねる。実USB Host列挙・HIDドライバは未接続。[検証記録](../verification/f446-dualsense-input-host.md)。
 
 ## 状態表示出力
 

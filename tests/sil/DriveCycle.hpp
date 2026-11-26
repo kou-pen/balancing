@@ -1,6 +1,8 @@
 #pragma once
 // この経路はホストのbxCANレジスタ模型専用。ARMバイナリに組み込まない。
-#if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
+#if defined(__arm__) || defined(__thumb__)
+#error "The SIL drive implementation must never be built for ARM firmware."
+#endif
 #include "balancing/app/ControlCycle.hpp"
 #include "balancing/app/MotorCanLink.hpp"
 #include "balancing/communication/can/MotorFramePlan.hpp"
@@ -67,4 +69,3 @@ private:
     bool configured_{false};
 };
 }
-#endif

@@ -2,6 +2,7 @@
 #include "balancing/communication/can/Can2FilterPlan.hpp"
 #include "balancing_app_bridge.h"
 #include "balancing/app/ApplicationObservation.hpp"
+#include "sil/DriveSil.hpp"
 #include "balancing/device/ImuObservation.hpp"
 
 #ifdef NDEBUG
@@ -244,10 +245,75 @@ int main(int argc, char** argv)
         return 0;
     }
 
-#if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
+    if (argc==2 && std::strcmp(argv[1],"--usb-input")==0) {
+        using namespace balancing;
+        // 人工の4バイト形式。実DualSenseの配置を表さない。
+        const DualSenseConfig cfg{{1,4,{1,10,128,240,true,2},{2,0,127,255,false,3},
+                                     {3,1},{3,2},true},300000,1000000,200000};
+        DualSenseHidCodec codec{cfg.hid};
+        std::array<std::uint8_t,4> report{1,128,127,0};
+        assert(codec.enabled() && codec.decode(report.data(),4)->speedMps==0);
+        report[1]=10; report[2]=255;
+        auto decoded=codec.decode(report.data(),4);
+        assert(decoded && decoded->speedMps==2 && decoded->yawRadS==3);
+        report[1]=9; assert(!codec.decode(report.data(),4));
+        report={1,128,127,0};
+        assert(!codec.decode(report.data(),3) && !codec.decode(nullptr,4));
+        report[0]=2; assert(!codec.decode(report.data(),4)); report[0]=1;
+        auto bad=cfg.hid; bad.circle=bad.options;
+        assert(!DualSenseHidCodec{bad}.enabled());
+        RemoteControlService remote{{300000,200000,2,3,0.01f,0.01f,10,10,true}};
+        DualSenseService usb{remote,cfg};
+        assert(usb.connect(1,0));
+        std::uint64_t serial=0;
+        const auto send=[&](std::uint64_t t,unsigned buttons) {
+            report[3]=static_cast<std::uint8_t>(buttons);
+            assert(usb.receive(1,++serial,report.data(),4,t,t));
+            return usb.takeEvents(t);
+        };
+        // 接続前から押したままのOPTIONSでは、1秒以上経過しても発火しない。
+        for (std::uint64_t t=100000;t<=1200000;t+=100000) assert(!send(t,1).arm);
+        assert(!send(1300000,0).arm);
+        for (std::uint64_t t=1400000;t<2400000;t+=100000) assert(!send(t,1).arm);
+        assert(send(2400000,1).arm);
+        assert(!send(2500000,1).arm);
+        assert(!usb.receive(1,serial,report.data(),4,2600000,2600000));
+        assert(!usb.takeEvents(2900000).arm);
+        assert(send(3000000,0).arm==false);
+        // 切替後はUSB ARM無効、停止ボタンだけは有効。
+        assert(usb.selectSource(B_OPERATOR_CAN_REMOTE,RobotState::Disarmed,3000000));
+        assert(!usb.selectSource(B_OPERATOR_USB_DUALSENSE,RobotState::Balancing,3000000));
+        for (std::uint64_t t=3100000;t<=4100000;t+=100000) assert(!send(t,1).arm);
+        assert(!send(4200000,0).disarm);
+        assert(!send(4300000,2).disarm); assert(!send(4400000,2).disarm);
+        assert(send(4500000,2).disarm);
+        assert(!send(4600000,2).disarm);
+        assert(usb.disconnect(1,4700000));
+        assert(!usb.receive(1,++serial,report.data(),4,4800000,4800000));
+        assert(!usb.connect(1,4800000) && usb.connect(2,4800000));
+        assert(!usb.receive(1,++serial,report.data(),4,4800100,4800100));
+        // 転送欠落と不正報告で長押しを再開しない。
+        report[3]=0; assert(usb.receive(2,1,report.data(),4,4900000,4900000));
+        assert(usb.selectSource(B_OPERATOR_USB_DUALSENSE,RobotState::Disarmed,4900000));
+        assert(usb.receive(2,2,report.data(),4,5000000,5000000));
+        report[3]=1;
+        assert(usb.receive(2,3,report.data(),4,5100000,5100000));
+        assert(usb.receive(2,5,report.data(),4,5200000,5200000));
+        for (std::uint64_t i=6;i<18;++i) {
+            auto at=5200000+(i-5)*100000;
+            assert(usb.receive(2,i,report.data(),4,at,at));
+            assert(!usb.takeEvents(at).arm);
+        }
+        assert(!usb.receive(2,18,report.data(),3,6500000,6500000));
+        assert(!usb.takeEvents(6500000).arm);
+        assert(remote.update(RobotState::Balancing,6500000)->waiting_neutral);
+        std::puts("PASS: USB report validation, generation, continuous holds, source/stop priority");
+        return 0;
+    }
     if (argc==2 && std::strncmp(argv[1],"--drive-sil",11)==0) {
         using namespace balancing;
         using namespace balancing::protocol;
+        const bool usbMode=std::strcmp(argv[1],"--drive-sil-usb")==0;
         const bool timeout=std::strcmp(argv[1],"--drive-sil-timeout")==0;
         const bool stale=std::strcmp(argv[1],"--drive-sil-stale")==0;
         const bool rsTimeout=std::strcmp(argv[1],"--drive-sil-rs-timeout")==0;
@@ -263,6 +329,8 @@ int main(int argc, char** argv)
         p.communication.communication={200000,100000,20000,20,1000,4,0xCA2u,false};
         p.communication.operatorConfig={10000,2000,2,3,0.01f,0.01f,10,10,true};
         p.communication.faultSlots=faults.data(); p.communication.faultCapacity=faults.size();
+        if (usbMode) p.communication.usb={{1,4,{1,0,128,255,false,2},{2,0,128,255,false,3},
+                                          {3,1},{3,2},true},10000,4000,2000};
         for (auto& leg:p.estimator.legs) {
             leg.motor={{0,0},{0,0},{1,1},1,1,true};
             leg.fixture={0.2f,0.15f,0.15f,0.25f,0.25f,0.02f,0.01f,-1};
@@ -321,8 +389,8 @@ int main(int argc, char** argv)
             DWT->CYCCNT=static_cast<std::uint32_t>(at*168u);
             balancing_f446_can_service();
             balancing_app_control_tick();
-            assert(applicationObservation()->driveSil);
-            return *applicationObservation()->driveSil;
+            assert(driveSilObservation());
+            return *driveSilObservation();
         };
         struct Counts { unsigned stop{},enable{},torque{},zero{},current{},diagnostic{}; };
         auto classify=[](CAN_TypeDef& bus,unsigned i,Counts& c) {
@@ -360,6 +428,45 @@ int main(int argc, char** argv)
             }
             return counts;
         };
+        if (usbMode) {
+            auto* usb=applicationDualSense();
+            assert(usb && usb->connect(1,0));
+            std::uint64_t serial=0;
+            auto report=[&](std::uint64_t at,unsigned buttons,unsigned speed=128) {
+                std::array<std::uint8_t,4> d{1,static_cast<std::uint8_t>(speed),128,static_cast<std::uint8_t>(buttons)};
+                assert(usb->receive(1,++serial,d.data(),d.size(),at-20,at-20));
+            };
+            pre(2000,false); report(2000,0); auto res=tick(2000); drain();
+            pre(4000,false); report(4000,0); res=tick(4000); drain();
+            // PiのARMはUSB選択中には通らない。
+            pre(6000,false); report(6000,1); request(RemoteRequestKind::Arm,1);
+            res=tick(6000); assert(res.control.sequence.state==RobotState::Disarmed); drain();
+            pre(8000,false); report(8000,1); res=tick(8000); assert(res.control.sequence.state==RobotState::Disarmed); drain();
+            pre(10000,false); report(10000,1); res=tick(10000);
+            assert(res.control.sequence.state==RobotState::Arming); drain();
+            pre(12000,true); report(12000,0); res=tick(12000); drain();
+            pre(14000,true); report(14000,0); res=tick(14000); drain();
+            assert(res.control.sequence.state==RobotState::Balancing);
+            pre(16000,true); report(16000,0,150); res=tick(16000); drain();
+            assert(res.control.appliedReference->forwardVelocityMps>0);
+            // USB切断はDISARMではなく、既存操作目標の減速を使う。
+            assert(usb->disconnect(1,17000));
+            pre(18000,true); res=tick(18000); drain();
+            assert(res.control.sequence.state==RobotState::Balancing &&
+                   res.control.appliedReference->forwardVelocityMps==0);
+            assert(usb->connect(2,19000)); serial=0;
+            auto second=[&](std::uint64_t at,unsigned buttons) {
+                std::array<std::uint8_t,4> d{1,128,128,static_cast<std::uint8_t>(buttons)};
+                assert(usb->receive(2,++serial,d.data(),4,at-20,at-20));
+            };
+            pre(20000,true); second(20000,0); res=tick(20000); drain();
+            pre(22000,true); second(22000,2); res=tick(22000); drain();
+            pre(24000,true); second(24000,2); res=tick(24000);
+            assert(res.control.sequence.state==RobotState::Disarmed && res.outputInhibited);
+            auto c=drain(); assert(c.stop==4 && c.zero==1 && c.current==0);
+            std::puts("PASS: USB report to Application ARM, motion, disconnect, DISARM in mock CAN");
+            return 0;
+        }
         pre(2000,false); request(RemoteRequestKind::SelectSource,1,WireInputSource::CanRemote);
         auto res=tick(2000); assert(res.control.sequence.state==RobotState::Disarmed);
         auto c=drain(); assert(c.stop==4 && c.zero==1 && c.torque==0);
@@ -529,7 +636,6 @@ int main(int argc, char** argv)
         std::puts("PASS: Application full SIL ARM, 250/500Hz, operation reference, abort/stop");
         return 0;
     }
-#endif
 
     if (argc == 2 && std::strcmp(argv[1], "--can2-services") == 0) {
         using namespace balancing;

@@ -1,10 +1,10 @@
 #pragma once
 #include "balancing_app_bridge.h"
 #include "balancing/app/ControlCycle.hpp"
-#include "balancing/app/DriveCycle.hpp"
 #include "balancing/app/PowerBoardService.hpp"
 #include "balancing/app/Can2ServiceLink.hpp"
 #include "balancing/app/RemoteControlService.hpp"
+#include "balancing/app/DualSenseService.hpp"
 #include "balancing/app/DiagnosticsService.hpp"
 #include "balancing/app/StatusIndicator.hpp"
 #include "balancing/device/StatusIndicatorPort.hpp"
@@ -27,9 +27,6 @@ struct ApplicationObservation {
     Can2ServiceSummary can2{};
     std::optional<IndicatorState> indicator{};
     IndicatorOutputSummary indicatorOutput{};
-#if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
-    std::optional<DriveSilResult> driveSil{};
-#endif
 };
 
 /** @brief 主ループで最後の周期診断を取得。初期化前は空。
@@ -46,6 +43,7 @@ struct Can2ObservationProfile {
     BOperatorInputConfig operatorConfig{};
     DiagnosticSlot* faultSlots{};
     std::size_t faultCapacity{};
+    DualSenseConfig usb{};
     IndicatorConfig indicator{};
     IndicatorOutputConfig indicatorOutput{};
 };
@@ -57,34 +55,16 @@ bool initializeCan2Observation(const Can2ObservationProfile&) noexcept;
  * @spec{BOARD-F446-001}
  */
 Can2ServiceLink* applicationCan2Link() noexcept;
+/** @brief 主ループのUSB完了通知境界。未設定なら空。実USB列挙は別工程。
+ * @spec{PROTO-PS5-001}
+ */
+DualSenseService* applicationDualSense() noexcept;
+/** @brief USB側の明示操作元選択。状態判断はApplicationの現在状態を用いる。
+ * @spec{PROTO-PS5-001}
+ */
+bool selectApplicationUsbSource(BOperatorSource target,std::uint64_t nowUs) noexcept;
 /** @brief CANランタイムの背景送信を一度進める。既定起動では何もしない。
  * @spec{BOARD-F446-001}
  */
 void serviceCan2ApplicationTx() noexcept;
-#if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
-/** @brief 人工の制御・通信設定。ホスト試験専用で実機バイナリには存在しない。
- * @spec{BOARD-F446-001}
- */
-struct DriveSilProfile {
-    Can2ObservationProfile communication{};
-    StateEstimatorConfig estimator{};
-    BalanceControlConfig controller{};
-    MotorCommandConfig converter{};
-    ArmTimeoutConfig arm{};
-    SequenceInterlocks interlocks{};
-    DriveSilConfig tx{};
-};
-/** @brief 模擬CAN起動前の一回限りのSIL設定。
- * @spec{BOARD-F446-001}
- */
-bool initializeDriveSil(const DriveSilProfile&) noexcept;
-/** @brief 起動済み模擬ランタイムの所有者をApplicationへ貸す。
- * @spec{BOARD-F446-001}
- */
-bool bindDriveSilRuntime(MotorService&,MotorCanLink&,CanTxScheduler&,CanTxScheduler&) noexcept;
-/** @brief 模擬CANの照合済み終端を周期統合に配送。
- * @spec{BOARD-F446-001}
- */
-void driveSilTerminal(CanBus,TxToken,CanTxOutcome,std::uint64_t atUs) noexcept;
-#endif
 }

@@ -121,9 +121,13 @@ set(BALANCING_CAN2_SERVICE_SOURCES
 set(BALANCING_CAN2_TX_SOURCE ${F446_APP}/Src/balancing/app/Can2ServiceLinkTx.cpp)
 add_executable(balancing_cpp_app_tests
     tests/test_cpp_app.cpp
+    ${F446_APP}/Src/balancing/app/DriveRuntime.cpp
     ${BALANCING_CONTROL_MATH_SOURCES}
     ${F446_APP}/Src/balancing/app/RobotSequence.cpp
     ${F446_APP}/Src/balancing/app/application.cpp
+    ${F446_APP}/Src/balancing/app/DualSenseService.cpp
+    ${F446_APP}/Src/balancing/device/UsbHidInput.cpp
+    ${F446_APP}/Src/balancing/communication/usb/DualSenseHidCodec.cpp
     ${BALANCING_CAN2_SERVICE_SOURCES}
     ${F446_APP}/Src/balancing/app/PowerBoardService.cpp
     ${BALANCING_POWER_CODEC_SOURCES}
@@ -186,13 +190,17 @@ set(BALANCING_CAN_DISPATCH_SOURCES
 # Startup, RX observation and IRQ ownership at both STM32F446 CAN buses.
 add_executable(balancing_f446_can1_runtime_tests
     tests/test_f446_can1_runtime.cpp
-    ${F446_APP}/Src/balancing/app/DriveCycle.cpp
+    tests/sil/DriveCycle.cpp
+    tests/sil/DriveRuntime.cpp
     ${F446_APP}/Src/balancing/communication/can/MotorFramePlan.cpp
     ${BALANCING_CAN2_TX_SOURCE}
     ${BALANCING_CONTROL_MATH_SOURCES}
     ${BALANCING_RS06_SERVICE_SOURCES}
     ${F446_APP}/Src/balancing/app/MotorCanLink.cpp
     ${F446_APP}/Src/balancing/app/application.cpp
+    ${F446_APP}/Src/balancing/app/DualSenseService.cpp
+    ${F446_APP}/Src/balancing/device/UsbHidInput.cpp
+    ${F446_APP}/Src/balancing/communication/usb/DualSenseHidCodec.cpp
     ${BALANCING_CAN2_SERVICE_SOURCES}
     ${F446_APP}/Src/balancing/app/PowerBoardService.cpp
     ${BALANCING_POWER_CODEC_SOURCES}
@@ -210,13 +218,14 @@ target_include_directories(balancing_f446_can1_runtime_tests PRIVATE
     ${F446_APP}/Inc
 )
 target_link_libraries(balancing_f446_can1_runtime_tests PRIVATE balancing_core m)
-target_compile_definitions(balancing_f446_can1_runtime_tests PRIVATE BALANCING_HOST_SIL)
 target_compile_options(balancing_f446_can1_runtime_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_can1_runtime_tests COMMAND balancing_f446_can1_runtime_tests)
 add_test(NAME balancing_f446_can_rollback_failure_tests COMMAND balancing_f446_can1_runtime_tests --rollback-failure)
 add_test(NAME balancing_f446_motor_observation_tests COMMAND balancing_f446_can1_runtime_tests --motor-observation)
 add_test(NAME balancing_f446_can2_services_tests COMMAND balancing_f446_can1_runtime_tests --can2-services)
 add_test(NAME balancing_f446_drive_sil_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil)
+add_test(NAME balancing_f446_usb_input_tests COMMAND balancing_f446_can1_runtime_tests --usb-input)
+add_test(NAME balancing_f446_drive_sil_usb_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-usb)
 add_test(NAME balancing_f446_drive_sil_timeout_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-timeout)
 add_test(NAME balancing_f446_drive_sil_invalid_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-invalid)
 add_test(NAME balancing_f446_drive_sil_gap_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-gap)
