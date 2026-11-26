@@ -1,15 +1,27 @@
 #pragma once
-#include "balancing/device/I2cPort.hpp"
-#include "balancing/control/filter/balancing_attitude_filter.h"
+#include <cstdint>
+#include <optional>
+#include <array>
 
 namespace balancing {
+class I2cPort;
+struct I2cCompletion;
+/** @brief 校正後のIMU物理値。軸向きとバイアスの適合は呼出元で検証する。
+ * @spec{CTRL-EST-001}
+ */
+struct ImuSample {
+    std::array<float,3> accel_m_s2{}; /**< X/Y/Z加速度 [m/s^2]。 */
+    std::array<float,3> gyro_rad_s{}; /**< X/Y/Z角速度 [rad/s]。 */
+};
+
+
 struct Bno055Config {
     std::uint64_t maxEvidenceWindowUs{0}; // 取得の時間窓上限、実機検証値のみ
     std::uint64_t maxRequestWaitUs{0};    // BUSY待ち上限
     bool timingVerified{false};
 };
 struct TimedImuSample {
-    BImuSample value{};
+    ImuSample value{};
     std::uint64_t earliestUs{0}; // 実測時刻の下限であり厳密な測定時刻ではない
     std::uint64_t completedAtUs{0};
     bool newMeasurementProven{false};

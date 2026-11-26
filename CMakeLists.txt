@@ -12,7 +12,7 @@ set(F446_APP firmware/f446/balancing_f446/App)
 
 add_library(balancing_core STATIC
     ${F446_APP}/Src/balancing/control/estimator/balancing_leg_kinematics.c
-    ${F446_APP}/Src/balancing/control/filter/balancing_attitude_filter.c
+    ${F446_APP}/Src/balancing/control/filter/ImuAttitudeSource.cpp
 )
 target_include_directories(balancing_core PUBLIC
     ${F446_APP}/Inc
@@ -65,7 +65,7 @@ target_compile_options(balancing_operator_input_tests PRIVATE -Wall -Wextra -Wpe
 add_test(NAME balancing_operator_input_tests COMMAND balancing_operator_input_tests)
 
 # ACCGYRO static calibration and pitch/roll complementary math, no real I2C.
-add_executable(balancing_attitude_filter_tests tests/test_attitude_filter.c)
+add_executable(balancing_attitude_filter_tests tests/test_attitude_filter.cpp)
 target_link_libraries(balancing_attitude_filter_tests PRIVATE balancing_core m)
 target_compile_options(balancing_attitude_filter_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_attitude_filter_tests COMMAND balancing_attitude_filter_tests)
@@ -237,7 +237,6 @@ add_executable(balancing_f446_can_event_poll_tests
     ${BALANCING_POWER_CODEC_SOURCES}
     ${F446_APP}/Src/balancing/app/DiagnosticsService.cpp
     ${BALANCING_CONTROL_MATH_SOURCES}
-    ${F446_APP}/Src/balancing/control/filter/ImuAttitudeSource.cpp
     ${F446_APP}/Src/balancing/communication/can/MotorFramePlan.cpp
     ${BALANCING_CAN_DISPATCH_SOURCES}
     ${BALANCING_RS06_SERVICE_SOURCES}
@@ -317,7 +316,6 @@ set(BALANCING_IMU_SOURCES
     ${F446_APP}/Src/balancing/device/I2cPort.cpp
     ${F446_APP}/Src/balancing/device/Bno055.cpp
     ${F446_APP}/Src/balancing/device/f446_imu_runtime.cpp
-    ${F446_APP}/Src/balancing/control/filter/ImuAttitudeSource.cpp
 )
 add_executable(balancing_f446_imu_runtime_tests
     tests/test_f446_imu_runtime.cpp
