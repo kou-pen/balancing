@@ -272,11 +272,10 @@
 
 | フォルダ・ファイル | 内容 |
 |---|---|
-| <a href="CanEventPoll_8hpp_source.html">CanEventPoll.hpp</a> | CAN1・CAN2からイベントを回収するAPI |
 | <a href="ControlCycle_8hpp_source.html">ControlCycle.hpp</a> | 時刻付き観測・状態機械・数学制御を1周期で処理する契約 |
-| <a href="CycleHealthMonitor_8hpp_source.html">CycleHealthMonitor.hpp</a> | 開始番号・完了証跡の照合と診断 |
+| <a href="CycleHealthMonitor_8hpp_source.html">CycleHealthMonitor.hpp</a> | 開始番号・完了証跡の照合、IWDG更新境界 |
 | <a href="ApplicationObservation_8hpp_source.html">ApplicationObservation.hpp</a> | 非駆動周期の入力・状態・診断コピー |
-| <a href="DualSenseService_8hpp_source.html">DualSenseService.hpp</a> | USB操作イベントと長押し判定 |
+| <a href="DualSenseService_8hpp_source.html">DualSenseService.hpp</a> | USB報告連続性、操作イベントと長押し判定 |
 | <a href="DriveRuntime_8hpp_source.html">DriveRuntime.hpp</a> | 周期実行・送信終端・CAN所有者結合の共通契約 |
 | <a href="Can2ServiceLink_8hpp_source.html">Can2ServiceLink.hpp</a> | 自作CAN2の受信・周期入力・応答・配信契約 |
 | <a href="PowerBoardService_8hpp_source.html">PowerBoardService.hpp</a> | 電源報告の受信API・生メタデータ・500ms期限・故障保持 |
@@ -284,7 +283,6 @@
 | <a href="DiagnosticsService_8hpp_source.html">DiagnosticsService.hpp</a> | 診断イベント・固定領域・送信進捗 |
 | <a href="StatusIndicator_8hpp_source.html">StatusIndicator.hpp</a> | 状態別の論理表示パターン |
 | <a href="StatusIndicatorPort_8hpp_source.html">StatusIndicatorPort.hpp</a> | RGB・ブザー出力と出力失敗診断 |
-| <a href="WatchdogPort_8hpp_source.html">WatchdogPort.hpp</a> | 正常完了証跡に基づくIWDG更新要求 |
 | <a href="MotorService_8hpp_source.html">MotorService.hpp</a> | RS06のARM・停止と、脚・車輪6軸の周期観測をまとめるAPI |
 | <a href="MotorCanLink_8hpp_source.html">MotorCanLink.hpp</a> | CAN1・CAN2の機器報告の配送、RS06の送信・終端接続 |
 | <a href="RobotSequence_8hpp_source.html">RobotSequence.hpp</a> | 運転状態、FAULT、要求と結果の公開型 |
@@ -312,7 +310,7 @@
 | フォルダ・ファイル | 内容 |
 |---|---|
 | <a href="CanPort_8hpp_source.html">CanPort.hpp</a> | 1バスの送受信、IRQ、メールボックスを扱うAPI |
-| <a href="CanRouter_8hpp_source.html">CanRouter.hpp</a> | CANイベントの配送API・CAN2自作通信6分類 |
+| <a href="CanRouter_8hpp_source.html">CanRouter.hpp</a> | CANイベントの交互回収と配送API・CAN2自作通信6分類 |
 | <a href="Can2FilterPlan_8hpp_source.html">Can2FilterPlan.hpp</a> | CAN2の32bit Listフィルタ構成と生成API |
 | <a href="CanTxScheduler_8hpp_source.html">CanTxScheduler.hpp</a> | 対象別の停止要求、通常FIFO、周期送信、受付と終端の照合API |
 | <a href="MotorFramePlan_8hpp_source.html">MotorFramePlan.hpp</a> | SIL専用Type1×4＋C620共通0x200の符号化計画 |
@@ -378,7 +376,6 @@
 | フォルダ・ファイル | 内容 |
 |---|---|
 | <a href="StateMachine_8hpp_source.html">StateMachine.hpp</a> | 状態機械で共用する型付きの状態保持 |
-| <a href="CycleTicket_8hpp_source.html">CycleTicket.hpp</a> | 周期開始と完了の時刻付きDTO |
 | <a href="balancing__observation__time_8h_source.html">balancing_observation_time.h</a> | 観測の経過時間と鮮度判定で使う関数 |
 */
 
@@ -390,17 +387,13 @@
 |---|---|
 | <a href="C620Motor_8hpp_source.html">C620Motor.hpp</a> | C620 1軸の受信順累積・連続性・鮮度のAPI |
 | <a href="Rs06Motor_8hpp_source.html">Rs06Motor.hpp</a> | RS06 1軸の有効化、停止、状態報告のAPI |
-| <a href="Can1Observation_8h_source.html">Can1Observation.h</a> | HAL非依存のCAN1受信監視コピーと採取時刻 |
-| <a href="Can2Observation_8h_source.html">Can2Observation.h</a> | CAN2の受信・左右分類・バス異常・共通評価時刻 |
 | <a href="MotorObservation_8hpp_source.html">MotorObservation.hpp</a> | 6軸周期観測と回収番号・故障保持 |
 | <a href="I2cPort_8hpp_source.html">I2cPort.hpp</a> | 非同期I2C転送の契約 |
 | <a href="UsbHostPort_8hpp_source.html">UsbHostPort.hpp</a> | 接続世代・転送連番・期限の契約 |
 | <a href="F446UsbHostPort_8hpp_source.html">F446UsbHostPort.hpp</a> | 基板設定と明示Host起動 |
-| <a href="UsbHidInput_8hpp_source.html">UsbHidInput.hpp</a> | HID報告連続性 |
 | <a href="Bno055_8hpp_source.html">Bno055.hpp</a> | ACCGYRO取得とDRDY・時間窓 |
 | <a href="ImuObservation_8hpp_source.html">ImuObservation.hpp</a> | 姿勢の周期読取API |
-| <a href="Led_8hpp_source.html">Led.hpp</a> | 明示極性付きLED・RGB論理出力 |
-| <a href="Buzzer_8hpp_source.html">Buzzer.hpp</a> | 時刻差による単発鳴動・停止 |
+| <a href="IndicatorOutput_8hpp_source.html">IndicatorOutput.hpp</a> | GPIO極性、LED・RGB・ブザー出力 |
 | <a href="balancing__f446__motor__bench__port_8h_source.html">balancing_f446_motor_bench_port.h</a> | F446の試運転ポートを操作するC API |
 */
 
@@ -431,23 +424,20 @@
 
 | フォルダ・ファイル | 内容 |
 |---|---|
-| <a href="CanEventPoll_8cpp_source.html">CanEventPoll.cpp</a> | 2バスのイベントを交互に上限付きで回収 |
 | <a href="ControlCycle_8cpp_source.html">ControlCycle.cpp</a> | 1周期の観測→ARM/FAULT→数学制御・指令変換の実行順 |
-| <a href="CycleHealthMonitor_8cpp_source.html">CycleHealthMonitor.cpp</a> | 欠落・重複・未完了の分離 |
+| <a href="CycleHealthMonitor_8cpp_source.html">CycleHealthMonitor.cpp</a> | 欠落・重複・未完了の分離、更新要求照合 |
 | <a href="MotorService_8cpp_source.html">MotorService.cpp</a> | 6軸の観測取得、報告の軸選択、RS06のARM・停止要求 |
 | <a href="MotorCanLink_8cpp_source.html">MotorCanLink.cpp</a> | 既存軸別受信とCAN1の有効化・停止の配送、自作CAN2を除外 |
 | <a href="RobotSequence_8cpp_source.html">RobotSequence.cpp</a> | 運転状態の遷移、ARMINGの期限、FAULT記録 |
 | <a href="application_8cpp_source.html">application.cpp</a> | F446のC++側初期化、6軸・IMU観測の固定、非駆動ControlCycle |
 | <a href="DualSenseService_8cpp_source.html">DualSenseService.cpp</a> | 報告の連続性・操作元・長押しイベント |
 | <a href="DriveRuntime_8cpp_source.html">DriveRuntime.cpp</a> | F446の非駆動周期実行。ホスト駆動は tests/sil/ に分離 |
-| <a href="Can2ServiceLink_8cpp_source.html">Can2ServiceLink.cpp</a> | 電源・操作・診断配送と周期結果の応答生成 |
-| <a href="Can2ServiceLinkTx_8cpp_source.html">Can2ServiceLinkTx.cpp</a> | 背景送信・FAULT符号化・購読配信 |
+| <a href="Can2ServiceLink_8cpp_source.html">Can2ServiceLink.cpp</a> | 電源・操作・診断配送と周期結果の応答生成、背景送信 |
 | <a href="PowerBoardService_8cpp_source.html">PowerBoardService.cpp</a> | CAN2電源状態の復号接続・受理と鮮度評価 |
 | <a href="RemoteControlService_8cpp_source.html">RemoteControlService.cpp</a> | C11操作数学とC++状態の接続 |
 | <a href="DiagnosticsService_8cpp_source.html">DiagnosticsService.cpp</a> | 重要通常FIFO、3部分の終端照合 |
 | <a href="StatusIndicator_8cpp_source.html">StatusIndicator.cpp</a> | FAULT優先と時刻差による点滅・鳴動 |
 | <a href="StatusIndicatorPort_8cpp_source.html">StatusIndicatorPort.cpp</a> | 極性変換・変更時書込み・失敗時OFF |
-| <a href="WatchdogPort_8cpp_source.html">WatchdogPort.cpp</a> | 更新重複拒否とコールバック結果の集計 |
 | <a href="f446__indicator__output_8cpp_source.html">f446_indicator_output.cpp</a> | 生成GPIO割当と出力ラッチ照合 |
 | <a href="balancing__motor__bench_8c_source.html">balancing_motor_bench.c</a> | 単軸試運転のコマンド、状態遷移、停止条件 |
 | <a href="balancing__operator__input_8c_source.html">balancing_operator_input.c</a> | 操作元選択、通信断、ニュートラル確認、指令値の整形 |
@@ -478,7 +468,7 @@
 | <a href="PowerBoardCodec_8cpp_source.html">PowerBoardCodec.cpp</a> | 電源フレームの符号化・復号と形式検査 |
 | <a href="RemoteControlCodec_8cpp_source.html">RemoteControlCodec.cpp</a> | 操作フレームの符号化・復号と形式検査 |
 | <a href="DiagnosticsCodec_8cpp_source.html">DiagnosticsCodec.cpp</a> | 診断フレームの符号化・型付き復号・値の検査 |
-| <a href="CanRouter_8cpp_source.html">CanRouter.cpp</a> | バス・IDE・固定ID・DLC・宛先で受信分類、送信終端・状態配送 |
+| <a href="CanRouter_8cpp_source.html">CanRouter.cpp</a> | 交互回収、バス・IDE・固定ID・DLC・宛先で受信分類、送信終端・状態配送 |
 | <a href="Can2FilterPlan_8cpp_source.html">Can2FilterPlan.cpp</a> | C620と自作受信IDの照合ワード生成 |
 | <a href="CanTxScheduler_8cpp_source.html">CanTxScheduler.cpp</a> | 停止送信の優先順位と再試行、通常FIFO、周期指令の期限と終端照合 |
 | <a href="MotorFramePlan_8cpp_source.html">MotorFramePlan.cpp</a> | 状態別の通常トルク抑止とC11コーデックによる5フレーム生成 |
@@ -542,7 +532,6 @@
 | <a href="f446__can1__runtime_8cpp_source.html">f446_can1_runtime.cpp</a> | CAN1/2起動、共有フィルタ、IRQ、共通DWT時計、独立した監視集計 |
 | <a href="UsbHostPort_8cpp_source.html">UsbHostPort.cpp</a> | 固定長転送と一回限りの完了配送 |
 | <a href="f446__usb__host__port_8cpp_source.html">f446_usb_host_port.cpp</a> | ST Host Core・HCD接続、非同期reset・回収・IRQ |
-| <a href="UsbHidInput_8cpp_source.html">UsbHidInput.cpp</a> | 入力世代・連番検査 |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_communication_usb usb/
@@ -551,8 +540,7 @@
 
 | ファイル | 内容 |
 |---|---|
-| <a href="DualSenseHostClass_8hpp_source.html">DualSenseHostClass.hpp</a> | 非Boot HIDとIN descriptor検査 |
-| <a href="DualSenseHidCodec_8hpp_source.html">DualSenseHidCodec.hpp</a> | 操作報告の復号 |
+| <a href="DualSenseProtocol_8hpp_source.html">DualSenseProtocol.hpp</a> | 非Boot HID descriptor・操作報告の型と検査 |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Src_balancing_communication_usb usb/
@@ -561,6 +549,5 @@
 
 | ファイル | 内容 |
 |---|---|
-| <a href="DualSenseHostClass_8cpp_source.html">DualSenseHostClass.cpp</a> | 非Boot HIDとIN descriptor検査 |
-| <a href="DualSenseHidCodec_8cpp_source.html">DualSenseHidCodec.cpp</a> | 操作報告の復号 |
+| <a href="DualSenseProtocol_8cpp_source.html">DualSenseProtocol.cpp</a> | USB descriptor検証と報告復号 |
 */

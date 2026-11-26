@@ -1,6 +1,6 @@
 #pragma once
 #include "balancing/app/StatusIndicator.hpp"
-#include "balancing/device/Led.hpp"
+#include "balancing/device/IndicatorOutput.hpp"
 
 namespace balancing {
 /** @brief RGB・ブザーの順で固定。極性・方式が確認できた場合のみverified。
