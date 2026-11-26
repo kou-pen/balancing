@@ -6,7 +6,8 @@ bool CycleHealthMonitor::begin(CycleTicket ticket) noexcept
     const bool unfinished=status_.inProgress;
     // 新しい開始が来ても前回の未完了を成功に読み替えない。
     abandon();
-    if (clockHighWater_ && ticket.startedAtUs<*clockHighWater_) {
+    if ((clockHighWater_ && ticket.startedAtUs<*clockHighWater_) ||
+        (status_.lastStarted && ticket.startedAtUs<=status_.lastStarted->startedAtUs)) {
         ++status_.clockRegressions;
         eligible_=false;
         // 逆行した時刻や番号を新たな基準にせず、復帰を待つ。

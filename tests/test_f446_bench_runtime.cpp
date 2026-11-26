@@ -1,3 +1,4 @@
+#include "balancing/device/F446Watchdog.hpp"
 #include "balancing/bench/MotorBench.hpp"
 #include "balancing_f446_bench_bridge.h"
 #ifdef NDEBUG
@@ -131,7 +132,25 @@ int main(int argc,char** argv) {
     assert(!startCanBench(&h2,&h1,rsCfg));
     assert(!canBenchSummary() && !balancing_f446_bench_capture_irq(1));
     service(1);assert(!filterCalls && !startCalls && !pending(1) && !pending(2));
-    if(!std::strcmp(mode,"--failures")) {
+    if(!std::strcmp(mode,"--iwdg")) {
+        RCC->CSR=RCC_CSR_IWDGRSTF;
+        balancing_f446_watchdog_capture_reset_flags();
+        assert(startCanBench(&h1,&h2,wheelCfg));
+        assert(startF446Watchdog({true,true,32,499})==BF446_WATCHDOG_STARTED);
+        assert(iwdgInitCalls==1 && iwdgRefreshCalls==0 && resetClearCalls==1);
+        service(1);assert(iwdgRefreshCalls==1);expectStop(2);
+        advance(100);finish(2);assert(iwdgRefreshCalls==1); // IRQだけでは更新しない
+        advance(1900);service(2);assert(iwdgRefreshCalls==2);
+        service(3);assert(iwdgRefreshCalls==2); // DWT停止
+        assert(canBenchSummary()->state==BenchState::Fault);
+        assert(!bindBenchWatchdog({nullptr,[](void*) noexcept{return true;},true}));
+        advance(4000);service(4);assert(iwdgRefreshCalls==2); // 欠落番号
+        advance(2000);service(5);assert(iwdgRefreshCalls==3); // FAULT停止処理完了
+        iwdgRefreshResult=HAL_ERROR;
+        advance(2000);service(6);assert(iwdgRefreshCalls==4 && f446WatchdogSummary().refreshFailed);
+        iwdgRefreshResult=HAL_OK;
+        advance(2000);service(7);assert(iwdgRefreshCalls==4);
+    } else if(!std::strcmp(mode,"--failures")) {
         dwt.CTRL=DWT_CTRL_NOCYCCNT_Msk;
         assert(!startCanBench(&h1,&h2,rsCfg));dwt.CTRL=0;
         failFilter=1;assert(!startCanBench(&h1,&h2,rsCfg) && !startCalls);

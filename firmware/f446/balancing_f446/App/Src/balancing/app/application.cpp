@@ -63,11 +63,12 @@ public:
     bool init(const Can2ObservationProfile& profile={},bool requireCan2=false) noexcept
     {
         // 起動済みHostを別のApplicationへ暗黙再結合しない。
-        if (control_ && control_->usbHost.summary().started) return false;
+        if (watchdog_.summary().configured || (control_ && control_->usbHost.summary().started)) return false;
         if (control_) control_->indicatorOutput.disable();
         observation_ = {};
         previousUs_.reset();
         health_={};
+        cycleStarted_=false;
         ticket_.reset();
         watchdog_=WatchdogPort{profile.watchdog};
         observation_.watchdog=watchdog_.summary();
@@ -77,6 +78,16 @@ public:
             return false;
         }
         initialized_ = true;
+        return true;
+    }
+
+    bool bindWatchdog(WatchdogConfig config) noexcept
+    {
+        // 更新証跡の履歴を再初期化で消さない。最初の周期開始より前だけ結合。
+        if (!initialized_ || watchdog_.summary().configured || cycleStarted_ ||
+            !config.verified || !config.refresh) return false;
+        watchdog_=WatchdogPort{config};
+        observation_.watchdog=watchdog_.summary();
         return true;
     }
 
@@ -109,6 +120,7 @@ public:
     void beginScheduledTick(std::uint32_t eventSequence) noexcept
     {
         if (!initialized_) return;
+        cycleStarted_=true;
         ticket_.reset();
         if (const auto now=observationClockUs()) {
             const CycleTicket ticket{eventSequence,*now};
@@ -122,6 +134,7 @@ public:
     void runTick() noexcept
     {
         if (!initialized_) return;
+        cycleStarted_=true;
         const bool processed=controlTick();
         if (ticket_) {
             // CAN回収から診断・表示まで戻った後にだけ証跡を確定する。
@@ -334,6 +347,7 @@ private:
     std::optional<ObservationCycle> control_{};
     std::optional<std::uint64_t> previousUs_{};
     bool initialized_{false};
+    bool cycleStarted_{false};
 };
 
 // 静的に一つだけ保持。malloc/newも静的初期化時のHAL利用も行わない。
@@ -362,6 +376,8 @@ bool initializeCan2Observation(const Can2ObservationProfile& profile) noexcept
     application.init(profile);
     return application.can2Link()!=nullptr;
 }
+
+bool bindApplicationWatchdog(WatchdogConfig config) noexcept { return application.bindWatchdog(config); }
 
 DualSenseService* applicationDualSense() noexcept { return application.usbLink(); }
 bool startApplicationUsbHost(UsbHostConfig config,UsbHostBackend backend) noexcept

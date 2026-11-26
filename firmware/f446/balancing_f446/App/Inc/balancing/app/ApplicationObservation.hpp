@@ -57,6 +57,10 @@ struct Can2ObservationProfile {
  * @spec{BOARD-F446-001}
  */
 bool initializeCan2Observation(const Can2ObservationProfile&) noexcept;
+/** @brief 周期開始前だけ更新ポートを一回結合。既存設定の上書き禁止。
+ * @spec{BOARD-F446-001}
+ */
+bool bindApplicationWatchdog(WatchdogConfig) noexcept;
 /** @brief 主ループ専用。無効設定・未初期化では空。
  * @spec{BOARD-F446-001}
  */

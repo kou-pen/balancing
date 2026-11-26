@@ -182,12 +182,14 @@ add_executable(balancing_f446_bench_runtime_tests
     ${F446_APP}/Src/balancing/device/C620Motor.cpp
     ${F446_APP}/Src/balancing/communication/can/CanPort.cpp
     ${BALANCING_CAN_DISPATCH_SOURCES}
+    ${F446_APP}/Src/balancing/device/F446Watchdog.cpp
+    ${F446_APP}/Src/balancing/app/CycleHealthMonitor.cpp
 )
 target_compile_definitions(balancing_f446_bench_runtime_tests PRIVATE BALANCING_BENCH_BUILD)
 target_include_directories(balancing_f446_bench_runtime_tests PRIVATE tests/stubs_can1)
 target_link_libraries(balancing_f446_bench_runtime_tests PRIVATE balancing_core balancing_motor_codecs m)
 target_compile_options(balancing_f446_bench_runtime_tests PRIVATE -Wall -Wextra -Wpedantic)
-foreach(mode rs wheel failures rollback gap)
+foreach(mode rs wheel failures rollback gap iwdg)
     add_test(NAME balancing_f446_bench_runtime_${mode}_tests COMMAND balancing_f446_bench_runtime_tests --${mode})
 endforeach()
 
@@ -216,6 +218,7 @@ add_executable(balancing_f446_can1_runtime_tests
     ${F446_APP}/Src/balancing/communication/can/CanPort.cpp
     ${F446_APP}/Src/balancing/device/f446_can1_runtime.cpp
     ${F446_APP}/Src/balancing/communication/can/Can2FilterPlan.cpp
+    ${F446_APP}/Src/balancing/device/F446Watchdog.cpp
 )
 target_include_directories(balancing_f446_can1_runtime_tests PRIVATE
     tests/stubs_can1
@@ -229,6 +232,9 @@ add_test(NAME balancing_f446_motor_observation_tests COMMAND balancing_f446_can1
 add_test(NAME balancing_f446_can2_services_tests COMMAND balancing_f446_can1_runtime_tests --can2-services)
 add_test(NAME balancing_f446_usb_host_tests COMMAND balancing_f446_can1_runtime_tests --usb-host)
 add_test(NAME balancing_f446_drive_sil_usb_host_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-usb-host)
+foreach(mode success disabled hardware frozen initfail unverified invalid unbound uncaptured late)
+    add_test(NAME balancing_f446_iwdg_${mode}_tests COMMAND balancing_f446_can1_runtime_tests --iwdg-${mode})
+endforeach()
 add_test(NAME balancing_f446_watchdog_tests COMMAND balancing_f446_can1_runtime_tests --watchdog)
 add_test(NAME balancing_f446_drive_sil_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil)
 add_test(NAME balancing_f446_usb_input_tests COMMAND balancing_f446_can1_runtime_tests --usb-input)

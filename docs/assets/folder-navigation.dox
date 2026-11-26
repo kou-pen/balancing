@@ -285,6 +285,7 @@
 | <a href="DiagnosticsService_8hpp_source.html">DiagnosticsService.hpp</a> | 診断イベント・固定領域・送信進捗 |
 | <a href="StatusIndicator_8hpp_source.html">StatusIndicator.hpp</a> | 状態別の論理表示パターン |
 | <a href="StatusIndicatorPort_8hpp_source.html">StatusIndicatorPort.hpp</a> | RGB・ブザー出力と出力失敗診断 |
+| <a href="F446Watchdog_8hpp_source.html">F446Watchdog.hpp</a> | 実機IWDGの固定設定・起動・リセット原因診断 |
 | <a href="MotorService_8hpp_source.html">MotorService.hpp</a> | RS06のARM・停止と、脚・車輪6軸の周期観測をまとめるAPI |
 | <a href="MotorCanLink_8hpp_source.html">MotorCanLink.hpp</a> | CAN1・CAN2の機器報告の配送、RS06の送信・終端接続 |
 | <a href="RobotSequence_8hpp_source.html">RobotSequence.hpp</a> | 運転状態、FAULT、要求と結果の公開型 |
@@ -430,6 +431,7 @@
 | <a href="DiagnosticsService_8cpp_source.html">DiagnosticsService.cpp</a> | 重要通常FIFO、3部分の終端照合 |
 | <a href="StatusIndicator_8cpp_source.html">StatusIndicator.cpp</a> | FAULT優先と時刻差による点滅・鳴動 |
 | <a href="StatusIndicatorPort_8cpp_source.html">StatusIndicatorPort.cpp</a> | 極性変換・変更時書込み・失敗時OFF |
+| <a href="F446Watchdog_8cpp_source.html">F446Watchdog.cpp</a> | HAL初期化と周期完了に限定した更新・失敗ラッチ |
 | <a href="f446__indicator__output_8cpp_source.html">f446_indicator_output.cpp</a> | 生成GPIO割当と出力ラッチ照合 |
 */
 

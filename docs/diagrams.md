@@ -697,3 +697,24 @@ flowchart TB
 </pre>
 
 実行時のモード切替はない。チェックイン済み設定は無効であり、BenchDebugから非ゼロ要求関数を呼ばない。[起動・IRQ分離検証](verification/f446-bench-startup.md)。
+
+## 10. IWDG更新経路
+
+<pre class="mermaid">
+flowchart TB
+    RESET["RCC CSRコピー（main開始）"] --> INIT["周辺・選択ランタイム・TIM7開始"]
+    INIT --> CFG{"IWDG固定設定・option byte確認"}
+    CFG -->|無効| DISABLED["更新ポート未接続"]
+    CFG -->|不適合| ERROR["Error_Handler / 再試行なし"]
+    CFG -->|有効・検証済み| BIND["選択側WatchdogPort結合"]
+    BIND --> HAL["HAL_IWDG_Init（初回reload）"]
+    HAL -->|失敗| ERROR
+    HAL -->|成功| TICK["番号付き主ループ周期"]
+    TICK --> PROCESS["CAN回収・制御/停止・診断完了"]
+    PROCESS --> PROOF{"CycleHealthMonitorの新規完了証跡"}
+    PROOF -->|成立| REFRESH["WatchdogPort → HAL_IWDG_Refresh"]
+    PROOF -->|不成立| NO["更新なし"]
+    REFRESH -->|HAL失敗| LATCH["更新禁止ラッチ"]
+</pre>
+
+通常ApplicationとBenchDebugは別のビルドで選択される。ISRや背景pollから更新しない。公称500msの実測と実機有効化は未実施。

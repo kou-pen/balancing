@@ -108,7 +108,7 @@ struct CAN_FilterTypeDef {
     std::uint32_t FilterFIFOAssignment, FilterBank, FilterMode, FilterScale;
     std::uint32_t FilterActivation, SlaveStartFilterBank;
 };
-enum HAL_StatusTypeDef { HAL_OK, HAL_ERROR, HAL_BUSY };
+enum HAL_StatusTypeDef { HAL_OK, HAL_ERROR, HAL_BUSY, HAL_TIMEOUT };
 HAL_StatusTypeDef HAL_CAN_ConfigFilter(CAN_HandleTypeDef*, const CAN_FilterTypeDef*);
 HAL_StatusTypeDef HAL_CAN_Start(CAN_HandleTypeDef*);
 HAL_StatusTypeDef HAL_CAN_Stop(CAN_HandleTypeDef*);
@@ -136,3 +136,35 @@ HAL_StatusTypeDef HAL_I2C_Mem_Read_IT(I2C_HandleTypeDef*,std::uint16_t,std::uint
 HAL_StatusTypeDef HAL_I2C_Mem_Write_IT(I2C_HandleTypeDef*,std::uint16_t,std::uint16_t,std::uint16_t,std::uint8_t*,std::uint16_t);
 void HAL_NVIC_SetPriority(int,int,int);
 void HAL_NVIC_EnableIRQ(int);
+
+// IWDG HAL境界の試験用。物理クロックやリセットは模擬しない。
+constexpr std::uint32_t FLASH_OPTCR_WDG_SW=1u<<5;
+constexpr std::uint32_t DBGMCU_APB1_FZ_DBG_IWDG_STOP=1u<<12;
+constexpr std::uint32_t RCC_CSR_IWDGRSTF=1u<<29;
+constexpr std::uint32_t IWDG_PRESCALER_32=3u;
+struct TestFlash { std::uint32_t OPTCR{FLASH_OPTCR_WDG_SW}; };
+struct TestDbg { std::uint32_t APB1FZ{}; };
+struct TestRcc { std::uint32_t CSR{}; };
+struct TestIwdg {};
+inline TestFlash testFlash{};
+inline TestDbg testDbg{};
+inline TestRcc testRcc{};
+inline TestIwdg testIwdg{};
+inline TestFlash* FLASH=&testFlash;
+inline TestDbg* DBGMCU=&testDbg;
+inline TestRcc* RCC=&testRcc;
+inline TestIwdg* IWDG=&testIwdg;
+struct IWDG_HandleTypeDef {
+    TestIwdg* Instance{};
+    struct { std::uint32_t Prescaler{},Reload{}; } Init;
+};
+inline unsigned iwdgInitCalls{},iwdgRefreshCalls{},resetClearCalls{};
+inline HAL_StatusTypeDef iwdgInitResult=HAL_OK,iwdgRefreshResult=HAL_OK;
+inline IWDG_HandleTypeDef iwdgLastInit{};
+inline void __HAL_RCC_CLEAR_RESET_FLAGS(){ ++resetClearCalls; RCC->CSR &= 0x00ffffffu; }
+inline HAL_StatusTypeDef HAL_IWDG_Init(IWDG_HandleTypeDef* h){
+    ++iwdgInitCalls;iwdgLastInit=*h;return iwdgInitResult;
+}
+inline HAL_StatusTypeDef HAL_IWDG_Refresh(IWDG_HandleTypeDef*){
+    ++iwdgRefreshCalls;return iwdgRefreshResult;
+}
