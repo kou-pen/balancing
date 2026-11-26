@@ -143,6 +143,7 @@ cpp_common = [
     "-I",
     str(F446_APP / "Inc"),
     str(F446_APP / "Src" / "balancing" / "app" / "application.cpp"),
+    str(app_source / "app" / "DriveRuntime.cpp"),
     str(ROOT / "tests" / "test_cpp_app.cpp"),
     str(app_source / "app" / "RobotSequence.cpp"),
     *app_math_cpp, power_id_source,
@@ -385,7 +386,7 @@ can_dispatch_common = [
     str(rs06_source / "app" / "Can2ServiceLinkTx.cpp"),
 ]
 for test, extra_sources in [
-    ("test_f446_can1_runtime", rs06_service_sources + app_math_cpp + [str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "device" / "f446_can1_runtime.cpp"), str(rs06_source / "communication" / "can" / "Can2FilterPlan.cpp"), str(rs06_source / "app" / "application.cpp"), str(rs06_source / "app" / "DriveCycle.cpp"), str(rs06_source / "communication" / "can" / "MotorFramePlan.cpp")]),
+    ("test_f446_can1_runtime", rs06_service_sources + app_math_cpp + [str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "device" / "f446_can1_runtime.cpp"), str(rs06_source / "communication" / "can" / "Can2FilterPlan.cpp"), str(rs06_source / "app" / "application.cpp"), str(ROOT / "tests" / "sil" / "DriveCycle.cpp"), str(ROOT / "tests" / "sil" / "DriveRuntime.cpp"), str(rs06_source / "communication" / "can" / "MotorFramePlan.cpp")]),
     ("test_f446_can_event_poll", rs06_service_sources + app_math_cpp + [str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "communication" / "can" / "MotorFramePlan.cpp"), str(rs06_source / "control" / "filter" / "ImuAttitudeSource.cpp")]),
 ]:
     for suffix, flags in [
@@ -404,7 +405,6 @@ for test, extra_sources in [
             link_libraries.append(str(attitude))
         print(f"[{test}{suffix}] コンパイル", flush=True)
         subprocess.run(can_dispatch_common + extra_sources + flags +
-                       (['-DBALANCING_HOST_SIL'] if test == 'test_f446_can1_runtime' else []) +
                        [str(source)] + link_libraries + ["-o", str(path)],
                        check=True, cwd=ROOT, timeout=30)
         subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
@@ -669,4 +669,5 @@ subprocess.run(
     cwd=ROOT,
     timeout=30,
 )
+subprocess.run([sys.executable, str(ROOT / "tests/test_drive_runtime_boundary.py")], check=True, cwd=ROOT, timeout=30)
 print("ホスト試験：全件合格")

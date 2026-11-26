@@ -1,5 +1,4 @@
-#include "balancing/app/DriveCycle.hpp"
-#if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
+#include "DriveCycle.hpp"
 #include <algorithm>
 #include <limits>
 
@@ -203,4 +202,3 @@ void DriveCycle::onTxTerminal(CanBus bus,TxToken token,CanTxOutcome outcome,
     }
 }
 }
-#endif
