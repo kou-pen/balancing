@@ -281,3 +281,7 @@ USB受信完了通知は主ループに配送し、再読出し時刻で鮮度�
 ## 独立単軸試運転
 
 `bench/MotorBench.hpp` の `MotorBench` は専用CanPortを借用し、`requestPulse(output, nowUs)`、`poll(nowUs)`、`cancel()`、`summary(nowUs)` を提供する。通常Applicationとは排他的に使用し、実機起動経路には未接続。詳細は [検証契約](../verification/f446-motor-bench-cpp.md) を参照。
+
+## 操作入力のC++統合
+
+`RemoteControlService.hpp/.cpp` が `OperatorSource`、`OperatorInputConfig`、`OperatorSample`、`OperatorTarget` と全操作入力状態を所有する。CAN/USBの復号後に `acceptDecoded`、DISARMED中の明示切替に `selectSource`、周期ごとに `update(RobotState, nowUs)` を使用する。旧C状態を介さず、ARMING/DISARMED/FAULTの目標はゼロ、BALANCINGの通信断は設定変化率で減速する。ARMイベントは生成しない。既存SI値フィールド名は維持。詳細は [C++操作入力検証](../verification/f446-operator-cpp.md)。
