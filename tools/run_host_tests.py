@@ -111,7 +111,7 @@ for label, flags in [
 # Both Application tests now link the actual C++ control cycle and C11 math.
 app_source = F446_APP / "Src" / "balancing"
 app_math_cpp = [str(app_source / name) for name in (
-    "app/ControlCycle.cpp", "app/PowerBoardService.cpp", "app/RemoteControlService.cpp", "app/DiagnosticsService.cpp", "app/StatusIndicator.cpp", "control/controller/MotorCommand.cpp",
+    "app/ControlCycle.cpp", "app/PowerBoardService.cpp", "app/RemoteControlService.cpp", "app/DiagnosticsService.cpp", "app/StatusIndicator.cpp", "device/StatusIndicatorPort.cpp", "control/controller/MotorCommand.cpp",
     "control/controller/BalanceControl.cpp", "control/estimator/StateEstimator.cpp",
     "control/estimator/LegKinematics.cpp", "control/estimator/WheelOdometry.cpp")]
 power_codec_sources = [str(app_source / ("communication/can/" + name)) for name in
@@ -591,7 +591,7 @@ for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-saniti
 for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"])]:
     path = OUT / f"test_f446_status_indicator{suffix}"
     subprocess.run(["g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
-        "-I", str(F446_APP / "Inc"), str(app_source / "app/StatusIndicator.cpp"),
+        "-I", str(F446_APP / "Inc"), str(app_source / "app/StatusIndicator.cpp"), str(app_source / "device/StatusIndicatorPort.cpp"),
         str(ROOT / "tests/test_f446_status_indicator.cpp"), *flags, "-o", str(path)],
         check=True, cwd=ROOT, timeout=30)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)

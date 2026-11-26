@@ -15,6 +15,13 @@ balancing::MotorObservationSnapshot observed{};
 bool available{};
 bool sampled{};
 unsigned acknowledgements{};
+struct Gpio { unsigned calls{}; bool high{},fail{}; };
+bool gpioWrite(void* ctx,bool high) noexcept {
+    auto& p=*static_cast<Gpio*>(ctx); ++p.calls;
+    if (p.fail) return false;
+    p.high=high; return true;
+}
+
 }
 std::optional<balancing::MotorObservationSnapshot> balancing::motorObservation() noexcept
 {
@@ -126,6 +133,43 @@ int main()
     assert(balancing_app_timing_snapshot(&timing));
     assert(!timing.sample_valid && !timing.elapsed_valid);
     assert(timing.duplicate_samples == 0 && timing.clock_regressions == 0);
+    // 非駆動Applicationに明示された模擬GPIOだけを接続。
+    using namespace balancing;
+    Can2ObservationProfile profile{};
+    profile.communication={200000,100000,20000,20,1000,4,0xCA2u,false};
+    std::array<Gpio,4> gpio{};
+    profile.indicator.verified=true;
+    profile.indicator.patterns[0]={false,true,false,0,0};
+    profile.indicator.patterns[3]={true,false,false,4,1000};
+    profile.indicatorOutput.verified=true;
+    for (unsigned i=0;i<4;++i)
+        profile.indicatorOutput.pins[i]={nullptr,&gpio[i],true,true,gpioWrite};
+    assert(initializeCan2Observation(profile));
+    for (const auto& p:gpio) assert(!p.calls);
+    observed.observedFaults=FaultFlags::None;
+    observed.motors.sampledAtUs=30000;
+    balancing_app_control_tick();
+    assert(gpio[1].high && !gpio[0].high && !gpio[3].high);
+    assert(applicationObservation()->indicatorOutput.applied);
+    observed.observedFaults=FaultFlags::BusOff;
+    observed.motors.sampledAtUs=32000;
+    balancing_app_control_tick();
+    assert(gpio[0].high && !gpio[1].high && gpio[3].high);
+    observed.observedFaults=FaultFlags::None;
+    observed.motors.sampledAtUs=33000;
+    balancing_app_control_tick(); assert(!gpio[0].high && gpio[3].high);
+    // 出力故障はFAULTの主因を変更しない。古いパターンを継続出力しない。
+    gpio[0].fail=true;
+    observed.motors.sampledAtUs=34000;
+    balancing_app_control_tick();
+    auto display=applicationObservation();
+    assert(display->indicatorOutput.failed && !display->indicatorOutput.applied);
+    assert(display->fault->primaryCause==FaultFlags::BusOff);
+    assert(!gpio[3].high);
+    auto n=gpio[0].calls;
+    observed.motors.sampledAtUs=36000;
+    balancing_app_control_tick(); assert(gpio[0].calls==n);
+    assert(applicationObservation()->diagnostics.latest->state==RobotState::Fault);
     std::puts("合格：CubeMX C -> C++ application ABI bridge");
     return 0;
 }
