@@ -381,8 +381,8 @@ int main(int argc, char** argv)
         assert(!usb.takeEvents(2900000).arm);
         assert(send(3000000,0).arm==false);
         // 切替後はUSB ARM無効、停止ボタンだけは有効。
-        assert(usb.selectSource(B_OPERATOR_CAN_REMOTE,RobotState::Disarmed,3000000));
-        assert(!usb.selectSource(B_OPERATOR_USB_DUALSENSE,RobotState::Balancing,3000000));
+        assert(usb.selectSource(OperatorSource::CanRemote,RobotState::Disarmed,3000000));
+        assert(!usb.selectSource(OperatorSource::UsbDualSense,RobotState::Balancing,3000000));
         for (std::uint64_t t=3100000;t<=4100000;t+=100000) assert(!send(t,1).arm);
         assert(!send(4200000,0).disarm);
         assert(!send(4300000,2).disarm); assert(!send(4400000,2).disarm);
@@ -394,7 +394,7 @@ int main(int argc, char** argv)
         assert(!usb.receive(1,++serial,report.data(),4,4800100,4800100));
         // 転送欠落と不正報告で長押しを再開しない。
         report[3]=0; assert(usb.receive(2,1,report.data(),4,4900000,4900000));
-        assert(usb.selectSource(B_OPERATOR_USB_DUALSENSE,RobotState::Disarmed,4900000));
+        assert(usb.selectSource(OperatorSource::UsbDualSense,RobotState::Disarmed,4900000));
         assert(usb.receive(2,2,report.data(),4,5000000,5000000));
         report[3]=1;
         assert(usb.receive(2,3,report.data(),4,5100000,5100000));
@@ -940,7 +940,7 @@ int main(int argc, char** argv)
         tick();
         response=send(0x08804c06);
         assert(response[0]==0x05000200 && (response[1]&0xffu)==0);
-        assert(applicationObservation()->operatorTarget->source==B_OPERATOR_CAN_REMOTE);
+        assert(applicationObservation()->operatorTarget->source==OperatorSource::CanRemote);
         rx(0x0880c402,2,0x0300);
         tick();
         response=send(0x08804c06);

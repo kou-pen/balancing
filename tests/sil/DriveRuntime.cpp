@@ -45,7 +45,7 @@ ControlTickResult step(ControlCycle& cycle,RobotSequence& sequence,RemoteControl
     input.interlocks.modelVerified &= cfg.lqr.verified && cfg.legPd.verified && cfg.yawPi.verified;
     const auto now=observation.motors->motors.sampledAtUs;
     observation.operatorTarget=remote.update(sequence.state(),now);
-    input.movingTarget=observation.operatorTarget.value_or(BOperatorTarget{});
+    input.movingTarget=observation.operatorTarget.value_or(OperatorTarget{});
     result=drive->step(input);
     // 同一時刻のモード切替だけでゼロを確定。変化率処理は二度進めない。
     if (sequence.state()!=RobotState::Balancing)

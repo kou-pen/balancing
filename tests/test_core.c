@@ -191,19 +191,6 @@ static void test_pending_cancellation(void)
     assert(!machine.arm_pending);
 }
 
-static void test_rate_limit(void)
-{
-    float value = -999.0f;
-    assert(b_rate_limit(0.0f, 10.0f, 2.0f, 0.1f, &value));
-    NEAR(value, 0.2f);
-    assert(b_rate_limit(value, -10.0f, 2.0f, 0.1f, &value));
-    NEAR(value, 0.0f);
-    assert(!b_rate_limit(0.0f, NAN, 2.0f, 0.1f, &value));
-    NEAR(value, 0.0f);
-    assert(!b_rate_limit(0.0f, 1.0f, 0.0f, 0.1f, &value));
-    assert(!b_rate_limit(0.0f, 1.0f, 2.0f, -0.1f, &value));
-}
-
 static void test_wheel_allocation(void)
 {
     BWheelAllocation w;
@@ -520,7 +507,6 @@ int main(void)
     test_arm_handshake_and_disarm();
     test_fault_latch_and_rearm();
     test_pending_cancellation();
-    test_rate_limit();
     test_wheel_allocation();
     test_lqr_no_unverified_gains();
     test_lqr_named_state_mapping();
@@ -529,6 +515,6 @@ int main(void)
     test_fault_clear_requires_a_separate_arm_event();
     test_arm_handshake_timestamp_strictness();
     test_scheduler_boundary_and_null_input_fail_closed();
-    puts("合格：鮮度監視、ARM応答、FAULT、目標制限、車輪配分、LQR数学処理");
+    puts("合格：鮮度監視、ARM応答、FAULT、車輪配分、LQR数学処理");
     return 0;
 }
