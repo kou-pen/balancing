@@ -5,6 +5,7 @@
 - 人間の入口は `README.md` → `docs/index.md`。全体像は短い段落・図・表で伝え、長い箇条書きや試験ログを概要へ転載しない。
 - AIだけが使う参照経路は [AI文書ルータ](docs/ai/context.md)。規則と具体的な仕様・受入条件・検証証拠は、それぞれの正本を参照する。
 - `docs/specs/`と`docs/todo/`の規範的な意味は、読みやすさの編集を理由に変更しない。人間向け概要では正本へのリンクで示す。
+- 現行の呼び出し順は `docs/diagrams.md`、ファイル一覧は `docs/design/public-api.md` とDoxygenの実フォルダページに集約し、旧APIや旧構造の記録を現行説明へ追記しない。ファイルを移動・追加した場合は実フォルダとDoxygen左ナビの両方を照合する。
 - 検証記録は削らず`docs/verification/`に保存。人間が読む試験一覧は`docs/verification/index.md`に置く。
 
 ## 文書の優先順位
@@ -18,9 +19,9 @@
 
 ## ファイル配置規約
 
-- F446のCubeMX生成`Core/`・`Drivers/`は移動しない。自作C11/C++は`firmware/f446/balancing_f446/App/{Inc,Src}/balancing/`の機能別ミラー階層で管理する。
+- F446のCubeMX生成`Core/`・`Drivers/`は移動しない。自作C++17は`firmware/f446/balancing_f446/App/{Inc,Src}/balancing/`の機能別ミラー階層で管理する。
 - 生成`main.c`からC++を呼ぶ公開ブリッジ`App/Inc/balancing_app_bridge.h`は互換性のため直下に残す。
-- 分類は`app/`・`control/controller/`・`control/estimator/`・`control/filter/`・`device/`・`communication/`・`core/`。`util/`は作らず、機能固有の処理を安易に`core/`へ置かない。
+- 分類は`app/`・`control/controller/`・`control/estimator/`・`control/filter/`・`device/`・`communication/`・`core/`・`bench/`。`util/`は作らず、機能固有の処理を安易に`core/`へ置かない。
 - パスだけの一括移動と、制御アルゴリズムの分割・挙動変更は別PRとして扱う。[配置と再生成の検証](docs/verification/f446-module-layout.md)を参照。
 
 ## コード変更時の必須手順
@@ -59,7 +60,7 @@
 
 ## 実機非依存コードのデータ設計
 
-- [データ構造と所有権](docs/design/data-model.md)、[共通C11制御コア](docs/software-core.md)を参照する。
+- [データ構造と所有権](docs/design/data-model.md)、[現行C++制御コア](docs/software-core.md)を参照する。
 - 共通コアではHAL、ROS、CAN通信処理、ヒープ割当を直接使用しない。
 - 物理量を渡す公開APIは名前と単位付きのstructを基本とする。行列内部でのみ配列を使用し、添字は名前付き定数を使う。
 - 同じ真偽を二重保持しない。入力は一周期のスナップショットとし、状態を持つ構造体の変更者は一つにする。

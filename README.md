@@ -1,40 +1,33 @@
 # Balancing — 二輪脚ロボット
 
-STM32F446を中心に、脚機構と車輪を協調制御するロボットのファームウェアを開発するリポジトリです。最初の目標は**固定脚長での基本バランシング**。可変脚長とジャンプはその後に扱います。
+STM32F446で左右の脚（RS06 × 4）と車輪（C620 × 2）を制御します。最初の目標は固定脚長での基本バランシングです。
+
+## プログラムを読む
+
+| 知りたいこと | 文書 |
+|---|---|
+| ファームウェア全体の構造と現在の動作 | [全体構成](docs/architecture.md) |
+| ファイルの配置・クラスの役割・コードへのリンク | [フォルダ別コード案内](docs/design/public-api.md) |
+| 起動・割り込み・500 Hz周期の呼び出し順 | [処理順序の図](docs/diagrams.md) |
+| どの型・クラスがデータを所有するか | [データ構造](docs/design/data-model.md) |
+| 文書全体のフォルダ一覧 | [docs/](docs/index.md) |
 
 ## 現在地
 
-| 領域 | 確認できていること | まだ確認できていないこと |
-|---|---|---|
-| F446のコード | C++17入口とC11モジュール。CubeIDE Debug/Releaseで10ソースのARMビルドPASS | 実機書込み、実時間500 Hz |
-| 制御・通信の基礎 | 制御コア、CAN通信、IMU数学フィルタ、操作入力モックのホスト試験PASS | CAN/HAL・USB/I2Cの実機統合、停止性能 |
-| ロボット全体 | 制御・通信・安全の設計と仕様IDを整備 | 状態推定・VMC等の結合、F303統合、実機倒立 |
+自作AppのC++17移行は完了。通常ビルドは既定で受信・非駆動観測のみ。停止専用送信はPR #88の実装で明示設定時に使用可能になりますが、実機設定は未投入です。ARMINGからの実機有効化・非ゼロ駆動は未接続です。試運転は別ビルドBenchDebug、IWDGとUSB Hostの実機起動は既定無効です。
 
-**ホストPASSと実機PASSは別物です。** 今のビルド成果物は、モータを安全に動かせることを保証しません。
+F303電源基板・Raspberry Piとの通信仕様とF446側Codecは存在します。対向ファームウェア・プログラムはこのリポジトリでは未確認です。
 
-## 仕組みを理解する
+[実装・検証の状態](docs/architecture.md) · [検証記録](docs/verification/index.md) · [残作業](docs/todo/roadmap.md)
 
-操作・センサ入力をF446で受け取り、状態推定と制御からRS06脚モータ・C620車輪への指令を求める設計です。実際の駆動許可は安全状態機械が決めます。
+## 開発環境
 
-[全体構成を図で見る](docs/architecture.md) · [実装順序を確認する](docs/todo/roadmap.md)
-
-## 読み始める場所
-
-| 知りたいこと | 最初に読むページ |
-|---|---|
-| 設計・コード・試験を理解する | [ドキュメント案内](docs/index.md) |
-| 開発環境を整える | [CubeIDEとC++](docs/design/cubeide-cpp.md) |
-| 仕様の確定値を調べる | [仕様ID索引](docs/spec-index.md) |
-| 開発・PRの進め方を確認する | [開発手順](CONTRIBUTING.md) |
-
-## PCで確認する
+[CubeIDEとC++](docs/design/cubeide-cpp.md) ／ [開発・PR手順](CONTRIBUTING.md) ／ [仕様索引](docs/spec-index.md)。
 
 ```sh
 python3 tools/validate_specs.py
+doxygen Doxyfile
 python3 tools/run_host_tests.py
-cmake -S . -B build/host-cmake
-cmake --build build/host-cmake -j4
-cmake --build build/host-cmake --target test
 ```
 
-[試験結果の読み方と記録](docs/verification/index.md)に、ホスト検証と実機未検証の境界をまとめています。AIの作業ルールは [AGENTS.md](AGENTS.md) に分離しています。
+Doxygenの出力は `build/docs/html/index.html`。ホスト試験とARMクロスビルドは実機動作・物理安全性を保証しません。AIの規則は [AGENTS.md](AGENTS.md) に分離しています。

@@ -1,25 +1,23 @@
 # docs/
 
-| フォルダ | 内容 |
+現行コードを調べる入口は、[architecture.md](architecture.md)（全体）→ [design/public-api.md](design/public-api.md)（フォルダ別）→ [diagrams.md](diagrams.md)（処理順序）です。Doxygenでは左側の実フォルダ名から各ソースの宣言・実装へ移動できます。
+
+| フォルダ | 役割 |
 |---|---|
-| `design/` | 設計の理由、実装方法、公開API |
-| `specs/` | 仕様IDを持つ要求。配下の `boards/`、`behavior/`、`control/`、`protocols/` に分かれる |
-| `todo/` | 作業順と受入条件 |
-| `verification/` | 実施済みの試験、その結果と未検証事項 |
-| `development/` | 開発環境、Git・GitHubの手順と運用規約 |
-| `ai/` | AIの作業で参照する文書の順序 |
-| `assets/` | Doxygenのフォルダ一覧とMermaid描画に使うファイル |
+| [design/](design/public-api.md) | 現行コードの役割・API、数学・通信の設計 |
+| [specs/](spec-index.md) | 要求仕様の正本。実装済みとは限らない |
+| [todo/](todo/roadmap.md) | 未完了の作業・受入条件 |
+| [verification/](verification/index.md) | 日付・コミット付きの検証証拠。旧実装の記録も保持 |
+| [development/](development/editor.md) | 開発環境・Git・運用 |
+| [ai/](ai/context.md) | AI専用の参照順 |
+| `assets/` | DoxygenとMermaidの表示設定 |
 
-| ファイル | 内容 |
+| 直下の文書 | 役割 |
 |---|---|
-| [architecture.md](architecture.md) | F446とF303の構成、制御周期、実装・検証の現状 |
-| [can-id-table.md](can-id-table.md) | CAN1・CAN2の用途、ID、データと物理単位 |
-| [diagrams.md](diagrams.md) | 制御のデータフロー、状態遷移、停止と電源遮断の図 |
-| [software-core.md](software-core.md) | 旧C11の状態機械、制御演算、ホスト回帰 |
-| [spec-index.md](spec-index.md) | 仕様IDと仕様書の対応表 |
+| [architecture.md](architecture.md) | 実装の全体像と動作範囲 |
+| [diagrams.md](diagrams.md) | 起動・周期・送受信・状態遷移の図 |
+| [software-core.md](software-core.md) | HAL非依存の制御数学と状態判定 |
+| [can-id-table.md](can-id-table.md) | CANの用途・ID一覧 |
+| [spec-index.md](spec-index.md) | 固定仕様IDの索引 |
 
-Doxygenでは、左のツリーからフォルダを開き、右の表で直下のファイル名と概要を確認できます。
-
-文書やソースを追加・移動したときは `docs/assets/folder-navigation.dox` の該当フォルダを更新します。フォルダの追加・移動は `docs/assets/doxygen-layout.xml` のツリーにも反映します。
-
-試験結果の読み方は [verification/index.md](verification/index.md)、AIの作業規約は [AGENTS.md](../AGENTS.md) を参照してください。
+現行説明と要求仕様と検証記録を混ぜない方針です。細かな引数・戻り値・単位は実コードのDoxygenを正本とします。
