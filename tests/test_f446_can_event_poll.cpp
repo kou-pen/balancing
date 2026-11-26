@@ -1579,8 +1579,8 @@ void testIntegratedObservationAndFrameScheduling()
     BalanceControlConfig controlConfig{};
     controlConfig.lqr.verified=true;
     controlConfig.lqr.max_position_error_m=0.2f;
-    controlConfig.lqr.gain[B_OUTPUT_WHEEL_TOTAL][B_STATE_PITCH]=2;
-    controlConfig.lqr.gain[B_OUTPUT_HIP_TOTAL][B_STATE_PITCH]=3;
+    controlConfig.lqr.gain[LqrWheelTotal][LqrPitch]=2;
+    controlConfig.lqr.gain[LqrHipTotal][LqrPitch]=3;
     controlConfig.legPd={100,10,2,0.5f,4,true};
     controlConfig.yawPi={3,4,2,true};
     controlConfig.wheelTorqueLimitNm={5,5};

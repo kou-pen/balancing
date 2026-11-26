@@ -441,9 +441,9 @@ int main(int argc, char** argv)
         p.estimator.wheels={{{0.1f,10,1,true},{0.1f,10,-1,true}}};
         p.controller.lqr.verified=true;
         p.controller.lqr.max_position_error_m=0.2f;
-        p.controller.lqr.gain[B_OUTPUT_WHEEL_TOTAL][B_STATE_PITCH]=2;
-        p.controller.lqr.gain[B_OUTPUT_WHEEL_TOTAL][B_STATE_POSITION]=1;
-        p.controller.lqr.gain[B_OUTPUT_HIP_TOTAL][B_STATE_PITCH]=3;
+        p.controller.lqr.gain[LqrWheelTotal][LqrPitch]=2;
+        p.controller.lqr.gain[LqrWheelTotal][LqrPosition]=1;
+        p.controller.lqr.gain[LqrHipTotal][LqrPitch]=3;
         p.controller.legPd={100,10,2,0.5f,4,true};
         p.controller.yawPi={3,4,2,true};
         p.controller.wheelTorqueLimitNm={5,5};

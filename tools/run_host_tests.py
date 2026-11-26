@@ -10,17 +10,27 @@ OUT = ROOT / "build" / "host"
 F446_APP = ROOT / "firmware" / "f446" / "balancing_f446" / "App"
 OUT.mkdir(parents=True, exist_ok=True)
 
+balance_controller = F446_APP / "Src/balancing/control/controller/BalanceControl.cpp"
+balance_geometry = F446_APP / "Src/balancing/control/estimator/balancing_leg_kinematics.c"
+balance_math_objects = {}
+for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"])]:
+    obj = OUT / f"balance_geometry{suffix}.o"
+    subprocess.run(["gcc","-std=c11","-Wall","-Wextra","-Werror","-pedantic",
+                    "-I",str(F446_APP / "Inc"),"-c",str(balance_geometry),*flags,"-o",str(obj)],
+                   check=True,cwd=ROOT,timeout=30)
+    balance_math_objects[suffix] = str(obj)
+
 common = [
-    "gcc",
-    "-std=c11",
+    "g++",
+    "-std=c++17",
     "-Wall",
     "-Wextra",
     "-Werror",
     "-pedantic",
     "-I",
     str(F446_APP / "Inc"),
-    str(F446_APP / "Src" / "balancing" / "control" / "controller" / "balancing_core.c"),
-    str(ROOT / "tests" / "test_core.c"),
+    str(balance_controller),
+    str(ROOT / "tests" / "test_core.cpp"),
     "-lm",
 ]
 for label, flags in [
@@ -28,7 +38,7 @@ for label, flags in [
     ("未定義動作検査", ["-fsanitize=undefined", "-fno-sanitize-recover=all"]),
 ]:
     path = OUT / ("test_core_ubsan" if flags else "test_core")
-    command = common + flags + ["-o", str(path)]
+    command = common + flags + [balance_math_objects["_ubsan" if flags else ""], "-o", str(path)]
     print(f"[{label}] コンパイル", flush=True)
     subprocess.run(command, check=True, cwd=ROOT, timeout=30)
     print(f"[{label}] 実行", flush=True)
@@ -67,9 +77,7 @@ app_math_cpp += power_codec_sources + [remote_codec_source,
 app_math_objects = {}
 for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"])]:
     app_math_objects[suffix] = []
-    for index, source in enumerate(("control/controller/balancing_core.c",
-        "control/controller/balancing_leg_pd.c", "control/controller/balancing_yaw_pi.c",
-        "control/estimator/balancing_leg_kinematics.c")):
+    for index, source in enumerate(("control/estimator/balancing_leg_kinematics.c",)):
         obj = OUT / f"app_math_{index}{suffix}.o"
         subprocess.run(["gcc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
             "-I", str(F446_APP / "Inc"), "-c", str(app_source / source), *flags,
@@ -171,10 +179,10 @@ for label, flags in [
 
 # ARM前固定脚長目標とRoll差動をC11単体で検証。実機ゲインは使用しない。
 leg_pd_common = [
-    "gcc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
+    "g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
     "-I", str(F446_APP / "Inc"),
-    str(F446_APP / "Src" / "balancing" / "control" / "controller" / "balancing_leg_pd.c"),
-    str(ROOT / "tests" / "test_leg_pd.c"), "-lm",
+    str(balance_controller),
+    str(ROOT / "tests" / "test_leg_pd.cpp"), "-lm",
 ]
 for label, flags in [
     ("固定脚長/ロールPD通常ビルド", []),
@@ -182,17 +190,16 @@ for label, flags in [
 ]:
     path = OUT / ("test_leg_pd_ubsan" if flags else "test_leg_pd")
     print(f"[{label}] コンパイル", flush=True)
-    subprocess.run(leg_pd_common + flags + ["-o", str(path)], check=True, cwd=ROOT, timeout=30)
+    subprocess.run(leg_pd_common + flags + [balance_math_objects["_ubsan" if flags else ""], "-o", str(path)], check=True, cwd=ROOT, timeout=30)
     print(f"[{label}] 実行", flush=True)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
 # 車輪倒立LQR配分との境界も含むYaw PIの通常・UBSan回帰。
 yaw_pi_common = [
-    "gcc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
+    "g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
     "-I", str(F446_APP / "Inc"),
-    str(F446_APP / "Src" / "balancing" / "control" / "controller" / "balancing_core.c"),
-    str(F446_APP / "Src" / "balancing" / "control" / "controller" / "balancing_yaw_pi.c"),
-    str(ROOT / "tests" / "test_yaw_pi.c"), "-lm",
+    str(balance_controller),
+    str(ROOT / "tests" / "test_yaw_pi.cpp"), "-lm",
 ]
 for label, flags in [
     ("Yaw PI通常ビルド", []),
@@ -200,7 +207,7 @@ for label, flags in [
 ]:
     path = OUT / ("test_yaw_pi_ubsan" if flags else "test_yaw_pi")
     print(f"[{label}] コンパイル", flush=True)
-    subprocess.run(yaw_pi_common + flags + ["-o", str(path)], check=True, cwd=ROOT, timeout=30)
+    subprocess.run(yaw_pi_common + flags + [balance_math_objects["_ubsan" if flags else ""], "-o", str(path)], check=True, cwd=ROOT, timeout=30)
     print(f"[{label}] 実行", flush=True)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
@@ -382,25 +389,10 @@ for suffix, flags in [
     ]
     c_math = OUT / f"estimator_c_math{suffix}.o"
     c_attitude = OUT / f"estimator_c_attitude{suffix}.o"
-    c_ctrl = OUT / f"sil_control_core{suffix}.o"
-    c_pd = OUT / f"sil_leg_pd{suffix}.o"
-    c_yaw = OUT / f"sil_yaw_pi{suffix}.o"
-    for input_file, output_file in (
-        (rs06_source / "control" / "controller" / "balancing_core.c", c_ctrl),
-        (rs06_source / "control" / "controller" / "balancing_leg_pd.c", c_pd),
-        (rs06_source / "control" / "controller" / "balancing_yaw_pi.c", c_yaw),
-    ):
-        subprocess.run(
-            ["gcc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
-             "-I", str(F446_APP / "Inc"), "-c", str(input_file), *flags,
-             "-o", str(output_file)],
-            check=True, cwd=ROOT, timeout=30,
-        )
     print(f"[test_f446_sil_control_cycle{suffix}] コンパイル", flush=True)
     subprocess.run(
         rs06_service_common + sources + flags +
-        [str(c_math), str(c_attitude), str(c_ctrl),
-         str(c_pd), str(c_yaw), "-lm", "-o", str(path)],
+        [str(c_math), str(c_attitude), "-lm", "-o", str(path)],
         check=True, cwd=ROOT, timeout=30,
     )
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)

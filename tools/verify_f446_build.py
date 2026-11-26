@@ -21,7 +21,7 @@ SOURCES = (
     "balancing/communication/Rs06Codec.cpp",
     "balancing/communication/C620Codec.cpp",
     "balancing/communication/can/CanTxScheduler.cpp",
-    "balancing/control/controller/balancing_core.c",
+    "balancing/control/controller/BalanceControl.cpp",
 )
 
 
