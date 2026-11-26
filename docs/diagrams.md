@@ -630,7 +630,7 @@ flowchart LR
     A --> S["RobotSequence"]
 ```
 
-実USB Hostは未接続。既定設定では入力無効。CAN2操作元選択を先に確定し、非常停止・DISARMをARMより優先する。
+USB Host転送経路は明示起動可能（基板未検証）。既定設定では入力無効。CAN2操作元選択を先に確定し、非常停止・DISARMをARMより優先する。
 
 
 ## 状態表示の出力境界
@@ -645,3 +645,23 @@ flowchart LR
 ```
 
 F446のRGB/BUZZERは生成main.hの定義を利用する。明示設定なしではGPIOに書き込まない。実機のパターン・極性・ブザー方式は未検証。
+
+## USB Host転送と操作配送
+
+```mermaid
+sequenceDiagram
+    participant H as OTG_HS HCD / ST USB Host Core
+    participant P as UsbHostPort
+    participant A as Application
+    participant D as DualSenseService
+    A->>P: poll(nowUs)
+    P->>H: poll (列挙状態を1段進める)
+    H-->>P: Ready / Detached / 完了通知
+    P->>H: Interrupt IN受付（高々1件）
+    Note over H: IRQで完了時刻・実長・トークンを保存
+    A->>P: takeConnectionEvent / takeReport
+    P-->>A: 世代・連番付き通知（一度のみ）
+    A->>D: 接続・報告・切断
+```
+
+起動は明示設定のみ。接続安定待ち200 ms、reset assert 100 ms、reset後10 ms等は主ループで期限照合する。HCD IRQ内部の処理時間は実基板で別途測定する。

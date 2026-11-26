@@ -7,7 +7,7 @@ OUTPUT_DIRECTORY       = build/docs
 INPUT                  = README.md CONTRIBUTING.md AGENTS.md docs firmware
 FILE_PATTERNS          = *.c *.cpp *.h *.hpp *.md *.dox
 # CubeMXとHAL/CMSISの自動生成コードはAPIの正本ではない。
-EXCLUDE                = firmware/f446/balancing_f446/Drivers firmware/f446/balancing_f446/Core
+EXCLUDE                = firmware/f446/balancing_f446/Drivers firmware/f446/balancing_f446/Core firmware/f446/balancing_f446/Middlewares
 RECURSIVE              = YES
 MARKDOWN_SUPPORT       = YES
 OPTIMIZE_OUTPUT_FOR_C  = NO
