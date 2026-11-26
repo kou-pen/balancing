@@ -19,7 +19,7 @@ SOURCES = (
     "balancing/app/application.cpp",
     "balancing/app/balancing_motor_bench.c",
     "balancing/communication/balancing_motor_can.c",
-    "balancing/communication/balancing_tx_scheduler.c",
+    "balancing/communication/can/CanTxScheduler.cpp",
     "balancing/control/controller/balancing_core.c",
     "balancing/device/balancing_f446_motor_bench_port.c",
 )

@@ -415,7 +415,9 @@ int main(int argc, char** argv)
         using namespace balancing::protocol;
         const bool usbHostMode=std::strcmp(argv[1],"--drive-sil-usb-host")==0;
         const bool usbMode=std::strcmp(argv[1],"--drive-sil-usb")==0 || usbHostMode;
-        const bool timeout=std::strcmp(argv[1],"--drive-sil-timeout")==0;
+        const bool shortDeadline=std::strcmp(argv[1],"--drive-sil-short-deadline")==0;
+        const bool longDeadline=std::strcmp(argv[1],"--drive-sil-long-deadline")==0;
+        const bool timeout=std::strcmp(argv[1],"--drive-sil-timeout")==0 || shortDeadline || longDeadline;
         const bool stale=std::strcmp(argv[1],"--drive-sil-stale")==0;
         const bool rsTimeout=std::strcmp(argv[1],"--drive-sil-rs-timeout")==0;
         const bool txError=std::strcmp(argv[1],"--drive-sil-tx-error")==0;
@@ -450,7 +452,9 @@ int main(int argc, char** argv)
         if (invalid) p.converter.c620[1].verified=false;
         if (invalidModel) p.controller.lqr.verified=false;
         p.arm={50000,true}; p.interlocks={true,true,true,true,true,true,MechanismSafety::Safe};
-        p.tx={12000,6000};
+        // 旧Cモデルの注入期限試験を実際のC++送信経路へ移す。
+        // 人工値であり本番の送信期限を決めない。
+        p.tx={12000,shortDeadline?4000u:(longDeadline?10000u:6000u)};
         assert(initializeDriveSil(p));
         expectSelfDefinedCan2=true;
         silImu=true;
@@ -703,9 +707,10 @@ int main(int argc, char** argv)
         }
         if (timeout || stale) {
             // 新規のRXを維持し、C620の送信終端だけを失わせる。受信鮮度で代用しない。
-            for (std::uint64_t at=26000;at<=32000;at+=2000) {
+            const auto faultAt=26000u+p.tx.c620TxTimeoutUs;
+            for (std::uint64_t at=26000;at<=faultAt;at+=2000) {
                 pre(at,true); res=tick(at);
-                if (at<32000) assert(res.control.sequence.state==RobotState::Balancing);
+                if (at<faultAt) assert(res.control.sequence.state==RobotState::Balancing);
                 drain(true,false);
                 if (stale && at==28000) {
                     // 26000の旧世代を正常終端させても現在世代の鮮度にはならない。

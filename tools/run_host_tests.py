@@ -58,29 +58,6 @@ for label, flags in [
     print(f"[{label}] 実行", flush=True)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
 
-# HALとは独立した送信スケジューラの故障注入を通常・UBSanの両方で確認する。
-scheduler_common = [
-    "gcc",
-    "-std=c11",
-    "-Wall",
-    "-Wextra",
-    "-Werror",
-    "-pedantic",
-    "-I",
-    str(F446_APP / "Inc"),
-    str(F446_APP / "Src" / "balancing" / "communication" / "balancing_tx_scheduler.c"),
-    str(ROOT / "tests" / "test_tx_scheduler.c"),
-]
-for label, flags in [
-    ("CANスケジューラ通常ビルド", []),
-    ("CANスケジューラ未定義動作検査", ["-fsanitize=undefined", "-fno-sanitize-recover=all"]),
-]:
-    path = OUT / ("test_tx_scheduler_ubsan" if flags else "test_tx_scheduler")
-    print(f"[{label}] コンパイル", flush=True)
-    subprocess.run(scheduler_common + flags + ["-o", str(path)], check=True, cwd=ROOT, timeout=30)
-    print(f"[{label}] 実行", flush=True)
-    subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)
-
 hal_common = [
     "gcc",
     "-std=c11",
@@ -415,7 +392,7 @@ for test, extra_sources in [
             subprocess.run([str(path), "--usb-host"], check=True, cwd=ROOT, timeout=30)
             subprocess.run([str(path), "--drive-sil-usb-host"], check=True, cwd=ROOT, timeout=30)
             subprocess.run([str(path), "--watchdog"], check=True, cwd=ROOT, timeout=30)
-            for mode in ("--usb-input", "--drive-sil-usb", "--drive-sil", "--drive-sil-timeout", "--drive-sil-invalid",
+            for mode in ("--usb-input", "--drive-sil-usb", "--drive-sil", "--drive-sil-timeout", "--drive-sil-short-deadline", "--drive-sil-long-deadline", "--drive-sil-invalid",
                          "--drive-sil-stale", "--drive-sil-rs-timeout", "--drive-sil-tx-error", "--drive-sil-estop",
                          "--drive-sil-invalid-model", "--drive-sil-rx-loss", "--drive-sil-gap"):
                 subprocess.run([str(path), mode], check=True, cwd=ROOT, timeout=30)
