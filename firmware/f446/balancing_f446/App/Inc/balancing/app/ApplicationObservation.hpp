@@ -4,6 +4,7 @@
 #include "balancing/app/PowerBoardService.hpp"
 #include "balancing/app/Can2ServiceLink.hpp"
 #include "balancing/app/RemoteControlService.hpp"
+#include "balancing/app/DualSenseService.hpp"
 #include "balancing/app/DiagnosticsService.hpp"
 #include "balancing/app/StatusIndicator.hpp"
 #include "balancing/device/MotorObservation.hpp"
@@ -40,6 +41,7 @@ struct Can2ObservationProfile {
     BOperatorInputConfig operatorConfig{};
     DiagnosticSlot* faultSlots{};
     std::size_t faultCapacity{};
+    DualSenseConfig usb{};
 };
 /** @brief 起動前にだけ非駆動試験設定を注入する。実機電源要求は常に無効。
  * @spec{BOARD-F446-001}
@@ -49,6 +51,14 @@ bool initializeCan2Observation(const Can2ObservationProfile&) noexcept;
  * @spec{BOARD-F446-001}
  */
 Can2ServiceLink* applicationCan2Link() noexcept;
+/** @brief 主ループのUSB完了通知境界。未設定なら空。実USB列挙は別工程。
+ * @spec{PROTO-PS5-001}
+ */
+DualSenseService* applicationDualSense() noexcept;
+/** @brief USB側の明示操作元選択。状態判断はApplicationの現在状態を用いる。
+ * @spec{PROTO-PS5-001}
+ */
+bool selectApplicationUsbSource(BOperatorSource target,std::uint64_t nowUs) noexcept;
 /** @brief CANランタイムの背景送信を一度進める。既定起動では何もしない。
  * @spec{BOARD-F446-001}
  */

@@ -47,6 +47,15 @@ void RemoteControlService::invalidateCanInput() noexcept
     input_.neutral_sample_count=0;
 }
 
+void RemoteControlService::invalidateUsbInput() noexcept
+{
+    if (!input_.initialized || input_.selected!=B_OPERATOR_USB_DUALSENSE) return;
+    input_.last_sample={};
+    input_.waiting_neutral=true;
+    input_.neutral_start_valid=false;
+    input_.neutral_sample_count=0;
+}
+
 std::optional<BOperatorTarget> RemoteControlService::update(RobotState state, std::uint64_t nowUs) noexcept
 {
     BMode mode{};
