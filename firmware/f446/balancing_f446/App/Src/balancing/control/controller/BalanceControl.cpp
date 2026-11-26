@@ -1,5 +1,5 @@
 #include "balancing/control/controller/BalanceControl.hpp"
-#include "balancing/control/estimator/balancing_leg_kinematics.h"
+#include "balancing/control/estimator/LegKinematics.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -339,18 +339,6 @@ LqrState lqrState(const ControlSnapshot& state) noexcept
     };
 }
 
-BLegKinematics kinematicsForVmc(const LegEstimate& source) noexcept
-{
-    // 旧C11の仮想仕事変換が参照するのはJの2行だけ。
-    // 他の幾何を合成したかのように見せず、必要なヤコビアンだけコピーする。
-    BLegKinematics mapped{};
-    mapped.jacobian.dlength_dq_m[0] = source.lengthJacobianM[0];
-    mapped.jacobian.dlength_dq_m[1] = source.lengthJacobianM[1];
-    mapped.jacobian.dtheta_dq[0] = source.thetaJacobian[0];
-    mapped.jacobian.dtheta_dq[1] = source.thetaJacobian[1];
-    return mapped;
-}
-
 } // namespace
 
 BalanceControl::BalanceControl(const BalanceControlConfig& config) noexcept : config_{config}
@@ -428,18 +416,16 @@ std::optional<BalanceControlOutput> BalanceControl::compute(
     // 変換、ガスシリンダ、最終モータ制限はここで扱わない。
     std::array<float, 4> joints{};
     for (std::size_t leg = 0; leg < 2; ++leg) {
-        const auto jacobian = kinematicsForVmc(snapshot.legs[leg].mechanism);
-        const BLegVirtualLoad virtualLoad{
-            leg == 0 ? support.left_force_n : support.right_force_n,
-            balance.hip_total_nm * 0.5f
-        };
-        BLegTorquePair torque{};
-        if (!b_leg_virtual_to_joint_torque(&jacobian, &virtualLoad, &torque)) {
+        std::array<float,2> torque{};
+        const float forceN=leg==0?support.left_force_n:support.right_force_n;
+        // StateEstimatorの解析Jをそのまま渡し、旧Cの中間構造体へコピーしない。
+        if (!LegKinematics::virtualToJointTorque(snapshot.legs[leg].mechanism,
+                forceN,balance.hip_total_nm*0.5f,torque)) {
             reset();
             return std::nullopt;
         }
-        joints[2 * leg] = torque.torque_nm[0];
-        joints[2 * leg + 1] = torque.torque_nm[1];
+        joints[2*leg]=torque[0];
+        joints[2*leg+1]=torque[1];
     }
     // 出力は機構軸の数学値であり、検証済みモータ指令には変換しない。
     return BalanceControlOutput{
