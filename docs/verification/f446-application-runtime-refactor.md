@@ -16,7 +16,7 @@
 
 ## 検証状況
 
-VMの ping、hosts、run_command が内部エラーを返しているため、GitHubのGitデータAPIで独立コミットを作成した。masterと既存#72/#73は変更しない。実行試験・ARMビルドは未実施であり、マージ可能とはみなさない。
+当初VMの ping、hosts、run_command が内部エラーを返したため、GitHubのGitデータAPIで独立コミットを作成。その後VM接続が復旧し、専用worktreeに取得して以下を実行した。masterと既存#72/#73は変更しない。
 
 受入条件:
 - Application.cpp / ApplicationObservation.hpp / f446_can1_runtime.cpp にSIL専用プリプロセッサ条件なし。
@@ -24,3 +24,17 @@ VMの ping、hosts、run_command が内部エラーを返しているため、Gi
 - CubeIDE 1.19.0 Debug/Release cleanBuild、python3 tools/verify_f446_build.py、ARM ELFと生成objects.listにSIL実装が存在しないことを確認。
 - python3 tools/validate_specs.py、Doxygen、git diff --check。
 - #72/#73をマージする場合は共通Application変更を統合し、両機能を含めて全件再検証する。
+
+## 実測結果（2026-11-26）
+
+| 検証 | 結果 |
+|---|---|
+| ソース境界 | PASS、App全体からSILマクロと型を排除 |
+| CMake / CTest | 44/44 PASS、job 2cd0b63b96a5477f、終了0 |
+| ホスト通常 / UBSan | 全件PASS、job e521cfed6f9c45a3、終了0 |
+| CAN監査 / CubeIDE設定 | 19/19 / 22/22 PASS |
+| CubeIDE 1.19.0 Debug / Release cleanBuild | 全47 Appソース、ARM ELF32、0エラー・0警告、job 7982b0dad8084950、終了0 |
+| ARM ELF / objects.list | 両構成で試験用型・関数シンボル、DriveCycleオブジェクト、tests/silソース不在 |
+| 仕様 / Doxygen / diff | PASS（既知の日本語翻訳警告のみ） |
+
+Release text=61308 B、data=92 B、bss=11240 B。実機駆動は未実施。未マージ#72/#73との統合は別ローカル検証ブランチで扱う。
