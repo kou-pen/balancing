@@ -21,6 +21,7 @@ struct ObservationCycle {
     DiagnosticsService diagnostics;
     Can2ServiceLink can2;
     StatusIndicator indicator{};
+    StatusIndicatorPort indicatorOutput{};
     StateEstimator estimator{StateEstimatorConfig{}};
     RobotSequence sequence{ArmTimeoutConfig{}};
     BalanceControl controller{BalanceControlConfig{}};
@@ -31,7 +32,8 @@ struct ObservationCycle {
         : remote{profile.operatorConfig},
           diagnostics{profile.faultSlots,profile.faultCapacity,nullptr,0,
                       profile.communication.tokenOrigin},
-          can2{power,remote,diagnostics,profile.communication}
+          can2{power,remote,diagnostics,profile.communication},
+          indicator{profile.indicator},indicatorOutput{profile.indicator.verified?profile.indicatorOutput:IndicatorOutputConfig{}}
     {}
 
 #if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
@@ -40,6 +42,7 @@ struct ObservationCycle {
           diagnostics{p.communication.faultSlots,p.communication.faultCapacity,nullptr,0,
                       p.communication.communication.tokenOrigin},
           can2{power,remote,diagnostics,p.communication.communication},
+          indicator{p.communication.indicator},indicatorOutput{p.communication.indicator.verified?p.communication.indicatorOutput:IndicatorOutputConfig{}},
           estimator{p.estimator},sequence{p.arm},controller{p.controller},converter{p.converter}
     {}
 #endif
@@ -61,6 +64,7 @@ public:
      */
     void init(const Can2ObservationProfile& profile={}) noexcept
     {
+        if (control_) control_->indicatorOutput.disable();
         observation_ = {};
         previousUs_.reset();
         control_.emplace(profile);
@@ -123,6 +127,9 @@ public:
 
         const auto motors = motorObservation();
         if (!motors) {
+            // 採取不能時に直前の鳴動を残さない。表示異常は駆動判定から独立。
+            control_->indicatorOutput.disable();
+            observation_.indicatorOutput=control_->indicatorOutput.summary();
             if (can2Link() && previousUs_) control_->can2.publishTelemetry({},*previousUs_);
             // 取得不能区間をまたいだ差分は一周期の実測値として公開しない。
             previousUs_.reset();
@@ -147,6 +154,11 @@ public:
                 // 逆行した時計で正常な基準を巻き戻さない。
                 control_->can2.publishTelemetry({},*previousUs_);
                 ++timing_.clock_regressions;
+                // 逆行を論理表示へも伝え、復帰時に古い点滅/鳴動を再開しない。
+                observation_.indicator=control_->indicator.update(control_->sequence.state(),
+                    control_->sequence.currentFault(),nowUs);
+                control_->indicatorOutput.disable();
+                observation_.indicatorOutput=control_->indicatorOutput.summary();
 #if defined(BALANCING_HOST_SIL) && !defined(__arm__) && !defined(__thumb__)
                 if (!drive_) return;
 #else
@@ -207,6 +219,8 @@ public:
         observation_.can2 = control_->can2.summary();
         publishCan2Telemetry(nowUs);
         observation_.indicator = control_->indicator.update(control_->sequence.state(), observation_.fault, nowUs);
+        (void)control_->indicatorOutput.apply(*observation_.indicator);
+        observation_.indicatorOutput=control_->indicatorOutput.summary();
         // 最新コピーを周期で消費してからのみ、受信側の異常を解除する。
         // 受信側のfault消費は実機FAULT解除ではない。
         (void)acknowledgeMotorObservation(motors->generation);
