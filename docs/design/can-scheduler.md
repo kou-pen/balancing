@@ -1,5 +1,7 @@
 # CAN送信スケジューラ：責務・時系列・保守手順（Issue #5）
 
+> 旧C11実装の設計・検証記録。現在の状態機械・観測・送信・試運転の契約は [F446公開API](../design/public-api.md) と [C++移行検証](../verification/f446-legacy-observation-retirement.md) を参照。旧コードを再現する場合は移行前のGit履歴を使用する。
+
 **実装範囲：** ホスト実行できるC11の送信要求モデル。HAL、実機CAN、モータ駆動、ARM処理、既存の安全状態機械には接続していない。  
 **仕様：** `BOARD-F446-001`、`PROTO-RS06-001`、`PROTO-C620-001`、MOTOR-189〜195。  
 **依存：** PR #16（2026-11-10に`master`へSquashマージ済み）の `firmware/f446/balancing_f446/App` 一元配置に基づく。今後のディレクトリ再配置は別PRで扱う。
