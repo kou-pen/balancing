@@ -117,19 +117,6 @@ void b_mode_init(BModeMachine *machine);
 BModeOutput b_mode_step(BModeMachine *machine, const BModeInput *input,
                         uint64_t now_us);
 
-/**
- * @brief 目標値に変化率制限を適用する。
- * @spec{CTRL-LQR-001}
- * @param[in] previous 前周期の目標値。
- * @param[in] request 操作元が要求した目標値。
- * @param[in] max_rate 正の変化率上限 [対象単位/s]。
- * @param[in] dt_s 演算間隔 [s]。
- * @param[out] result 制限後の値。失敗時は0を格納。
- * @return 計算が有効ならtrue。
- */
-bool b_rate_limit(float previous, float request, float max_rate,
-                  float dt_s, float *result);
-
 /** @brief 車輪左右のトルク配分結果。単位は全て[N·m]。 */
 typedef struct {
     float left_nm;

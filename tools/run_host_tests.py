@@ -75,7 +75,7 @@ for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-saniti
     app_math_objects[suffix] = []
     for index, source in enumerate(("control/controller/balancing_core.c",
         "control/controller/balancing_leg_pd.c", "control/controller/balancing_yaw_pi.c",
-        "control/estimator/balancing_leg_kinematics.c", "app/balancing_operator_input.c")):
+        "control/estimator/balancing_leg_kinematics.c")):
         obj = OUT / f"app_math_{index}{suffix}.o"
         subprocess.run(["gcc", "-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic",
             "-I", str(F446_APP / "Inc"), "-c", str(app_source / source), *flags,
@@ -161,18 +161,11 @@ for label, flags in [
 
 # USB/CAN操作元の切替、通信断→ニュートラル復旧を実際のC11入力モデルで試験。
 operator_common = [
-    "gcc",
-    "-std=c11",
-    "-Wall",
-    "-Wextra",
-    "-Werror",
-    "-pedantic",
-    "-I",
-    str(F446_APP / "Inc"),
-    str(F446_APP / "Src" / "balancing" / "app" / "balancing_operator_input.c"),
-    str(F446_APP / "Src" / "balancing" / "control" / "controller" / "balancing_core.c"),
-    str(ROOT / "tests" / "test_operator_input.c"),
-    "-lm",
+    "g++","-std=c++17","-Wall","-Wextra","-Werror","-pedantic",
+    "-I",str(F446_APP / "Inc"),
+    str(app_source / "app/RemoteControlService.cpp"),
+    remote_codec_source, str(app_source / "communication/can/ProtocolPayload.cpp"), power_id_source,
+    str(ROOT / "tests/test_operator_input.cpp"), "-lm",
 ]
 for label, flags in [
     ("操作入力モック通常ビルド", []),
@@ -218,7 +211,6 @@ flow_common = [
     "-pedantic",
     "-I",
     str(F446_APP / "Inc"),
-    str(F446_APP / "Src" / "balancing" / "app" / "balancing_operator_input.c"),
     str(F446_APP / "Src" / "balancing" / "control" / "controller" / "balancing_core.c"),
     str(F446_APP / "Src" / "balancing" / "control" / "estimator" / "balancing_observation.c"),
     str(F446_APP / "Src" / "balancing" / "control" / "filter" / "balancing_attitude_filter.c"),
@@ -545,7 +537,7 @@ for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-saniti
     path = OUT / f"test_f446_remote_control_service{suffix}"
     subprocess.run(["g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
         "-I", str(F446_APP / "Inc"), str(app_source / "app/RemoteControlService.cpp"),
-        str(ROOT / "tests/test_f446_remote_control_service.cpp"), remote_codec_source,
+        str(ROOT / "tests/test_f446_remote_control_service.cpp"), str(app_source / "app/RobotSequence.cpp"), remote_codec_source,
         str(app_source / "communication/can/ProtocolPayload.cpp"), power_id_source, *app_math_objects[suffix],
         *flags, "-lm", "-o", str(path)], check=True, cwd=ROOT, timeout=30)
     subprocess.run([str(path)], check=True, cwd=ROOT, timeout=30)

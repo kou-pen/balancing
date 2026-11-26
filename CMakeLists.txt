@@ -17,7 +17,6 @@ add_library(balancing_core STATIC
     ${F446_APP}/Src/balancing/communication/balancing_motor_can.c
     ${F446_APP}/Src/balancing/control/estimator/balancing_leg_kinematics.c
     ${F446_APP}/Src/balancing/control/estimator/balancing_observation.c
-    ${F446_APP}/Src/balancing/app/balancing_operator_input.c
     ${F446_APP}/Src/balancing/control/filter/balancing_attitude_filter.c
 )
 target_include_directories(balancing_core PUBLIC
@@ -61,7 +60,11 @@ target_compile_options(balancing_observation_tests PRIVATE -Wall -Wextra -Wpedan
 add_test(NAME balancing_observation_tests COMMAND balancing_observation_tests)
 
 # Explicitly decoded USB/CAN operator targets; host fixtures only, no HID/CAN IDs.
-add_executable(balancing_operator_input_tests tests/test_operator_input.c)
+add_executable(balancing_operator_input_tests tests/test_operator_input.cpp
+    ${F446_APP}/Src/balancing/app/RemoteControlService.cpp
+    ${F446_APP}/Src/balancing/communication/can/RemoteControlCodec.cpp
+    ${F446_APP}/Src/balancing/communication/can/ProtocolPayload.cpp
+    ${F446_APP}/Src/balancing/communication/can/ProtocolId.cpp)
 target_link_libraries(balancing_operator_input_tests PRIVATE balancing_core m)
 target_compile_options(balancing_operator_input_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_operator_input_tests COMMAND balancing_operator_input_tests)
@@ -345,6 +348,7 @@ target_compile_options(balancing_f446_power_service_tests PRIVATE -Wall -Wextra 
 add_test(NAME balancing_f446_power_service_tests COMMAND balancing_f446_power_service_tests)
 
 add_executable(balancing_f446_remote_service_tests tests/test_f446_remote_control_service.cpp
+    ${F446_APP}/Src/balancing/app/RobotSequence.cpp
     ${F446_APP}/Src/balancing/app/RemoteControlService.cpp
     ${F446_APP}/Src/balancing/communication/can/RemoteControlCodec.cpp
     ${F446_APP}/Src/balancing/communication/can/ProtocolPayload.cpp

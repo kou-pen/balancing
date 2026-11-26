@@ -232,44 +232,6 @@ finish:
 }
 
 /*
- * 前回の目標値から1周期に進める量を max_rate × dt に制限する。
- * スティックがニュートラルへ戻った際にも瞬間的な指令反転を避けるため、
- * 出力範囲そのものではなく「前回からの変化量」を飽和する。
- * NaN・Infと不正周期は0へフェイルクローズする。
- */
-bool b_rate_limit(float previous, float request, float max_rate,
-                  float dt_s, float *result)
-{
-    float max_step;
-    float delta;
-
-    if (result == NULL) {
-        return false;
-    }
-    *result = 0.0f;
-    if (!isfinite(previous) || !isfinite(request) || !isfinite(max_rate) ||
-        !isfinite(dt_s) || max_rate <= 0.0f || dt_s <= 0.0f) {
-        return false;
-    }
-    max_step = max_rate * dt_s;
-    if (!isfinite(max_step)) {
-        return false;
-    }
-
-    delta = request - previous;
-    if (!isfinite(delta)) {
-        return false;
-    }
-    delta = fmaxf(-max_step, fminf(max_step, delta));
-    *result = previous + delta;
-    if (!isfinite(*result)) {
-        *result = 0.0f;
-        return false;
-    }
-    return true;
-}
-
-/*
  * 2輪の合計バランストルクをまず左右同量に分け、そのあとYaw差動を配分する。
  * 左右個別の上限が異なるときは小さい側を共通成分の上限とし、
  * 残容量の範囲でのみYawを入れるため、姿勢保持を優先する。

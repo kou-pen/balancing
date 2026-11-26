@@ -1,4 +1,3 @@
-#include "balancing/app/balancing_operator_input.h"
 #include "balancing/control/controller/balancing_core.h"
 #include "balancing/control/estimator/balancing_observation.h"
 #include "balancing/control/filter/balancing_attitude_filter.h"
@@ -32,22 +31,6 @@ static BAttitudeFilterConfig filter_fixture(void)
         .gravity_max_m_s2 = 11.0f,
         .gyro_alpha = 0.95f,
         .max_sample_dt_s = 0.02f,
-        .verified = true
-    };
-    return cfg;
-}
-
-static BOperatorInputConfig operator_fixture(void)
-{
-    BOperatorInputConfig cfg = {
-        .input_timeout_us = 10000u,
-        .neutral_hold_us = 4000u,
-        .max_speed_m_s = 2.0f,
-        .max_yaw_rate_rad_s = 1.0f,
-        .neutral_speed_m_s = 0.02f,
-        .neutral_yaw_rad_s = 0.02f,
-        .speed_slew_m_s2 = 4.0f,
-        .yaw_slew_rad_s2 = 2.0f,
         .verified = true
     };
     return cfg;
@@ -135,57 +118,9 @@ static void test_sensor_filter_flow_and_freshness(void)
     assert(!stale.imu && !stale.wheel[0] && !stale.wheel[1]);
 }
 
-static void test_operator_and_mode_integration_boundary(void)
-{
-    BOperatorInput input;
-    const BOperatorInputConfig cfg = operator_fixture();
-    BOperatorTarget command = {0};
-    BModeMachine machine;
-    b_mode_init(&machine);
-    assert(machine.mode == B_MODE_DISARMED);
-    assert(b_operator_init(&input, &cfg));
-
-    /* 操作元の受信が正常でも、それだけでは状態機械はARMしない。
-     * FAULTや実機の受信系統を捏造して安全ゲートを通さない。 */
-    assert(b_operator_accept(&input, B_OPERATOR_USB_DUALSENSE,
-                             0.0f, 0.0f, true, 2000u, 2000u));
-    assert(b_operator_accept(&input, B_OPERATOR_USB_DUALSENSE,
-                             0.0f, 0.0f, true, 6000u, 6000u));
-    assert(b_operator_tick(&input, machine.mode, 6000u, &command));
-    assert(command.operator_ready);
-    assert(command.speed_m_s == 0.0f);
-
-    BModeInput safety = {0};
-    safety.arm_edge = false;
-    const BModeOutput mode_result = b_mode_step(&machine, &safety, 6000u);
-    assert(mode_result.mode == B_MODE_DISARMED);
-    assert(!mode_result.drive_allowed);
-    assert(!mode_result.request_rs_enable);
-
-    /* 通信は新規の非中立入力へ更新してもDISARMEDなら0を保持。 */
-    assert(b_operator_accept(&input, B_OPERATOR_USB_DUALSENSE,
-                             1.0f, -0.4f, true, 8000u, 8000u));
-    assert(b_operator_tick(&input, machine.mode, 8000u, &command));
-    assert(command.speed_m_s == 0.0f);
-    assert(command.yaw_rate_rad_s == 0.0f);
-
-    /* 入力が期限切れになっても操作元は勝手に切り替わらない。
-     * その後、非中立入力だけ復帰しても操作目標を許可しない。 */
-    assert(b_operator_tick(&input, machine.mode, 20000u, &command));
-    assert(!command.source_fresh && command.waiting_neutral);
-    assert(input.selected == B_OPERATOR_USB_DUALSENSE);
-    assert(b_operator_accept(&input, B_OPERATOR_USB_DUALSENSE,
-                             1.0f, 0.4f, true, 22000u, 22000u));
-    assert(b_operator_tick(&input, machine.mode, 22000u, &command));
-    assert(!command.operator_ready);
-    assert(!b_operator_select(&input, B_OPERATOR_CAN_REMOTE, B_MODE_BALANCING));
-    assert(machine.mode == B_MODE_DISARMED);
-}
-
 int main(void)
 {
     test_sensor_filter_flow_and_freshness();
-    test_operator_and_mode_integration_boundary();
-    puts("PASS: Issue #10 integrated sensors, IMU math, operator loss and safe mode boundary");
+    puts("PASS: Issue #10 integrated sensors, IMU math and sensor freshness");
     return 0;
 }

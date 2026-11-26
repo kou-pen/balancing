@@ -28,7 +28,7 @@
 |---|---|---|
 | `b_check_freshness` | 同一単調時計の更新時刻 [µs] | IMU 50 ms、RS06 30 ms、車輪20 ms、電源500 msの鮮度判定 |
 | `b_mode_step` | 電源・通信・校正・姿勢・検証済みパラメータと操作イベント | DISARMED／BALANCING／FAULT、駆動許可と停止要求 |
-| `b_rate_limit` | 前回目標、今回目標、最大変化率、dt [s] | 変化率を制限した目標 |
+| `RemoteControlService::update`（旧 `b_rate_limit` を内部に移行） | 前回目標、今回目標、最大変化率、dt [s] | 変化率を制限した目標 |
 | `b_wheel_allocate` | 合計倒立トルク、Yaw差動、左右上限 [N·m] | 左右車輪トルク [N·m] |
 | `b_lqr_compute` | `BLqrConfig`と名前付きの`BControlState`（状態・目標） | `BControlTorque`（車輪合計／仮想股関節合計 [N·m]） |
 
