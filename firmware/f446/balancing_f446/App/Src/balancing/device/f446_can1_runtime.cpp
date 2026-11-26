@@ -78,22 +78,13 @@ public:
           motors_{config.rs06MappingVerified ? config.rs06 : balancing::Rs06BusConfig{},
                   config.wheelContinuity},
           link_{motors_, tx1_}, mappingVerified_{config.rs06MappingVerified && motors_.hasRs06Configuration()},
-          selfDefinedCan2_{selfDefinedCan2}, cyclesPerUs_{cyclesPerUs}, lastCycle_{DWT->CYCCNT}
+          selfDefinedCan2_{selfDefinedCan2}, clock_{cyclesPerUs}
     {
     }
 
     std::uint64_t sampleClock() noexcept
     {
-        const auto irqMask = __get_PRIMASK();
-        __disable_irq();
-        const auto count = DWT->CYCCNT;
-        // 500 Hzの主ループでも読んで、割込みが来ない間のCYCCNT周回をつなぐ。
-        // 32 bitの差分を取ってから足すことで、周回境界でも時刻を巻き戻さない。
-        accumulated_ += static_cast<std::uint32_t>(count - lastCycle_);
-        lastCycle_ = count;
-        const auto cycles = accumulated_;
-        __set_PRIMASK(irqMask);
-        return cycles / cyclesPerUs_;
+        return clock_.sample();
     }
 
     void service() noexcept
@@ -220,9 +211,7 @@ private:
     bool selfDefinedCan2_;
     std::uint64_t observationGeneration_{0};
     balancing::FaultFlags pendingFaults_{balancing::FaultFlags::None};
-    std::uint32_t cyclesPerUs_;
-    std::uint32_t lastCycle_;
-    std::uint64_t accumulated_{0};
+    balancing::CanClock clock_;
 };
 
 std::optional<CanRuntime> runtime;
@@ -254,9 +243,7 @@ bool balancing::startCanObservation(CAN_HandleTypeDef* can1, CAN_HandleTypeDef* 
         (DWT->CTRL & DWT_CTRL_NOCYCCNT_Msk) != 0u) {
         return false;
     }
-    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
-    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
-    if ((DWT->CTRL & DWT_CTRL_CYCCNTENA_Msk) == 0u ||
+    if (!balancing::CanClock::enable() ||
         !installCan1Filters(*can1) || !installCan2Filters(*can2,selfDefinedCan2)) {
         return false;
     }

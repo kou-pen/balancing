@@ -40,6 +40,10 @@ struct MotorBenchSummary {
  */
 class MotorBench final : private CanEventSink {
 public:
+    /** @brief 明示設定の形式検証。実機安全の証明ではない。
+     * @spec{BOARD-F446-001}
+     */
+    static bool validConfig(const MotorBenchConfig&) noexcept;
     MotorBench(CanPort& exclusivePort,MotorBenchConfig config={}) noexcept;
     MotorBench(const MotorBench&)=delete;
     MotorBench& operator=(const MotorBench&)=delete;
@@ -55,6 +59,10 @@ public:
      * @spec{BEHAV-001}
      */
     void cancel() noexcept;
+    /** @brief 時計・基板側の異常を停止方向へラッチする。
+     * @spec{BEHAV-001}
+     */
+    void fault() noexcept;
     /** @brief 試験・通信状態の診断コピー。停止送達は物理停止を保証しない。
      * @spec{BOARD-F446-001}
      */
@@ -92,4 +100,14 @@ private:
     float output_{};
     bool stopSent_{},busOff_{};
 };
+/** @brief 試運転ビルド専用の停止確認ランタイム。起動時のみ。非ゼロ要求を公開しない。
+ * @pre 通常Applicationは起動しない。両CANは初期化済み、未開始。
+ * @spec{BOARD-F446-001}
+ */
+bool startCanBench(CAN_HandleTypeDef* can1,CAN_HandleTypeDef* can2,
+                   const MotorBenchConfig& config) noexcept;
+/** @brief 試運転の状態コピー。起動失敗時は空。主ループのみ。
+ * @spec{BOARD-F446-001}
+ */
+std::optional<MotorBenchSummary> canBenchSummary() noexcept;
 }
