@@ -277,14 +277,16 @@ for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-saniti
         str(rs06_source / "device/C620Motor.cpp"),
         str(rs06_source / "bench/MotorBench.cpp"),
         str(rs06_source / "bench/f446_motor_bench_runtime.cpp"),
+        str(rs06_source / "app/CycleHealthMonitor.cpp"),
+        str(rs06_source / "device/F446Watchdog.cpp"),
         str(ROOT / "tests/test_f446_bench_runtime.cpp"),
         "-lm",
     ] + flags + ["-o", str(executable)], check=True, cwd=ROOT, timeout=30)
-    for mode in ("--rs","--wheel","--failures","--rollback","--gap"):
+    for mode in ("--rs","--wheel","--failures","--rollback","--gap","--iwdg"):
         subprocess.run([str(executable),mode], check=True, cwd=ROOT, timeout=30)
 
 for test, extra_sources in [
-    ("test_f446_can1_runtime", rs06_service_sources + app_math_cpp + [str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "device" / "f446_can1_runtime.cpp"), str(rs06_source / "communication" / "can" / "Can2FilterPlan.cpp"), str(rs06_source / "app" / "application.cpp"), str(ROOT / "tests" / "sil" / "DriveCycle.cpp"), str(ROOT / "tests" / "sil" / "DriveRuntime.cpp"), str(rs06_source / "communication" / "can" / "MotorFramePlan.cpp")]),
+    ("test_f446_can1_runtime", rs06_service_sources + app_math_cpp + [str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "device" / "f446_can1_runtime.cpp"), str(rs06_source / "device/F446Watchdog.cpp"), str(rs06_source / "communication" / "can" / "Can2FilterPlan.cpp"), str(rs06_source / "app" / "application.cpp"), str(ROOT / "tests" / "sil" / "DriveCycle.cpp"), str(ROOT / "tests" / "sil" / "DriveRuntime.cpp"), str(rs06_source / "communication" / "can" / "MotorFramePlan.cpp")]),
     ("test_f446_can_event_poll", rs06_service_sources + app_math_cpp + [str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "communication" / "can" / "MotorFramePlan.cpp"), str(rs06_source / "control" / "filter" / "ImuAttitudeSource.cpp")]),
 ]:
     for suffix, flags in [
@@ -307,6 +309,8 @@ for test, extra_sources in [
             subprocess.run([str(path), "--can2-services"], check=True, cwd=ROOT, timeout=30)
             subprocess.run([str(path), "--usb-host"], check=True, cwd=ROOT, timeout=30)
             subprocess.run([str(path), "--drive-sil-usb-host"], check=True, cwd=ROOT, timeout=30)
+            for mode in ("success","disabled","hardware","frozen","initfail","unverified","invalid","unbound","uncaptured","late"):
+                subprocess.run([str(path), "--iwdg-"+mode], check=True, cwd=ROOT, timeout=30)
             subprocess.run([str(path), "--watchdog"], check=True, cwd=ROOT, timeout=30)
             for mode in ("--usb-input", "--drive-sil-usb", "--drive-sil", "--drive-sil-timeout", "--drive-sil-short-deadline", "--drive-sil-long-deadline", "--drive-sil-invalid",
                          "--drive-sil-stale", "--drive-sil-rs-timeout", "--drive-sil-tx-error", "--drive-sil-estop",

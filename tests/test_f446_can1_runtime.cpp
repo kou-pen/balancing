@@ -1,3 +1,4 @@
+#include "balancing/device/F446Watchdog.hpp"
 #include "balancing_f446_can1_bridge.h"
 #include "balancing/communication/can/Can2FilterPlan.hpp"
 #include "balancing_app_bridge.h"
@@ -771,6 +772,83 @@ int main(int argc, char** argv)
         pre(78000,false); res=tick(78000); c=drain();
         assert(res.control.sequence.state==RobotState::Disarmed && c.zero==1 && c.torque==0);
         std::puts("PASS: Application full SIL ARM, 250/500Hz, operation reference, abort/stop");
+        return 0;
+    }
+
+    if (argc == 2 && std::strncmp(argv[1],"--iwdg-",7)==0) {
+        using namespace balancing;
+        const auto mode=argv[1]+7;
+        const auto flags=RCC_CSR_IWDGRSTF|(1u<<27);
+        RCC->CSR=flags;
+        if (std::strcmp(mode,"uncaptured")!=0) {
+            balancing_f446_watchdog_capture_reset_flags();
+            RCC->CSR|=1u<<26;
+            balancing_f446_watchdog_capture_reset_flags();
+            assert(f446WatchdogSummary().rawResetFlags==flags);
+        }
+        const F446WatchdogConfig enabled{true,true,32,499};
+        if (!std::strcmp(mode,"hardware")) FLASH->OPTCR=0;
+        if (!std::strcmp(mode,"frozen")) DBGMCU->APB1FZ=DBGMCU_APB1_FZ_DBG_IWDG_STOP;
+        if (!std::strcmp(mode,"initfail")) iwdgInitResult=HAL_TIMEOUT;
+        if (std::strcmp(mode,"unbound")!=0) {
+            balancing_app_init();
+            assert(startCanObservation(&handle,&handle2,{},false));
+        }
+        if (!std::strcmp(mode,"late")) {
+            balancing_app_begin_control_tick(1);
+            balancing_f446_can_service();balancing_app_control_tick();
+        }
+        auto config=enabled;
+        if (!std::strcmp(mode,"unverified")) config.verified=false;
+        if (!std::strcmp(mode,"invalid")) config.reload=4096;
+        const bool disabled=!std::strcmp(mode,"disabled");
+        const auto result=disabled?balancing_f446_watchdog_start():startF446Watchdog(config);
+        const bool success=!std::strcmp(mode,"success");
+        const bool attempted=success || !std::strcmp(mode,"initfail");
+        assert(result==(disabled?BF446_WATCHDOG_DISABLED:success?BF446_WATCHDOG_STARTED:BF446_WATCHDOG_FAILED));
+        assert(iwdgInitCalls==unsigned(attempted) && resetClearCalls==unsigned(attempted));
+        auto diag=f446WatchdogSummary();
+        assert(diag.state==result && diag.attempted==attempted);
+        if (!attempted) assert(!diag.initResult && (RCC->CSR&flags)==flags);
+        if (attempted) {
+            assert(iwdgLastInit.Instance==IWDG && iwdgLastInit.Init.Prescaler==IWDG_PRESCALER_32);
+            assert(iwdgLastInit.Init.Reload==499 && diag.initResult==std::uint32_t(iwdgInitResult));
+        }
+        assert(startF446Watchdog(enabled)==BF446_WATCHDOG_FAILED);
+        assert(iwdgInitCalls==unsigned(attempted));
+        if (attempted) assert(!bindApplicationWatchdog({nullptr,[](void*) noexcept{return true;},true}));
+        const auto cycle=[&](unsigned seq,bool collect=true,bool advance=true){
+            if(advance) DWT->CYCCNT+=168u*2000u;
+            balancing_app_begin_control_tick(seq);
+            if(collect) balancing_f446_can_service();
+            balancing_app_control_tick();
+        };
+        if(success) {
+            cycle(1);assert(iwdgRefreshCalls==1);
+            balancing_app_init(); // 既存証跡を初期化で破棄しない
+            assert(applicationObservation()->watchdog.successes==1);
+            cycle(2);assert(iwdgRefreshCalls==2);
+            for(unsigned i=0;i<10;++i) balancing_app_poll();
+            assert(iwdgRefreshCalls==2);
+            cycle(2);cycle(4);cycle(5,false);assert(iwdgRefreshCalls==2);
+            cycle(6);assert(iwdgRefreshCalls==3);
+            cycle(7,true,false);assert(iwdgRefreshCalls==3);
+            // バス故障時の正常な停止処理完了は更新可能。
+            can1.ESR=CAN_ESR_BOFF;
+            assert(balancing_f446_can1_capture_irq());
+            cycle(8); // 時刻停止で拒否した番号7の次は欠落扱い
+            assert(iwdgRefreshCalls==3);
+            cycle(9);assert(iwdgRefreshCalls==4);
+            assert(applicationObservation()->cycle->sequence.state==RobotState::Fault);
+            iwdgRefreshResult=HAL_ERROR;
+            cycle(10);assert(iwdgRefreshCalls==5 && f446WatchdogSummary().refreshFailed);
+            iwdgRefreshResult=HAL_OK;
+            cycle(11);assert(iwdgRefreshCalls==5);
+        } else if(attempted || disabled) {
+            cycle(1);cycle(2);
+            assert(iwdgRefreshCalls==0);
+        }
+        std::puts("PASS: F446 HAL IWDG startup and completion gate");
         return 0;
     }
 
