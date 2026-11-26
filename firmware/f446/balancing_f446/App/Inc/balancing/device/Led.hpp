@@ -9,6 +9,10 @@ struct IndicatorPin {
     void* context{nullptr};
     bool activeHigh{false};
     bool verified{false};
+    // 既存void GPIO通知と、失敗を報告できるアダプタを併存させる。
+    using TryWrite = bool (*)(void*,bool) noexcept;
+    TryWrite tryWrite{nullptr};
+    bool configured() const noexcept { return verified && (write || tryWrite); }
 };
 class Led final {
 public:
@@ -21,8 +25,16 @@ public:
      */
     bool set(bool on) noexcept
     {
-        if (!pin_.verified || !pin_.write) return false;
-        if (!known_ || on!=on_) pin_.write(pin_.context,on==pin_.activeHigh);
+        if (!pin_.configured()) return false;
+        if (!known_ || on!=on_) {
+            if (pin_.tryWrite) {
+                // 失敗した出力をキャッシュすると再試行時に未出力のままになる。
+                if (!pin_.tryWrite(pin_.context,on==pin_.activeHigh)) {
+                    known_=false;
+                    return false;
+                }
+            } else pin_.write(pin_.context,on==pin_.activeHigh);
+        }
         known_=true; on_=on;
         return true;
     }
@@ -36,7 +48,7 @@ private:
 class RgbLed final {
 public:
     RgbLed(IndicatorPin r={},IndicatorPin g={},IndicatorPin b={}) noexcept
-        : r_{r},g_{g},b_{b},configured_{r.verified && r.write && g.verified && g.write && b.verified && b.write} {}
+        : r_{r},g_{g},b_{b},configured_{r.configured() && g.configured() && b.configured()} {}
     /** @brief 三色すべてが確認済みの場合のみ出力。部分設定で誤表示しない。
      * @spec{BOARD-F446-001}
      */

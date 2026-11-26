@@ -7,6 +7,7 @@
 #include "balancing/app/DualSenseService.hpp"
 #include "balancing/app/DiagnosticsService.hpp"
 #include "balancing/app/StatusIndicator.hpp"
+#include "balancing/device/StatusIndicatorPort.hpp"
 #include "balancing/device/MotorObservation.hpp"
 
 namespace balancing {
@@ -25,6 +26,7 @@ struct ApplicationObservation {
     DiagnosticSummary diagnostics{};
     Can2ServiceSummary can2{};
     std::optional<IndicatorState> indicator{};
+    IndicatorOutputSummary indicatorOutput{};
 };
 
 /** @brief 主ループで最後の周期診断を取得。初期化前は空。
@@ -42,6 +44,8 @@ struct Can2ObservationProfile {
     DiagnosticSlot* faultSlots{};
     std::size_t faultCapacity{};
     DualSenseConfig usb{};
+    IndicatorConfig indicator{};
+    IndicatorOutputConfig indicatorOutput{};
 };
 /** @brief 起動前にだけ非駆動試験設定を注入する。実機電源要求は常に無効。
  * @spec{BOARD-F446-001}
