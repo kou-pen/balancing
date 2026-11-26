@@ -1,5 +1,6 @@
 #pragma once
 #include "balancing/communication/can/CanPort.hpp"
+#include "balancing/app/CycleHealthMonitor.hpp"
 #include "balancing/communication/can/CanRouter.hpp"
 #include "balancing/communication/can/CanTxScheduler.hpp"
 #include "balancing/device/Rs06Motor.hpp"
@@ -106,6 +107,10 @@ private:
  */
 bool startCanBench(CAN_HandleTypeDef* can1,CAN_HandleTypeDef* can2,
                    const MotorBenchConfig& config) noexcept;
+/** @brief 試運転の周期開始前に更新ポートを一度だけ結合。
+ * @spec{BOARD-F446-001}
+ */
+bool bindBenchWatchdog(WatchdogConfig) noexcept;
 /** @brief 試運転の状態コピー。起動失敗時は空。主ループのみ。
  * @spec{BOARD-F446-001}
  */

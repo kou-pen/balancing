@@ -49,6 +49,8 @@ struct Runtime {
     MotorBench bench;
     std::optional<std::uint32_t> sequence{};
     std::optional<std::uint64_t> lastUs{};
+    CycleHealthMonitor health{};
+    WatchdogPort watchdog{};
 };
 std::optional<Runtime> runtime;
 bool started=false,rollbackFailed=false;
@@ -86,6 +88,14 @@ bool startCanBench(CAN_HandleTypeDef* can1,CAN_HandleTypeDef* can2,
     started=true;
     return true;
 }
+bool bindBenchWatchdog(WatchdogConfig config) noexcept
+{
+    // 起動済みの選択バスにのみ結合する。周期開始後は上書きできない。
+    if (!started || runtime->sequence || runtime->watchdog.summary().configured ||
+        !config.verified || !config.refresh) return false;
+    runtime->watchdog=WatchdogPort{config};
+    return true;
+}
 std::optional<MotorBenchSummary> canBenchSummary() noexcept
 {
     if (!started) return std::nullopt;
@@ -116,7 +126,14 @@ extern "C" void balancing_f446_bench_service(std::uint32_t sequence)
         if (delta==0u || delta>=3u ||
             (r.lastUs && (now<=*r.lastUs || now-*r.lastUs>=6000u))) r.bench.fault();
     }
+    const CycleTicket ticket{sequence,now};
+    const bool begun=r.health.begin(ticket);
     r.sequence=sequence;r.lastUs=now;
     r.bench.poll(now);
+    // CAN回収・停止処理を終えた周期のみ。FAULT中でも処理継続は健全。
+    if (begun) {
+        if (const auto proof=r.health.complete(ticket,r.clock.sample(),true))
+            (void)r.watchdog.refresh(*proof);
+    }
 }
 #endif

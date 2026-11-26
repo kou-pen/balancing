@@ -21,6 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "../../App/Inc/balancing/device/F446Watchdog.hpp"
 #ifdef BALANCING_BENCH_BUILD
 #include "../../App/Inc/balancing_f446_bench_bridge.h"
 #else
@@ -88,6 +89,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+  balancing_f446_watchdog_capture_reset_flags();
 
   /* USER CODE END 1 */
 
@@ -134,6 +136,12 @@ int main(void)
   (void)balancing_f446_imu_start(&hi2c1);
 #endif
   if (HAL_TIM_Base_Start_IT(&htim7) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* 全周辺・選択ランタイム・TIM7の開始後にだけIWDGの起動を判断する。
+   * HALの失敗は既にIWDGが開始済みの可能性がある。再試行・更新しない。 */
+  if (balancing_f446_watchdog_start() == BF446_WATCHDOG_FAILED)
   {
     Error_Handler();
   }

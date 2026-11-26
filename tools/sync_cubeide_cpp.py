@@ -316,6 +316,8 @@ def audit() -> None:
     expected_main = [
         '#include "../../App/Inc/balancing_app_bridge.h"',
         "HAL_TIM_Base_Start_IT(&htim7)",
+        "balancing_f446_watchdog_capture_reset_flags();",
+        "balancing_f446_watchdog_start() == BF446_WATCHDOG_FAILED",
         "balancing_app_control_tick();",
         "balancing_app_poll();",
         "balancing_f446_bench_start(&hcan1, &hcan2)",
@@ -325,6 +327,14 @@ def audit() -> None:
     missing += ["main.c: " + text for text in expected_main if text not in main]
     if not bridge.is_file() or not app.is_file():
         missing.append("C++ App bridge files")
+    conf=(PROJECT / "Core/Inc/stm32f4xx_hal_conf.h").read_text(encoding="utf-8")
+    if not re.search(r"^#define HAL_IWDG_MODULE_ENABLED\s*$",conf,re.M):
+        missing.append("explicit IWDG HAL module enable")
+    if re.search(r"^Mcu\.IP\d+=IWDG$",ioc,re.M) or "MX_IWDG_Init(" in main:
+        missing.append("IWDG must not be auto-started by CubeMX")
+    for name in ("Inc/stm32f4xx_hal_iwdg.h","Src/stm32f4xx_hal_iwdg.c"):
+        if not (PROJECT / "Drivers/STM32F4xx_HAL_Driver" / name).is_file():
+            missing.append("IWDG HAL driver: "+name)
     if missing:
         raise ValueError("Regenerated project lost required configuration: " + ", ".join(missing))
 
