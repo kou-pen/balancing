@@ -101,7 +101,7 @@ C++オブジェクトの構築後、CubeMX／HALの周辺初期化が完了し�
 
 ## C++17 BalanceControlと500 HzのSIL経路（実機未接続）
 
-`BalanceControl` は旧C11の純粋な数学演算 `b_lqr_compute` → `b_leg_pd_compute` → `b_leg_virtual_to_joint_torque`、および `b_yaw_pi_step` と `b_wheel_allocate` を順序付きで呼ぶ。6状態は `ControlSnapshot` から作り、左右脚の仮想トルクはLQRの両脚合計を左右へ等分し、脚別PD支持力とヤコビアンで4関節軸トルクへ変換する。車輪倒立トルクを優先して残った容量だけをYaw PIへ渡す。**飽和診断にはYaw PIによる事前制限と最後の車輪配分の両方を含める。**
+`BalanceControl` は共通C++の純粋な数学演算（一部VMCはC11移行中） `balance_math::computeLqr` → `balance_math::computeLegSupport` → `b_leg_virtual_to_joint_torque`、および `balance_math::stepYaw` と `balance_math::allocateWheels` を順序付きで呼ぶ。6状態は `ControlSnapshot` から作り、左右脚の仮想トルクはLQRの両脚合計を左右へ等分し、脚別PD支持力とヤコビアンで4関節軸トルクへ変換する。車輪倒立トルクを優先して残った容量だけをYaw PIへ渡す。**飽和診断にはYaw PIによる事前制限と最後の車輪配分の両方を含める。**
 
 公開 `BalanceReference` は位置基準 [m]、速度基準 [m/s]、Yaw角速度基準 [rad/s] を**上流が明示**する。位置目標の自動生成規則、操作者の変化率制限を先回りして実装しない。固定脚長目標は `initialize()` 時点の現在左右脚長から取得し、`reset()` でYaw積分と初期脚長目標を破棄する。未検証ゲイン・数値異常があれば `std::nullopt` を返し、古い指令を流用しない。
 

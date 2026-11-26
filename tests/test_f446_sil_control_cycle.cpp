@@ -35,9 +35,9 @@ BalanceControlConfig controlFixture()
     BalanceControlConfig c{};
     c.lqr.verified = true; // ホスト内の数学fixture検査のみを表す。
     c.lqr.max_position_error_m = 0.2f;
-    c.lqr.gain[B_OUTPUT_WHEEL_TOTAL][B_STATE_PITCH] = 2.0f;
-    c.lqr.gain[B_OUTPUT_WHEEL_TOTAL][B_STATE_POSITION] = 1.0f;
-    c.lqr.gain[B_OUTPUT_HIP_TOTAL][B_STATE_PITCH] = 3.0f;
+    c.lqr.gain[LqrWheelTotal][LqrPitch] = 2.0f;
+    c.lqr.gain[LqrWheelTotal][LqrPosition] = 1.0f;
+    c.lqr.gain[LqrHipTotal][LqrPitch] = 3.0f;
     c.legPd = {100.0f, 10.0f, 2.0f, 0.5f, 4.0f, true};
     c.yawPi = {3.0f, 4.0f, 2.0f, true};
     c.wheelTorqueLimitNm = {5.0f, 5.0f};

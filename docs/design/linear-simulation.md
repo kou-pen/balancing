@@ -46,7 +46,7 @@ python3 tools/linear_sim.py tests/fixtures/math_linear_model.json --output build
 ## 後続の実機非依存開発
 
 1. `A_d/B_d`の物理単位・状態の符号・基準姿勢の整合性を検証するモデルローダーを拡張。
-2. 共通C11コアの`b_lqr_compute`をホストモデルへ接続し、ゲイン注入による閉ループ挙動を数値比較。
+2. 共通C++演算の`balance_math::computeLqr`をホストモデルへ接続し、ゲイン注入による閉ループ挙動を数値比較。
 3. 飽和、遅延、観測ノイズ、操作断、周期欠落を再現可能な入力シナリオとして追加。
 4. ヤコビアンとVMCの数学的検証を、CADに依存しないテスト関数から開始。
 

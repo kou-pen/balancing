@@ -29,8 +29,8 @@ flowchart LR
 | `RobotSequence` | Application | DISARMED／ARMING／BALANCING／FAULT、ARM期限、故障記録 |
 | `RobotSequenceResult` | RobotSequenceの戻り値 | 周期の状態・継続駆動要求・セッション。送信完了の証拠ではない |
 | `ControlSnapshot` | StateEstimator | 元時刻を保持する6軸・姿勢の数学観測。成立した周期のみ |
-| `BControlState` / `BLqrConfig` / `BControlTorque` | BalanceControlの数値演算 | 移行中のLQR状態・ゲイン・抽象トルク |
-| `BWheelAllocation` | 車輪配分関数 | 左右N·m、飽和情報 |
+| `LqrState` / `LqrConfig` / `LqrTorque` | BalanceControlの数値演算 | LQR状態・ゲイン・抽象トルク |
+| `WheelAllocation` | 車輪配分関数 | 左右N·m、飽和情報 |
 
 通信鮮度は各機器の所有者が判定し、上位は周期コピーを使う。旧CのBObservedStamps、BFreshness、BModeMachine、観測ストアは廃止した。現行C++の期限ちょうどで無効となる判定やARMセッションを、旧Cの判定で置き換えない。
 
@@ -40,16 +40,16 @@ flowchart LR
 
 | 添字定数 | 構造体フィールド | 単位 |
 |---|---|---|
-| `B_STATE_THETA` | `theta_rad` | rad |
-| `B_STATE_THETA_RATE` | `theta_rate_rad_s` | rad/s |
-| `B_STATE_POSITION` | `position_m` | m |
-| `B_STATE_VELOCITY` | `velocity_m_s` | m/s |
-| `B_STATE_PITCH` | `pitch_rad` | rad |
-| `B_STATE_PITCH_RATE` | `pitch_rate_rad_s` | rad/s |
-| `B_OUTPUT_WHEEL_TOTAL` | `wheel_total_nm` | N·m |
-| `B_OUTPUT_HIP_TOTAL` | `hip_total_nm` | N·m |
+| `LqrTheta` | `theta_rad` | rad |
+| `LqrThetaRate` | `theta_rate_rad_s` | rad/s |
+| `LqrPosition` | `position_m` | m |
+| `LqrVelocity` | `velocity_m_s` | m/s |
+| `LqrPitch` | `pitch_rad` | rad |
+| `LqrPitchRate` | `pitch_rate_rad_s` | rad/s |
+| `LqrWheelTotal` | `wheel_total_nm` | N·m |
+| `LqrHipTotal` | `hip_total_nm` | N·m |
 
-行列のゲインを指定するときは、`B_OUTPUT_WHEEL_TOTAL`と`B_STATE_THETA`のような定数で行と列の意味を明示する。C構造体のメモリ配置をポインタの型変換によって配列扱いしない。
+行列のゲインを指定するときは、`LqrWheelTotal`と`LqrTheta`のような定数で行と列の意味を明示する。C構造体のメモリ配置をポインタの型変換によって配列扱いしない。
 
 ## 4. 人間が扱いやすくするための制限
 
@@ -66,21 +66,21 @@ flowchart LR
 
 **避ける書き方**
 
-```c
-float state[6] = {0};
-float torque[2] = {0};
+```cpp
+float state[6]{};
+float torque[2]{};
 state[4] = measured_pitch;
 controller(state, torque);
 ```
 
 **採用する書き方（概念例）**
 
-```c
-BControlState state = {0};
-BControlState target = {0};
-BControlTorque torque = {0};
+```cpp
+LqrState state{};
+LqrState target{};
+LqrTorque torque{};
 state.pitch_rad = measured_pitch_rad;
-bool ok = b_lqr_compute(&config, &state, &target, &torque);
+bool ok = balance_math::computeLqr(config, state, target, torque);
 ```
 
 これは関数の使用形を示す例であり、未知の`K_300`を生成するものではない。戻り値`ok=false`のときに実機の駆動を許可しないことは上位アプリケーションの責務。

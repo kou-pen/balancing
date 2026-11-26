@@ -1,5 +1,7 @@
 # 実機非依存の制御コア設計
 
+> 旧C11実装の歴史的記録。現在は [BalanceControlのC++統合](verification/f446-balance-math-cpp.md) と [公開API](design/public-api.md) を参照。
+
 **作成日：** 2026-10-28／仕様との整合注記：2026-11-09  
 **位置付け：** 2026-10-28当時のC11ロジックと移行時の比較基準。旧状態機械・観測ストア・操作入力は後続C++実装に統合済み。本ページの旧状態機械の記述は履歴であり、現行の安全仕様ではない。[C++17公開API設計](design/public-api.md)に新しい型・呼び出し順を記載。  
 **対応仕様：** [F446](specs/boards/f446_control.md)、[状態推定](specs/control/state_estimation.md)、[LQR・VMC](specs/control/balance_vmc.md)、[動作・状態遷移](specs/behavior/robot_operation.md)。[図はこちら](diagrams.md)。

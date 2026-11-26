@@ -129,7 +129,7 @@ class CubeIdeMetadataTests(unittest.TestCase):
             "balancing/communication/Rs06Codec.hpp",
             "balancing/communication/C620Codec.hpp",
             "balancing/communication/can/CanTxScheduler.hpp",
-            "balancing/control/controller/balancing_core.h",
+            "balancing/control/controller/BalanceControl.hpp",
         )
         inc = PROJECT / "App" / "Inc"
         self.assertTrue((inc / "balancing_app_bridge.h").is_file())
@@ -238,24 +238,24 @@ class CubeIdeBuildArtifactTests(unittest.TestCase):
         self.assertTrue(any("Debug/App/Src/subdir.mk" in error for error in errors))
 
     def test_missing_mandatory_source_is_rejected(self) -> None:
-        (self.project / "App/Src/balancing/control/controller/balancing_core.c").unlink()
+        (self.project / "App/Src/balancing/control/controller/BalanceControl.cpp").unlink()
         errors = verify_configuration(self.project, "Debug")
         self.assertTrue(
-            any("missing:" in error and "balancing_core.c" in error for error in errors)
+            any("missing:" in error and "BalanceControl.cpp" in error for error in errors)
         )
 
     def test_stale_makefile_is_detected_even_with_elf(self) -> None:
         mk = self.project / "Debug/App/Src/balancing/control/controller/subdir.mk"
         mk.write_text("../App/Src/balancing/app/application.cpp\\n", encoding="utf-8")
         errors = verify_configuration(self.project, "Debug")
-        self.assertTrue(any("omits" in error and "balancing_core.c" in error for error in errors))
+        self.assertTrue(any("omits" in error and "BalanceControl.cpp" in error for error in errors))
 
     def test_stale_object_is_rejected(self) -> None:
-        obj = self.project / "Debug/App/Src/balancing/control/controller/balancing_core.o"
+        obj = self.project / "Debug/App/Src/balancing/control/controller/BalanceControl.o"
         os.utime(obj, ns=(1, 1))
         self.assertTrue(
             any(
-                "stale object" in error and "balancing_core.o" in error
+                "stale object" in error and "BalanceControl.o" in error
                 for error in verify_configuration(self.project, "Debug")
             )
         )

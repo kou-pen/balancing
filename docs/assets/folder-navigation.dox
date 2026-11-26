@@ -337,11 +337,8 @@
 
 | フォルダ・ファイル | 内容 |
 |---|---|
-| <a href="balancing__core_8h_source.html">balancing_core.h</a> | 旧C11状態機械と倒立制御演算の型・API |
 | <a href="BalanceControl_8hpp_source.html">BalanceControl.hpp</a> | LQR・LegPD/RollPD・VMC・Yaw PIの数値合成API |
 | <a href="MotorCommand_8hpp_source.html">MotorCommand.hpp</a> | RS06・C620の6軸独立換算設定と数学プレビューAPI |
-| <a href="balancing__leg__pd_8h_source.html">balancing_leg_pd.h</a> | 脚長・Roll PDの入出力と設定 |
-| <a href="balancing__yaw__pi_8h_source.html">balancing_yaw_pi.h</a> | Yaw角速度PIの入出力と状態 |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_control_estimator estimator/
@@ -484,11 +481,8 @@
 
 | フォルダ・ファイル | 内容 |
 |---|---|
-| <a href="balancing__core_8c_source.html">balancing_core.c</a> | 旧C11の運転モードや制御演算 |
-| <a href="BalanceControl_8cpp_source.html">BalanceControl.cpp</a> | C11数値演算の呼出順と機構側6軸トルクの計算 |
+| <a href="BalanceControl_8cpp_source.html">BalanceControl.cpp</a> | LQR・脚長/Roll PD・Yaw PI・車輪配分の数値実装とVMC合成 |
 | <a href="MotorCommand_8cpp_source.html">MotorCommand.cpp</a> | モータ軸トルク/電流換算、最終軸別飽和と原子的な不採用 |
-| <a href="balancing__leg__pd_8c_source.html">balancing_leg_pd.c</a> | 脚長とRollのPD演算、出力制限 |
-| <a href="balancing__yaw__pi_8c_source.html">balancing_yaw_pi.c</a> | Yaw角速度PI、積分飽和防止と車輪出力配分 |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Src_balancing_control_estimator estimator/
