@@ -4,6 +4,14 @@
 
 namespace balancing {
 
+/** @brief 通常起動で停止指令だけを送る明示設定。
+ * @note verifiedはRS06宛先/主機、CAN2 ID1/2とID3/4未使用、バス配線の照合を表す。
+ * @spec{BOARD-F446-001}
+ */
+struct StopOutputConfig {
+    bool enabled{},verified{};
+};
+
 /** @brief 起動時固定の受信軸設定。未検証ではRS06軸を割り当てない。
  *  @spec{BOARD-F446-001}
  */
@@ -11,6 +19,7 @@ struct MotorObservationConfig {
     Rs06BusConfig rs06{};
     bool rs06MappingVerified{false};
     std::array<C620ContinuityConfig, 2> wheelContinuity{};
+    StopOutputConfig stopOutput{};
 };
 
 /** @brief 両バス回収後の同一時刻の観測コピー。駆動許可ではない。

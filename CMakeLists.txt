@@ -107,12 +107,16 @@ add_executable(balancing_cpp_app_tests
     ${F446_APP}/Src/balancing/app/DiagnosticsService.cpp
     ${F446_APP}/Src/balancing/device/StatusIndicatorPort.cpp
     ${F446_APP}/Src/balancing/app/StatusIndicator.cpp
+    ${F446_APP}/Src/balancing/app/MotorCanLink.cpp
+    ${F446_APP}/Src/balancing/app/MotorService.cpp
+    ${F446_APP}/Src/balancing/device/Rs06Motor.cpp
+    ${F446_APP}/Src/balancing/device/C620Motor.cpp
 )
 target_include_directories(balancing_cpp_app_tests PRIVATE
     tests/stubs_can1
     ${F446_APP}/Inc
 )
-target_link_libraries(balancing_cpp_app_tests PRIVATE balancing_core m)
+target_link_libraries(balancing_cpp_app_tests PRIVATE balancing_core balancing_motor_codecs m)
 target_compile_options(balancing_cpp_app_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_cpp_app_tests COMMAND balancing_cpp_app_tests)
 
@@ -194,11 +198,7 @@ foreach(mode rs wheel failures rollback gap iwdg)
 endforeach()
 
 # Startup, RX observation and IRQ ownership at both STM32F446 CAN buses.
-add_executable(balancing_f446_can1_runtime_tests
-    tests/test_f446_can1_runtime.cpp
-    tests/sil/DriveCycle.cpp
-    tests/sil/DriveRuntime.cpp
-    ${F446_APP}/Src/balancing/communication/can/MotorFramePlan.cpp
+set(BALANCING_CAN_RUNTIME_SOURCES
     ${BALANCING_CONTROL_MATH_SOURCES}
     ${BALANCING_RS06_SERVICE_SOURCES}
     ${F446_APP}/Src/balancing/app/MotorCanLink.cpp
@@ -219,6 +219,24 @@ add_executable(balancing_f446_can1_runtime_tests
     ${F446_APP}/Src/balancing/device/f446_can1_runtime.cpp
     ${F446_APP}/Src/balancing/communication/can/Can2FilterPlan.cpp
     ${F446_APP}/Src/balancing/device/F446Watchdog.cpp
+)
+add_executable(balancing_f446_stop_output_tests
+    tests/test_f446_stop_output.cpp
+    ${F446_APP}/Src/balancing/app/DriveRuntime.cpp
+    ${BALANCING_CAN_RUNTIME_SOURCES}
+)
+target_include_directories(balancing_f446_stop_output_tests PRIVATE tests/stubs_can1 ${F446_APP}/Inc)
+target_link_libraries(balancing_f446_stop_output_tests PRIVATE balancing_core balancing_motor_codecs m)
+target_compile_options(balancing_f446_stop_output_tests PRIVATE -Wall -Wextra -Wpedantic)
+foreach(mode default collision normal timing faults retry)
+    add_test(NAME balancing_f446_stop_output_${mode}_tests COMMAND balancing_f446_stop_output_tests --${mode})
+endforeach()
+add_executable(balancing_f446_can1_runtime_tests
+    tests/test_f446_can1_runtime.cpp
+    tests/sil/DriveCycle.cpp
+    tests/sil/DriveRuntime.cpp
+    ${F446_APP}/Src/balancing/communication/can/MotorFramePlan.cpp
+    ${BALANCING_CAN_RUNTIME_SOURCES}
 )
 target_include_directories(balancing_f446_can1_runtime_tests PRIVATE
     tests/stubs_can1
