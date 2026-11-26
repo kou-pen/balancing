@@ -8,6 +8,7 @@
 #include "balancing/app/DiagnosticsService.hpp"
 #include "balancing/app/StatusIndicator.hpp"
 #include "balancing/device/StatusIndicatorPort.hpp"
+#include "balancing/device/UsbHostPort.hpp"
 #include "balancing/device/MotorObservation.hpp"
 
 namespace balancing {
@@ -27,6 +28,7 @@ struct ApplicationObservation {
     Can2ServiceSummary can2{};
     std::optional<IndicatorState> indicator{};
     IndicatorOutputSummary indicatorOutput{};
+    UsbHostSummary usbHost{};
 };
 
 /** @brief 主ループで最後の周期診断を取得。初期化前は空。
@@ -59,6 +61,10 @@ Can2ServiceLink* applicationCan2Link() noexcept;
  * @spec{PROTO-PS5-001}
  */
 DualSenseService* applicationDualSense() noexcept;
+/** @brief 検証済みUSB設定と非ブロッキング下位Hostを明示接続。既定起動は無効。
+ * @spec{PROTO-PS5-001}
+ */
+bool startApplicationUsbHost(UsbHostConfig,UsbHostBackend) noexcept;
 /** @brief USB側の明示操作元選択。状態判断はApplicationの現在状態を用いる。
  * @spec{PROTO-PS5-001}
  */
