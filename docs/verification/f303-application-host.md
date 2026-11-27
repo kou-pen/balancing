@@ -25,4 +25,4 @@ CubeIDE付属ARM GCC 13.3.1で application.cpp のCortex-M4 hard-floatオブジ�
 
 ## 残件
 
-実GPIO、ADC/DMA、CAN、TIM、IRQ、IWDG、実機周期の計測、出力適用後の割り込み競合、主電源導通確認方法、回路定数は未検証。CubeMX生成と製品FWビルドは保留。PR #107のSDK/リンク試験は独立した承認待ちのため本ブランチには含めない。F446側の製品コード・CAN仕様は変更なし。T-F303-01〜06の完了条件は維持。
+実GPIO、ADC/DMA、CAN、TIM、IRQ、IWDG、実機周期の計測、出力適用後の割り込み競合、主電源導通確認方法、回路定数は未検証。CubeMX生成と製品FWビルドは保留。PR #107のSDK/リンク試験は承認後に統合済み。F446側の製品コード・CAN仕様は変更なし。T-F303-01〜06の完了条件は維持。
