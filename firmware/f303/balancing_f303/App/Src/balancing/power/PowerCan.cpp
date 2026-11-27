@@ -96,4 +96,9 @@ PowerCanOutput PowerCan::step(PowerController& controller, PowerInputs in,
     return out;
 }
 
+void PowerCan::invalidateStatus() noexcept {
+    // 生成済み候補がGPIO適用失敗で破棄されても、次の状態報告を100ms待たせない。
+    statusIssued_ = false;
+}
+
 } // namespace balancing::power

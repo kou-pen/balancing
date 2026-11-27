@@ -45,6 +45,10 @@ public:
      */
     PowerCanOutput step(PowerController& controller, PowerInputs inputs,
                         const PowerCanRx& rx, std::uint64_t nowUs) noexcept;
+    /** @brief 未適用出力に基づく送信候補を破棄した後、次周期に状態報告を再生成する。
+     * @spec{PROTO-PWR-001}
+     */
+    void invalidateStatus() noexcept;
 private:
     bool statusIssued_{false};
     std::uint64_t lastStatusUs_{0};
