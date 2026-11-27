@@ -9,8 +9,8 @@ CAN1とCAN2はそれぞれCanPortとCanTxSchedulerを所有します。CAN IDの
 | 受信分類・送信終端・バス異常の配送 | communication/can/CanRouter.hpp/.cpp |
 | 4軸の停止要求・受付・終端 | app/MotorCanLink.hpp/.cpp、app/MotorService.hpp/.cpp |
 | 共通周期送信の5対象・世代・終端・期限 | app/MotorCanLink.hpp/.cpp 内の MotorPeriodicTx |
-| 通常停止専用・新規周期の検査 | app/DriveRuntime.hpp/.cpp |
-| SILでの運転許可・4msの位相 | tests/sil/DriveCycle.cpp |
+| 通常停止専用・新規周期の検査、SILの駆動配送と4ms位相 | app/DriveExecution.hpp/.cpp |
+| 起動設定・フレーム生成境界 | app/DriveRuntime.cpp、tests/sil/DriveRuntime.cpp |
 
 Schedulerは停止を優先し、周期要求を最新世代で置換します。期限切れの旧周期を後から積まないこと、受付済み要求は終端まで照合することが重要です。通常イベントはFIFO、診断の背景送信は枠を制限します。
 

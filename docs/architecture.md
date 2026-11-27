@@ -1,6 +1,6 @@
 # ソフトウェア構成
 
-**基準：#91までのmasterと車輪原点再設定のレビュー版。** 実機非ゼロ指令は未接続です。このページは目標構成ではなく実際のコードを中心に記述します。要求は [仕様](spec-index.md)、実装根拠は [検証記録](verification/index.md)。
+**基準：#93までのmasterと駆動実行共通化のレビュー版。** 実機非ゼロ指令は未接続です。このページは目標構成ではなく実際のコードを中心に記述します。要求は [仕様](spec-index.md)、実装根拠は [検証記録](verification/index.md)。
 
 ## 1. ロボット全体
 
@@ -24,14 +24,16 @@ flowchart TB
     CORE --> IO["device/ HAL・機器接続"]
     IO --> COMM["communication/ CAN・USB"]
     COMM --> APP
-    APP --> CYCLE["app/ControlCycle"]
+    APP --> DRIVE["DriveRuntime 起動・許可境界"]
+    DRIVE --> EXEC["DriveExecution 共通周期実行"]
+    DRIVE -. 未結合時 .-> CYCLE["app/ControlCycle"]
+    EXEC --> CYCLE
     CYCLE --> EST["control/estimator"]
     IO --> FILTER["control/filter 姿勢フィルタ"]
     FILTER --> APP
     CYCLE --> SEQ["RobotSequence 状態判定"]
     CYCLE --> CTRL["control/controller 数学演算"]
-    APP --> DRIVE["DriveRuntime 停止専用出力"]
-    DRIVE --> TX["MotorPeriodicTx 共通周期送信管理"]
+    EXEC --> TX["MotorPeriodicTx 共通周期送信管理"]
     TX --> COMM
     CORE -. 別ビルド .-> BENCH["bench/ MotorBench"]
 </pre>
@@ -53,7 +55,7 @@ flowchart TB
 |---|---|---|
 | Debug / Release | 通常Application、CAN1/2、IMU起動判断、TIM7、IWDG起動判断 | 既定はモータ送信なし。#88の明示設定時のみRS06停止＋C620全ゼロ |
 | BenchDebug | 試運転専用の起動経路 | 既定の未検証設定ではCAN開始前に停止。明示設定で停止確認。パルス入力は未接続 |
-| PCのSIL | `tests/sil/DriveRuntime.cpp` と `DriveCycle.cpp` | 人工モデルによるARMING・6軸指令を模擬CANで検証。上位の駆動実装はSTM32にはリンクしない。周期送信管理は共通 |
+| PCのSIL | `tests/sil/DriveRuntime.cpp` と共通 `DriveExecution.cpp` | 人工モデルによるARMING・6軸指令を模擬CANで検証。人工設定とフレーム生成入口はSTM32にリンクしない |
 
 実行中に通常/試運転を切り替える機能はありません。通常ビルドにSILの人工ゲインを投入していません。
 

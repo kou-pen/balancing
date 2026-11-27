@@ -1,6 +1,6 @@
 # 起動・周期・通信の処理順序
 
-対象は停止専用送信・ARM準備診断・周期送信共通化と車輪原点再設定の実装。実際の呼び出し順と将来仕様を分けます。クラスの所在は [フォルダ別コード案内](design/public-api.md)。
+対象は停止専用送信・ARM準備診断・車輪原点再設定・駆動実行共通化の実装。実際の呼び出し順と将来仕様を分けます。クラスの所在は [フォルダ別コード案内](design/public-api.md)。
 
 ## 1. 通常起動と試運転起動
 
@@ -39,7 +39,7 @@ sequenceDiagram
     C->>C: CAN1/2イベント回収と観測コピー
     M->>A: balancing_app_control_tick
     A->>A: 観測と操作・電源を固定
-    A->>P: drive_runtime::step → ControlCycle.step
+    A->>P: drive_runtime::step → DriveExecution（明示設定時）→ ControlCycle.step
     P-->>A: ControlTickResult
     Note over A: #88の明示設定時は停止予約・送信処理も行う
     A->>A: 診断・表示・観測ack
@@ -87,27 +87,27 @@ flowchart TB
 
 演算はARM前の脚長初期化や、既にBALANCINGの場合など必要なときだけ行います。状態機械は一周期に一度更新します。現行通常実機設定ではARM条件は成立せず、数学プレビューを実機へ送りません。
 
-## 5. 停止専用送信（#88）
+## 5. 共通駆動実行と停止専用出力
 
 <pre class="mermaid">
-flowchart LR
-    APP["DriveRuntime"] --> CHECK{"明示検証済み設定"}
-    CHECK -->|未設定| OFF["送信しない"]
-    CHECK -->|成立| STOP["MotorService: StopAll"]
+flowchart TB
+    NORMAL["通常 DriveRuntime"] --> CHECK{"明示停止設定"}
+    CHECK -->|未設定| OFF["ControlCycleのみ・送信なし"]
+    CHECK -->|成立、生成関数なし| EXEC["DriveExecution"]
+    SIL["PCのみ: 人工設定とフレーム生成"] --> EXEC
+    EXEC --> CYCLE["ControlCycle: 1回の状態判定"]
+    EXEC --> STOP["MotorService: 状態要求"]
     STOP --> LINK["MotorCanLink"]
+    EXEC --> TX["MotorPeriodicTx: ゼロ、SILのみ4/2ms指令"]
     LINK --> S1["CAN1 Scheduler"]
-    S1 --> P1["CanPort: Type4×4"]
-    CHECK -->|新規正常周期| ZERO["C620Codec: 0x200 全ゼロ"]
-    ZERO --> TX["MotorPeriodicTx"]
-    SIL["PCのみ: DriveCycle"] -->|4ms/2msの模擬指令| TX
     TX --> S1
-    TX --> S2["CAN2 Scheduler 最新世代"]
-    S2 --> P2["CanPort"]
-    P1 --> ACK["IRQ → Router → 終端照合"]
-    P2 --> ACK
+    TX --> S2["CAN2 Scheduler"]
+    S1 --> ACK["IRQ → Router → 終端照合"]
+    S2 --> ACK
+    ACK --> EXEC
 </pre>
 
-通常とSILは同じMotorPeriodicTxを使用し、RS06の停止・有効化はMotorCanLinkが管理する。RS06は3メールボックスを使って4軸を停止します。C620ゼロは2ms周期予約枠を使い、期限切れと置換を記録します。非ゼロ指令・Type3への経路は追加していません。
+通常の明示停止設定では生成関数を渡さずStopAllとC620全ゼロに限定します。SILは人工設定とMotorFramePlanを接続しますが、実機用のフレーム生成は未接続です。共通DriveExecutionは状態判定を一周期に一度だけ実行し、MotorPeriodicTxの世代・終端管理を再利用します。RS06は3メールボックスで4軸を停止します。
 
 ## 6. 操作・電源・表示
 

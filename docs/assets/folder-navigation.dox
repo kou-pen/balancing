@@ -172,6 +172,7 @@
 | [f446-arm-readiness.md](../verification/f446-arm-readiness.md) | ARM準備の設定・観測診断 |
 | [f446-motor-periodic-tx.md](../verification/f446-motor-periodic-tx.md) | 通常とSILの周期送信管理共通化 |
 | [f446-wheel-reference.md](../verification/f446-wheel-reference.md) | 車輪原点の明示再設定と世代同期 |
+| [f446-drive-execution.md](../verification/f446-drive-execution.md) | 通常とSILの駆動実行共通化 |
 | [can-contract-audit.md](../verification/can-contract-audit.md) | CAN通信契約の静的照合（Issue #6） |
 | [core-mode-contract-audit.md](../verification/core-mode-contract-audit.md) | 制御コア状態機械の仕様差分監査 |
 | [cpp17-migration-preflight-20261112.md](../verification/cpp17-migration-preflight-20261112.md) | C++17集中移植前のmaster基準検証（2026-11-12） |
@@ -361,6 +362,7 @@ ApplicationObservationは周期コピー、ControlCycleは数学と状態判定�
 | <a href="CycleHealthMonitor_8hpp_source.html">CycleHealthMonitor.hpp</a> | 開始番号・完了証跡の照合、IWDG更新境界。実装: <a href="CycleHealthMonitor_8cpp_source.html">CycleHealthMonitor.cpp</a> |
 | <a href="DiagnosticsService_8hpp_source.html">DiagnosticsService.hpp</a> | 診断イベント・固定領域・送信進捗。実装: <a href="DiagnosticsService_8cpp_source.html">DiagnosticsService.cpp</a> |
 | <a href="DriveRuntime_8hpp_source.html">DriveRuntime.hpp</a> | 周期実行・送信終端・CAN所有者結合の共通契約。実装: <a href="DriveRuntime_8cpp_source.html">DriveRuntime.cpp</a> |
+| <a href="DriveExecution_8hpp_source.html">DriveExecution.hpp</a> | 共通周期実行・駆動要求と停止の配送。実装: <a href="DriveExecution_8cpp_source.html">DriveExecution.cpp</a> |
 | <a href="DualSenseService_8hpp_source.html">DualSenseService.hpp</a> | USB報告連続性、操作イベントと長押し判定。実装: <a href="DualSenseService_8cpp_source.html">DualSenseService.cpp</a> |
 | <a href="MotorCanLink_8hpp_source.html">MotorCanLink.hpp</a> | 機器報告・RS06停止/有効化の配送、MotorPeriodicTxの共通周期送信管理。実装: <a href="MotorCanLink_8cpp_source.html">MotorCanLink.cpp</a> |
 | <a href="MotorService_8hpp_source.html">MotorService.hpp</a> | RS06のARM・停止と、脚・車輪6軸の周期観測をまとめるAPI。実装: <a href="MotorService_8cpp_source.html">MotorService.cpp</a> |
@@ -442,7 +444,7 @@ ApplicationObservationは周期コピー、ControlCycleは数学と状態判定�
 
 @ref folder_firmware_f446_balancing_f446_App_Src_balancing "firmware/f446/balancing_f446/App/Src/balancing/" / app/
 
-最初に application.cpp → DriveRuntime.cpp → ControlCycle.cpp を読む。RobotSequenceが運転状態を決定する。
+最初に application.cpp → DriveRuntime.cpp → DriveExecution.cpp（明示設定時）→ ControlCycle.cpp を読む。RobotSequenceが運転状態を決定する。
 
 対応フォルダ: @ref folder_firmware_f446_balancing_f446_App_Inc_balancing_app "Inc/balancing/app/"
 
@@ -452,7 +454,8 @@ ApplicationObservationは周期コピー、ControlCycleは数学と状態判定�
 | <a href="ControlCycle_8cpp_source.html">ControlCycle.cpp</a> | 1周期の観測→ARM/FAULT→数学制御・指令変換の実行順 |
 | <a href="CycleHealthMonitor_8cpp_source.html">CycleHealthMonitor.cpp</a> | 欠落・重複・未完了の分離、更新要求照合 |
 | <a href="DiagnosticsService_8cpp_source.html">DiagnosticsService.cpp</a> | 重要通常FIFO、3部分の終端照合 |
-| <a href="DriveRuntime_8cpp_source.html">DriveRuntime.cpp</a> | 通常の周期実行と#88停止専用送信。SIL実装はtests/sil/ |
+| <a href="DriveRuntime_8cpp_source.html">DriveRuntime.cpp</a> | 通常起動・停止専用の共通実行への結合。SILアダプタはtests/sil/ |
+| <a href="DriveExecution_8cpp_source.html">DriveExecution.cpp</a> | 共通周期実行、停止専用条件、SIL駆動配送・4ms位相 |
 | <a href="DualSenseService_8cpp_source.html">DualSenseService.cpp</a> | 報告の連続性・操作元・長押しイベント |
 | <a href="MotorCanLink_8cpp_source.html">MotorCanLink.cpp</a> | 軸別受信・RS06有効化/停止と共通周期世代・受付・終端・期限管理 |
 | <a href="MotorService_8cpp_source.html">MotorService.cpp</a> | 6軸の観測取得、報告の軸選択、RS06のARM・停止要求 |
