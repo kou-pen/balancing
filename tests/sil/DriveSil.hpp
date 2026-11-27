@@ -1,8 +1,13 @@
 #pragma once
 #include "balancing/app/DriveRuntime.hpp"
-#include "DriveCycle.hpp"
+#if defined(__arm__) || defined(__thumb__)
+#error "The SIL drive adapter must never be built for ARM firmware."
+#endif
+#include "balancing/app/DriveExecution.hpp"
 
 namespace balancing {
+using DriveSilConfig=DriveExecutionConfig;
+using DriveSilResult=DriveExecutionResult;
 /** @brief 人工の制御・通信設定。ホスト試験専用で実機バイナリには存在しない。
  * @spec{BOARD-F446-001}
  */

@@ -424,6 +424,8 @@ int main(int argc, char** argv)
         const bool txError=std::strcmp(argv[1],"--drive-sil-tx-error")==0;
         const bool estop=std::strcmp(argv[1],"--drive-sil-estop")==0;
         const bool invalid=std::strcmp(argv[1],"--drive-sil-invalid")==0;
+        const bool invalidRsDeadline=std::strcmp(argv[1],"--drive-sil-invalid-rs-deadline")==0;
+        const bool invalidWheelDeadline=std::strcmp(argv[1],"--drive-sil-invalid-wheel-deadline")==0;
         const bool invalidModel=std::strcmp(argv[1],"--drive-sil-invalid-model")==0;
         const bool rxLoss=std::strcmp(argv[1],"--drive-sil-rx-loss")==0;
         const bool gap=std::strcmp(argv[1],"--drive-sil-gap")==0;
@@ -459,6 +461,8 @@ int main(int argc, char** argv)
         // 旧Cモデルの注入期限試験を実際のC++送信経路へ移す。
         // 人工値であり本番の送信期限を決めない。
         p.tx={12000,shortDeadline?4000u:(longDeadline?10000u:6000u)};
+        if (invalidRsDeadline) p.tx.rs06TxTimeoutUs=0;
+        if (invalidWheelDeadline) p.tx.c620TxTimeoutUs=0;
         p.communication.allowWheelReferenceReset=reference || referenceActive;
         assert(!resetApplicationWheelReference());
         assert(initializeDriveSil(p));
@@ -696,10 +700,10 @@ int main(int argc, char** argv)
         res=tick(6000); assert(applicationObservation()->operatorTarget->operator_ready); drain();
         pre(8000,false); request(RemoteRequestKind::Arm,2);
         res=tick(8000);
-        if (invalid || invalidModel) {
+        if (invalid || invalidModel || invalidRsDeadline || invalidWheelDeadline) {
             assert(res.control.sequence.state==RobotState::Disarmed && res.outputInhibited);
             c=drain(); assert(c.enable==0 && c.torque==0 && c.current==0);
-            std::puts("PASS: invalid six-axis conversion or unverified gain prevents SIL ARM");
+            std::puts("PASS: invalid conversion, model or independent deadline prevents SIL ARM");
             return 0;
         }
         assert(res.control.sequence.state==RobotState::Arming && res.outputInhibited);

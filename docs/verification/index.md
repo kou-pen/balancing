@@ -2,16 +2,16 @@
 
 各記録は当時のコード・環境・試験結果です。最新の実装説明は[全体構成](../architecture.md)、[フォルダ別コード案内](../design/public-api.md)に置き、過去のPASSを現在の実機動作に読み替えません。
 
-## 最新の基準（車輪原点再設定レビュー版 253aca0）
+## 最新の基準（駆動実行共通化レビュー版 51bd7bf）
 
 | 項目 | 結果 |
 |---|---|
-| App自作コード | 96ファイル、45 .cpp、旧 .c 0 |
-| CTest・通常/UBSan | 74/74・全件PASS |
+| App自作コード | 98ファイル、46 .cpp、旧 .c 0 |
+| CTest・通常/UBSan | 76/76・全件PASS |
 | ARM管理ビルド | Debug / Release / BenchDebug すべて0 error / 0 warning |
 | 実機 | 書込み、実通信、実時間、物理停止、倒立は未検証 |
 
-出典：[車輪原点再設定](f446-wheel-reference.md)。レビュー版とmasterを区別する。#88〜#91はmaster反映済み。
+出典：[駆動実行共通化](f446-drive-execution.md)。レビュー版とmasterを区別する。#88〜#93はmaster反映済み。
 
 ## 機能別の記録
 
@@ -58,6 +58,7 @@
 
 ### 推定・制御数学
 
+- [F446 通常とSILの駆動実行共通化](f446-drive-execution.md)
 - [F446 車輪原点再設定の統合](f446-wheel-reference.md)
 - [F446 6軸・IMU同一周期StateEstimatorのホスト検証](f446-state-estimator-host.md)
 - [F446 C++17 車輪オドメトリのホスト検証](f446-wheel-odometry-host.md)

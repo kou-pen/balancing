@@ -104,7 +104,7 @@ NORMAL_SYMBOLS = ("balancing_app_init", "balancing_app_begin_control_tick",
 BENCH_SYMBOLS = ("balancing_f446_bench_start", "balancing_f446_bench_service",
                  "balancing_f446_bench_capture_irq", "balancing::startCanBench(",
                  "balancing::MotorBench::poll(")
-FORBIDDEN_SYMBOLS = ("balancing::MotorBench::requestPulse(", "DriveCycle::",
+FORBIDDEN_SYMBOLS = ("balancing::MotorBench::requestPulse(", "DriveCycle::", "balancing::MotorFramePlan::compose(",
                      "driveSilObservation", "initializeDriveSil")
 
 
