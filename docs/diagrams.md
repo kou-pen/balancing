@@ -270,3 +270,17 @@ flowchart LR
 </pre>
 
 同周期の要求はESTOP、OFF、ONの優先順。状態報告と応答の符号化は既存Codecを使用する。F446の受信サービスには実フレーム形式の候補を直接渡して検証した。実バスでの送信完了を確認したものではない。
+
+## F303基板論理出力とLED（レビュー版）
+
+<pre class="mermaid">
+flowchart LR
+    CTRL["PowerController / PowerCan"] --> IO["BoardIO.evaluate"]
+    GATE["出力直前の安全条件"] --> IO
+    IO --> OUT["両電源の論理出力要求"]
+    IO --> LED["LEDの論理点灯"]
+    OUT -.-> GPIO["実GPIO（未接続）"]
+    LED -.-> GPIO
+</pre>
+
+BoardIOは状態の所有者ではなく、出力要求の整合と安全条件を確認する。実GPIOへの適用と遮断ラッチ確認の不可分性、拒否時のController通知とCAN候補破棄は今後の接続作業。
