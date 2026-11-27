@@ -31,7 +31,7 @@ flowchart LR
 
 ## 検証
 
-新規SILの通常・UBSanはPASS。CMake Debug全CTest 87/87 PASS（job 2959b2b3432946e2）。仕様整合・Doxygen生成・差分検査PASS（既知の日本語翻訳警告のみ）。#107のARMリンク試験も統合後に再実行し28ソースのコンパイル・既存試験ELFのリンク・ベクタ検査PASS。application.cppはコンパイル対象だが試験mainから未呼出しであり、applicationのリンク保持・実行を証明しない。製品ソース、CAN契約、実機用設定の変更なし。
+新規SILの通常・UBSanはPASS。CMake Debug全CTest 87/87 PASS（job 2959b2b3432946e2）。全通常/UBSan回帰試験PASS（job 0f36707b47a24970、CubeIDE設定25/25、CAN監査19/19）。仕様整合・Doxygen生成・差分検査PASS（既知の日本語翻訳警告のみ）。#107のARMリンク試験も統合後に再実行し28ソースのコンパイル・既存試験ELFのリンク・ベクタ検査PASS。application.cppはコンパイル対象だが試験mainから未呼出しであり、applicationのリンク保持・実行を証明しない。製品ソース、CAN契約、実機用設定の変更なし。
 
 ## 限界と残件
 
