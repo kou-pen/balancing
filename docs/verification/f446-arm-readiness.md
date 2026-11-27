@@ -17,4 +17,4 @@ tests/test_f446_stop_output.cpp --readiness で既定の全不足、人工値の
 
 CTest 71/71 PASS（21c302abf3be4a5d）。実機操作なし。ARM拒否の原因を診断として取得可能にしたが、Piへの新規CAN診断配信、実機駆動、機構保護モデルは未実装。
 
-通常・UBSan全件PASS（4a0775cc49364a99）。CubeIDE Debug/Release/BenchDebug cleanBuild（a6142b6f599e4c36）全構成0 errors/0 warnings、45 Appソース。Release text76108/data2828/bss12600 B（基準よりtext+756 B、bss+16 B）。Debug text219572/data2828/bss12600 B、BenchDebug text83732/data2748/bss14288 B。nmでARM準備診断は通常ELFのみ、全構成にSIL/試運転パルス/MotorFramePlan::composeなし。仕様493 API参照、メタデータ24/24、CAN監査19/19、Doxygenソースリンク・diff check合格。App96ファイル、C++45、旧C0を維持。
+通常・UBSan全件PASS（4a0775cc49364a99）。CubeIDE Debug/Release/BenchDebug cleanBuild（a6142b6f599e4c36）全構成0 errors/0 warnings、45 Appソース。Release text76108/data2828/bss12600 B（基準よりtext+756 B、bss+16 B）。Debug text219572/data2828/bss12600 B、BenchDebug text83732/data2748/bss14288 B。nmでARM準備診断は通常ELFのみ、全構成にSIL/試運転パルス/`MotorFramePlan::compose` なし。仕様493 API参照、メタデータ24/24、CAN監査19/19、Doxygenソースリンク・diff check合格。App96ファイル、C++45、旧C0を維持。
