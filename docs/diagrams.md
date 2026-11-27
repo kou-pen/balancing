@@ -284,3 +284,19 @@ flowchart LR
 </pre>
 
 BoardIOは状態の所有者ではなく、出力要求の整合と安全条件を確認する。実GPIOへの適用と遮断ラッチ確認の不可分性、拒否時のController通知とCAN候補破棄は今後の接続作業。
+
+## F303 applicationの周期処理（論理統合）
+
+<pre class="mermaid">
+flowchart TD
+    T["1 kHzタイマ通知・ADC・CANスナップショット"] --> A["application.runCycle"]
+    A --> M["PowerMonitor"]
+    M --> C["PowerCan / PowerController"]
+    C --> B["BoardIO"]
+    B --> G{"出力適用コールバック成功?"}
+    G -->|成功・周期正常| X["CAN候補とIWDG更新許可"]
+    G -->|失敗| F["FAULT・候補破棄・IWDG更新なし"]
+    G -->|周期異常| F
+</pre>
+
+実GPIO/IRQは未接続。出力適用コールバックはホスト上の模擬基板に置き換える。
