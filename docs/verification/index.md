@@ -19,6 +19,7 @@
 - [PowerMonitorの換算・保護とController結合試験](f303-power-monitor-host.md)（人工fixture）
 - [PowerCanの要求処理とF446対向試験](f303-power-can-host.md)（ホストフレーム接続）
 - [BoardIOの論理出力境界・LED表示](f303-board-io-host.md)（実GPIO未接続）
+- [applicationの全論理モジュール統合](f303-application-host.md)（模擬基板）
 
 ## 機能別の記録
 

@@ -205,6 +205,7 @@
 | [f303-power-monitor-host.md](../verification/f303-power-monitor-host.md) | F303のADC換算と電源保護判定 |
 | [f303-power-can-host.md](../verification/f303-power-can-host.md) | F303電源CANとF446対向検証 |
 | [f303-board-io-host.md](../verification/f303-board-io-host.md) | F303論理出力境界・LED表示とARMオブジェクト検証 |
+| [f303-application-host.md](../verification/f303-application-host.md) | F303全論理モジュールの周期統合とF446対向試験 |
 | [f446-drive-cycle-sil.md](../verification/f446-drive-cycle-sil.md) | F446 Application通常運転のSIL統合 |
 | [f446-dual-can-runtime-host.md](../verification/f446-dual-can-runtime-host.md) | F446 CAN1/CAN2共通受信ランタイムのホスト検証 |
 | [f446-dualsense-input-host.md](../verification/f446-dualsense-input-host.md) | F446 DualSense USB入力境界 |
@@ -725,6 +726,7 @@ ApplicationObservationは周期コピー、ControlCycleは数学と状態判定�
 | <a href="PowerMonitor_8hpp_source.html">PowerMonitor.hpp</a> | ADC観測・校正・保護設定と公開API |
 | <a href="PowerCan_8hpp_source.html">PowerCan.hpp</a> | 周期受信バッチと送信候補・公開API |
 | <a href="BoardIO_8hpp_source.html">BoardIO.hpp</a> | 出力直前の安全条件とLED論理出力 |
+| <a href="application_8hpp_source.html">application.hpp</a> | 周期入力・出力適用接続点・周期結果 |
 */
 
 /** @page folder_firmware_f303_balancing_f303_App_Src Src/
@@ -755,4 +757,5 @@ ApplicationObservationは周期コピー、ControlCycleは数学と状態判定�
 | <a href="PowerMonitor_8cpp_source.html">PowerMonitor.cpp</a> | ADC換算・観測鮮度・電圧と持続過電流の判定 |
 | <a href="PowerCan_8cpp_source.html">PowerCan.cpp</a> | CAN要求集約・操作応答・状態報告 |
 | <a href="BoardIO_8cpp_source.html">BoardIO.cpp</a> | 出力要求の整合確認・LED点滅 |
+| <a href="f303_2balancing__f303_2App_2Src_2balancing_2power_2application_8cpp_source.html">application.cpp</a> | 4モジュールの周期統合と完了条件 |
 */
