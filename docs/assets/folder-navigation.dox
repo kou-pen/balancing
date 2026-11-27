@@ -170,6 +170,7 @@
 |---|---|
 | [index.md](../verification/index.md) | 最新基準・機能別の全記録 |
 | [f446-arm-readiness.md](../verification/f446-arm-readiness.md) | ARM準備の設定・観測診断 |
+| [f446-motor-periodic-tx.md](../verification/f446-motor-periodic-tx.md) | 通常とSILの周期送信管理共通化 |
 | [can-contract-audit.md](../verification/can-contract-audit.md) | CAN通信契約の静的照合（Issue #6） |
 | [core-mode-contract-audit.md](../verification/core-mode-contract-audit.md) | 制御コア状態機械の仕様差分監査 |
 | [cpp17-migration-preflight-20261112.md](../verification/cpp17-migration-preflight-20261112.md) | C++17集中移植前のmaster基準検証（2026-11-12） |
@@ -360,7 +361,7 @@ ApplicationObservationは周期コピー、ControlCycleは数学と状態判定�
 | <a href="DiagnosticsService_8hpp_source.html">DiagnosticsService.hpp</a> | 診断イベント・固定領域・送信進捗。実装: <a href="DiagnosticsService_8cpp_source.html">DiagnosticsService.cpp</a> |
 | <a href="DriveRuntime_8hpp_source.html">DriveRuntime.hpp</a> | 周期実行・送信終端・CAN所有者結合の共通契約。実装: <a href="DriveRuntime_8cpp_source.html">DriveRuntime.cpp</a> |
 | <a href="DualSenseService_8hpp_source.html">DualSenseService.hpp</a> | USB報告連続性、操作イベントと長押し判定。実装: <a href="DualSenseService_8cpp_source.html">DualSenseService.cpp</a> |
-| <a href="MotorCanLink_8hpp_source.html">MotorCanLink.hpp</a> | CAN1・CAN2の機器報告の配送、RS06の送信・終端接続。実装: <a href="MotorCanLink_8cpp_source.html">MotorCanLink.cpp</a> |
+| <a href="MotorCanLink_8hpp_source.html">MotorCanLink.hpp</a> | 機器報告・RS06停止/有効化の配送、MotorPeriodicTxの共通周期送信管理。実装: <a href="MotorCanLink_8cpp_source.html">MotorCanLink.cpp</a> |
 | <a href="MotorService_8hpp_source.html">MotorService.hpp</a> | RS06のARM・停止と、脚・車輪6軸の周期観測をまとめるAPI。実装: <a href="MotorService_8cpp_source.html">MotorService.cpp</a> |
 | <a href="PowerBoardService_8hpp_source.html">PowerBoardService.hpp</a> | 電源報告の受信API・生メタデータ・500ms期限・故障保持。実装: <a href="PowerBoardService_8cpp_source.html">PowerBoardService.cpp</a> |
 | <a href="RemoteControlService_8hpp_source.html">RemoteControlService.hpp</a> | 操作元・設定・サンプル・目標型と操作管理API。実装: <a href="RemoteControlService_8cpp_source.html">RemoteControlService.cpp</a> |
@@ -452,7 +453,7 @@ ApplicationObservationは周期コピー、ControlCycleは数学と状態判定�
 | <a href="DiagnosticsService_8cpp_source.html">DiagnosticsService.cpp</a> | 重要通常FIFO、3部分の終端照合 |
 | <a href="DriveRuntime_8cpp_source.html">DriveRuntime.cpp</a> | 通常の周期実行と#88停止専用送信。SIL実装はtests/sil/ |
 | <a href="DualSenseService_8cpp_source.html">DualSenseService.cpp</a> | 報告の連続性・操作元・長押しイベント |
-| <a href="MotorCanLink_8cpp_source.html">MotorCanLink.cpp</a> | 既存軸別受信とCAN1の有効化・停止の配送、自作CAN2を除外 |
+| <a href="MotorCanLink_8cpp_source.html">MotorCanLink.cpp</a> | 軸別受信・RS06有効化/停止と共通周期世代・受付・終端・期限管理 |
 | <a href="MotorService_8cpp_source.html">MotorService.cpp</a> | 6軸の観測取得、報告の軸選択、RS06のARM・停止要求 |
 | <a href="PowerBoardService_8cpp_source.html">PowerBoardService.cpp</a> | CAN2電源状態の復号接続・受理と鮮度評価 |
 | <a href="RemoteControlService_8cpp_source.html">RemoteControlService.cpp</a> | 操作入力の検証、ニュートラル復帰、変化率制限、状態ごとの目標 |

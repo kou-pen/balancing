@@ -8,8 +8,9 @@ CAN1とCAN2はそれぞれCanPortとCanTxSchedulerを所有します。CAN IDの
 | 停止・周期・通常イベント・背景枠・トークン照合 | communication/can/CanTxScheduler.hpp/.cpp |
 | 受信分類・送信終端・バス異常の配送 | communication/can/CanRouter.hpp/.cpp |
 | 4軸の停止要求・受付・終端 | app/MotorCanLink.hpp/.cpp、app/MotorService.hpp/.cpp |
-| #88停止専用のC620全ゼロ | app/DriveRuntime.hpp/.cpp |
-| 模擬通常駆動の4ms/2ms世代 | tests/sil/DriveCycle.cpp |
+| 共通周期送信の5対象・世代・終端・期限 | app/MotorCanLink.hpp/.cpp 内の MotorPeriodicTx |
+| 通常停止専用・新規周期の検査 | app/DriveRuntime.hpp/.cpp |
+| SILでの運転許可・4msの位相 | tests/sil/DriveCycle.cpp |
 
 Schedulerは停止を優先し、周期要求を最新世代で置換します。期限切れの旧周期を後から積まないこと、受付済み要求は終端まで照合することが重要です。通常イベントはFIFO、診断の背景送信は枠を制限します。
 
@@ -23,6 +24,8 @@ flowchart LR
     ROUTER --> MATCH["Scheduler.consumeTerminal"]
     MATCH --> OWNER["要求元"]
 </pre>
+
+MotorPeriodicTxは通常の停止専用処理とSILで同じ世代・受付・終端管理を使う。駆動開始の明示期限はSILのみ設定し、ゼロ停止用の終端を通常駆動の鮮度に数えない。中止後の終端は診断に残すが、駆動鮮度は回復しない。予約期限（4ms/2ms）と送達監視期限は別。
 
 CANでの受付、実送信の終端、モータの応答、物理停止は同一ではありません。バスオフ・失敗・欠落を区別します。現在の通常停止専用経路は明示設定が必要で、通常駆動指令はSILのみです。
 

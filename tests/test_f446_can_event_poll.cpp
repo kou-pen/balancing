@@ -1758,6 +1758,78 @@ void testAbortPeriodicDoesNotDelayOtherAxisStop()
     assert(tx.service(105).result==ScheduledTxResult::Idle); // 捨てた旧軸1は復活しない
 }
 
+// 共通機構そのものを模擬ポートとRouterで検証する。実機駆動設定なし。
+void testSharedMotorPeriodicTx()
+{
+    Fixture a,b;
+    CanTxScheduler s1{a.port},s2{b.port};
+    MotorService motors{{{11,12,13,14},0x5a}};
+    MotorCanLink link{motors,s1};
+    MotorPeriodicTx tx{s1,s2,0xD000u};
+    Recorder recorder;
+    CanRouter router{recorder,&s1,&s2};
+    auto finish=[&](Fixture& f,CanBus bus,unsigned box,std::uint32_t flags,std::uint64_t at){
+        f.complete(box,flags,at);
+        const auto before=recorder.count;
+        pollCanEvents(&a.port,&b.port,router);
+        assert(recorder.count==before+1);
+        const auto& e=recorder.entries[before];
+        assert(e.bus==bus && e.kind==CanEventKind::Tx);
+        tx.onTxTerminal(e.bus,e.token,e.outcome,e.atUs);
+    };
+    const std::array<CanFrame,4> frames{{
+        {0x111,{},8,false},{0x112,{},8,false},{0x113,{},8,false},{0x114,{},8,false}}};
+    // ゼロの受付が駆動開始前。後から成功しても駆動鮮度に数えない。
+    assert(tx.queueZero(100));
+    auto z=tx.service(CanBus::Can2,link,100);assert(z.result==ScheduledTxResult::Accepted);
+    b.occupy(0);
+    tx.beginActive(200,4000,2000);tx.markDriving();
+    assert(tx.queue(CanBus::Can1,frames,4,200));
+    for(unsigned i=0;i<3;++i){assert(tx.service(CanBus::Can1,link,200).result==ScheduledTxResult::Accepted);a.occupy(i);}
+    assert(tx.service(CanBus::Can1,link,200).result==ScheduledTxResult::Busy);
+    finish(b,CanBus::Can2,0,CAN_TSR_TXOK0,210);
+    assert(tx.summary()[4].sent==1);
+    assert(!tx.deadlineFault(2199) && tx.deadlineFault(2200));
+    // CAN1の第4対象は第1枠解放後だけ受付可能。
+    finish(a,CanBus::Can1,0,CAN_TSR_TXOK0,220);
+    auto fourth=tx.service(CanBus::Can1,link,221);
+    assert(fourth.result==ScheduledTxResult::Accepted);a.occupy(0);
+    tx.onTxTerminal(CanBus::Can2,fourth.token,CanTxOutcome::Sent,222);
+    tx.onTxTerminal(CanBus::Can1,{fourth.token.serial,0xD001u},CanTxOutcome::Sent,222);
+    tx.onTxTerminal(CanBus::Can1,fourth.token,CanTxOutcome::Sent,220);
+    assert(tx.summary()[3].sent==0);
+    finish(a,CanBus::Can1,0,CAN_TSR_TXOK0,222);
+    assert(tx.summary()[3].sent==1);
+    finish(a,CanBus::Can1,1,CAN_TSR_TXOK0,223);
+    finish(a,CanBus::Can1,2,CAN_TSR_TXOK0,224);
+    // 最新世代へ置換した後の旧終端は累計に入るが監視鮮度を回復しない。
+    assert(tx.queue(CanBus::Can2,{CanFrame{0x200,{},8,false}},1,225));
+    auto old=tx.service(CanBus::Can2,link,225);assert(old.result==ScheduledTxResult::Accepted);b.occupy(0);
+    assert(tx.queue(CanBus::Can2,{CanFrame{0x200,{},8,false}},1,1000));
+    finish(b,CanBus::Can2,0,CAN_TSR_TXOK0,1001);
+    assert(tx.summary()[4].sent==2 && tx.deadlineFault(2200));
+    assert(tx.service(CanBus::Can2,link,1002).result==ScheduledTxResult::Accepted);b.occupy(0);
+    // 期限ちょうどの終端でも期限故障は消えない。
+    finish(b,CanBus::Can2,0,CAN_TSR_TXOK0,2200);
+    assert(tx.takeFault() && tx.deadlineFault(2200));
+    // 明示ゼロは駆動中に予約されても駆動の鮮度・期限終端を更新しない。
+    assert(tx.queueZero(2201));
+    assert(tx.service(CanBus::Can2,link,2201).result==ScheduledTxResult::Accepted);b.occupy(0);
+    finish(b,CanBus::Can2,0,CAN_TSR_TXOK0,2202);
+    assert(!tx.takeFault() && tx.deadlineFault(2202));
+    // 中止時の未受付破棄と旧受付終端の隔離。
+    assert(tx.queue(CanBus::Can1,frames,4,2300));
+    assert(tx.service(CanBus::Can1,link,2300).result==ScheduledTxResult::Accepted);a.occupy(0);
+    tx.withdraw();assert(a.registers.TSR.aborts==CAN_TSR_ABRQ0);
+    assert(tx.summary()[1].dropped==1 && !tx.deadlineFault(999999));
+    assert(s1.enqueueStop(0,frames[0],{1,0x123u})==StopEnqueueResult::Queued);
+    assert(tx.service(CanBus::Can1,link,2301).result==ScheduledTxResult::Busy);
+    finish(a,CanBus::Can1,0,0,2302);
+    assert(tx.summary()[0].failed==1);
+    assert(tx.service(CanBus::Can1,link,2303).result==ScheduledTxResult::Accepted);
+    assert(!tx.takeFault());
+}
+
 void testDiagnosticPartsWithScheduler()
 {
     // ここでのCAN ID/DLCは模擬転送の容器にすぎず、PC向け通信仕様ではない。
@@ -1823,5 +1895,6 @@ int main()
     testIntegratedObservationAndFrameScheduling();
     testAbortPeriodicDoesNotDelayOtherAxisStop();
     testDiagnosticPartsWithScheduler();
+    testSharedMotorPeriodicTx();
     std::puts("PASS: F446 CAN dispatch, TX scheduling, six-axis feedback and RS06 arm/stop");
 }

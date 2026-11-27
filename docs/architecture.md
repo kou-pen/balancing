@@ -1,6 +1,6 @@
 # ソフトウェア構成
 
-**基準：停止専用送信 #88とARM準備診断の実装。** ARM準備診断はレビュー中です。このページは目標構成ではなく実際のコードを中心に記述します。要求は [仕様](spec-index.md)、実装根拠は [検証記録](verification/index.md)。
+**基準：#90までのmasterと周期送信管理共通化のレビュー版。** 実機非ゼロ指令は未接続です。このページは目標構成ではなく実際のコードを中心に記述します。要求は [仕様](spec-index.md)、実装根拠は [検証記録](verification/index.md)。
 
 ## 1. ロボット全体
 
@@ -31,7 +31,8 @@ flowchart TB
     CYCLE --> SEQ["RobotSequence 状態判定"]
     CYCLE --> CTRL["control/controller 数学演算"]
     APP --> DRIVE["DriveRuntime 停止専用出力"]
-    DRIVE --> COMM
+    DRIVE --> TX["MotorPeriodicTx 共通周期送信管理"]
+    TX --> COMM
     CORE -. 別ビルド .-> BENCH["bench/ MotorBench"]
 </pre>
 
@@ -52,7 +53,7 @@ flowchart TB
 |---|---|---|
 | Debug / Release | 通常Application、CAN1/2、IMU起動判断、TIM7、IWDG起動判断 | 既定はモータ送信なし。#88の明示設定時のみRS06停止＋C620全ゼロ |
 | BenchDebug | 試運転専用の起動経路 | 既定の未検証設定ではCAN開始前に停止。明示設定で停止確認。パルス入力は未接続 |
-| PCのSIL | `tests/sil/DriveRuntime.cpp` と `DriveCycle.cpp` | 人工モデルによるARMING・6軸指令を模擬CANで検証。STM32にはリンクしない |
+| PCのSIL | `tests/sil/DriveRuntime.cpp` と `DriveCycle.cpp` | 人工モデルによるARMING・6軸指令を模擬CANで検証。上位の駆動実装はSTM32にはリンクしない。周期送信管理は共通 |
 
 実行中に通常/試運転を切り替える機能はありません。通常ビルドにSILの人工ゲインを投入していません。
 

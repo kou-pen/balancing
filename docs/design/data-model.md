@@ -15,7 +15,8 @@
 | `StateEstimator` | WheelOdometryと脚・車輪の設定 | ControlSnapshot または StateEstimateError |
 | `BalanceControl` | 脚長基準、Yaw積分、固定ゲイン | BalanceControlOutput（機構側Nm） |
 | `MotorCommand` | 6軸別の固定換算・制限設定 | MotorCommandPreview（モータNm/A） |
-| `DriveRuntime` | #88の停止専用予約・受付・終端の記録 | StopOutputSummary |
+| `MotorPeriodicTx`（MotorCanLink.hpp/.cpp） | 5対象の周期予約・受付・終端・送達時刻、明示駆動期限 | MotorPeriodicTxStatus × 5 |
+| `DriveRuntime` | 停止専用・新規周期判定と共通送信管理 | StopOutputSummary |
 | `Application` | 周期時刻・完了証跡、上記ObservationCycle、最新診断・固定設定と観測の不足ビット | ApplicationObservation |
 | `MotorBench` | 別ビルドの単軸機器・停止・試運転状態 | MotorBenchSummary |
 
