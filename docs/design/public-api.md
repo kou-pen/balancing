@@ -189,4 +189,4 @@ IWDGのC ABIはF446Watchdog.hppに同居。GPIOアダプタの宣言はStatusInd
 | [BoardIO.hpp](../../firmware/f303/balancing_f303/App/Inc/balancing/power/BoardIO.hpp) | 出力直前の安全条件・論理出力・公開API |
 | [BoardIO.cpp](../../firmware/f303/balancing_f303/App/Src/balancing/power/BoardIO.cpp) | 出力要求の整合確認・LED表示 |
 
-BoardIOの論理部分は実装済み。実GPIO・application・CubeMX生成コードは未実装。将来構成と決定理由は[F303仕様](../specs/boards/f303_power.md)、試験は[Controller](../verification/f303-power-controller-host.md)・[Monitor](../verification/f303-power-monitor-host.md)・[PowerCan](../verification/f303-power-can-host.md)・[BoardIO](../verification/f303-board-io-host.md)の検証記録を参照。
+BoardIOの論理部分は#106統合済み。実GPIO・application・CubeMX生成コードは未実装。STM32CubeF3を使うARMリンク試験は[開発環境検証](../verification/f303-cube-environment.md)を参照。将来構成と決定理由は[F303仕様](../specs/boards/f303_power.md)、試験は[Controller](../verification/f303-power-controller-host.md)・[Monitor](../verification/f303-power-monitor-host.md)・[PowerCan](../verification/f303-power-can-host.md)・[BoardIO](../verification/f303-board-io-host.md)の検証記録を参照。
