@@ -444,3 +444,8 @@ add_library(balancing_f303_power STATIC
     ${F303_APP}/Src/balancing/power/PowerController.cpp)
 target_include_directories(balancing_f303_power PUBLIC ${F303_APP}/Inc)
 target_compile_options(balancing_f303_power PRIVATE -Wall -Wextra -Wpedantic -Werror)
+
+add_executable(balancing_f303_power_tests tests/test_f303_power_controller.cpp)
+target_link_libraries(balancing_f303_power_tests PRIVATE balancing_f303_power)
+target_compile_options(balancing_f303_power_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
+add_test(NAME balancing_f303_power_tests COMMAND balancing_f303_power_tests)
