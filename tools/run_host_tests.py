@@ -78,6 +78,7 @@ cpp_common = [
     str(F446_APP / "Inc"),
     str(F446_APP / "Src" / "balancing" / "app" / "application.cpp"),
     str(app_source / "app" / "DriveRuntime.cpp"),
+    str(app_source / "app" / "DriveExecution.cpp"),
     *motor_codec_sources,
     *[str(app_source / n) for n in ("app/MotorCanLink.cpp","app/MotorService.cpp","device/Rs06Motor.cpp","device/C620Motor.cpp")],
     str(ROOT / "tests" / "test_cpp_app.cpp"),
@@ -288,7 +289,7 @@ for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-saniti
         subprocess.run([str(executable),mode], check=True, cwd=ROOT, timeout=30)
 
 for test, extra_sources in [
-    ("test_f446_can1_runtime", rs06_service_sources + app_math_cpp + [str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "device" / "f446_can1_runtime.cpp"), str(rs06_source / "device/F446Watchdog.cpp"), str(rs06_source / "communication" / "can" / "Can2FilterPlan.cpp"), str(rs06_source / "app" / "application.cpp"), str(ROOT / "tests" / "sil" / "DriveCycle.cpp"), str(ROOT / "tests" / "sil" / "DriveRuntime.cpp"), str(rs06_source / "communication" / "can" / "MotorFramePlan.cpp")]),
+    ("test_f446_can1_runtime", rs06_service_sources + app_math_cpp + [str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "device" / "f446_can1_runtime.cpp"), str(rs06_source / "device/F446Watchdog.cpp"), str(rs06_source / "communication" / "can" / "Can2FilterPlan.cpp"), str(rs06_source / "app" / "application.cpp"), str(rs06_source / "app" / "DriveExecution.cpp"), str(ROOT / "tests" / "sil" / "DriveRuntime.cpp"), str(rs06_source / "communication" / "can" / "MotorFramePlan.cpp")]),
     ("test_f446_can_event_poll", rs06_service_sources + app_math_cpp + [str(rs06_source / "app" / "MotorCanLink.cpp"), str(rs06_source / "communication" / "can" / "MotorFramePlan.cpp"), str(rs06_source / "control" / "filter" / "ImuAttitudeSource.cpp")]),
 ]:
     for suffix, flags in [
@@ -324,7 +325,7 @@ for test, extra_sources in [
             subprocess.run([str(path), "--watchdog"], check=True, cwd=ROOT, timeout=30)
             for mode in ("--usb-input", "--drive-sil-usb", "--drive-sil", "--drive-sil-timeout", "--drive-sil-short-deadline", "--drive-sil-long-deadline", "--drive-sil-invalid",
                          "--drive-sil-stale", "--drive-sil-rs-timeout", "--drive-sil-tx-error", "--drive-sil-estop",
-                         "--drive-sil-invalid-model", "--drive-sil-rx-loss", "--drive-sil-gap",
+                         "--drive-sil-invalid-model", "--drive-sil-invalid-rs-deadline", "--drive-sil-invalid-wheel-deadline", "--drive-sil-rx-loss", "--drive-sil-gap",
                          "--drive-sil-wheel-reference", "--drive-sil-wheel-reference-disabled",
                          "--drive-sil-wheel-reference-active"):
                 subprocess.run([str(path), mode], check=True, cwd=ROOT, timeout=30)
