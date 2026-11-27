@@ -7,6 +7,7 @@
 #include <cassert>
 #include <cstring>
 #include <cstdio>
+#include <limits>
 
 using namespace balancing;
 namespace {
@@ -46,8 +47,19 @@ void expectStop(unsigned bus) {
         else assert((box.TIR>>21u)==0x200u && !(box.TIR&CAN_TI0R_IDE));
     }
 }
-void service(std::uint32_t seq) {
-    balancing_f446_bench_service(seq);
+// 模擬操作元のみ。実機のボタンやCANコマンドへ接続しない。
+unsigned operationCalls{};
+bool requestStart{},requestStop{},operationAccepted{};
+float requestedOutput{};
+void consumeOperation(MotorBench& bench,std::uint64_t now) noexcept {
+    ++operationCalls;
+    // 同時押しは停止優先。一度消費した開始は次周期へ繰り越さない。
+    if(requestStop) bench.cancel();
+    else if(requestStart) operationAccepted=bench.requestPulse(requestedOutput,now);
+}
+void service(std::uint32_t seq,MotorBench::Operation op=nullptr) {
+    if(op) serviceCanBench(seq,op);
+    else balancing_f446_bench_service(seq);
     // Simulate the mailbox ownership bit which hardware changes on TXRQ.
     for (unsigned bus:{1u,2u}) for (unsigned i=0;i<3;++i)
         if (regs(bus).sTxMailBox[i].TIR&CAN_TI0R_TXRQ)
@@ -60,6 +72,117 @@ void finish(unsigned bus,bool sent=true) {
         r.TSR.bits|=(CAN_TSR_TME0<<i)|((CAN_TSR_RQCP0|(sent?CAN_TSR_TXOK0:CAN_TSR_TERR0))<<(8*i));
     }
     assert(balancing_f446_bench_capture_irq(bus));
+}
+void operation(std::uint32_t seq,bool start,bool stop=false,float output=0.1f) {
+    requestStart=start;requestStop=stop;requestedOutput=output;operationAccepted=false;
+    service(seq,consumeOperation);
+    requestStart=requestStop=false;
+}
+void expectDrive(unsigned bus,unsigned type=1) {
+    assert(pending(bus)==1 && !pending(3-bus));
+    for(const auto& box:regs(bus).sTxMailBox) if(box.TIR&CAN_TI0R_TXRQ) {
+        assert(box.TDTR==8);
+        if(bus==1) {
+            assert((box.TIR&CAN_RI0R_IDE) && (box.TIR>>27u)==type);
+            assert(((box.TIR>>3u)&0xffu)==11);
+        } else {
+            assert(!(box.TIR&CAN_RI0R_IDE) && (box.TIR>>21u)==0x200u);
+            // 選択したC620 ID4だけが非ゼロ。他3チャネルは全ゼロ。
+            assert(box.TDLR==0 && (box.TDHR&0xffffu)==0 && (box.TDHR>>16u)!=0);
+        }
+    }
+}
+void freshReport(unsigned bus,unsigned mode=0) {
+    if(bus==1) rs(11,0xfd,mode); else rx(2,0x204,false);
+    assert(balancing_f446_bench_capture_irq(bus));
+}
+void testOperation(CAN_HandleTypeDef& h1,CAN_HandleTypeDef& h2,unsigned bus,bool faultMode) {
+    assert(startCanBench(&h1,&h2,bus==1?rsCfg:wheelCfg));
+    unsigned seq=1;
+    operation(seq,true);assert(!operationAccepted);expectStop(bus);
+    advance(2000);operation(++seq,true);assert(!operationAccepted);expectStop(bus);
+    // 旧停止の送達後の新規報告を回収してから同周期の操作を処理。
+    advance(100);finish(bus);advance(100);freshReport(bus);
+    advance(1800);operation(++seq,true,false,std::numeric_limits<float>::quiet_NaN());
+    assert(!operationAccepted && canBenchSummary()->state==BenchState::Idle);
+    if(bus==2)expectStop(bus);
+    // 停止と開始の同時操作は停止だけ。
+    if(pending(bus)){advance(100);finish(bus);advance(1900);}else advance(2000);
+    freshReport(bus);operation(++seq,true,true);
+    assert(!operationAccepted && canBenchSummary()->state==BenchState::Idle);
+    if(bus==2)expectStop(bus);
+    if(pending(bus)){advance(100);finish(bus);advance(1900);}else advance(2000);
+    freshReport(bus);operation(++seq,true,false,0.3f);
+    assert(!operationAccepted && canBenchSummary()->state==BenchState::Idle);
+    if(bus==2)expectStop(bus);
+    if(pending(bus)){advance(100);finish(bus);advance(1900);}else advance(2000);
+    freshReport(bus);operation(++seq,true);
+    assert(operationAccepted);
+    if(bus==1) {
+        expectDrive(1,3);
+        // 送達前のRunning報告では駆動開始しない。
+        advance(100);freshReport(1,2);advance(1900);service(++seq);
+        expectDrive(1,3);assert(canBenchSummary()->state==BenchState::Enabling);
+        advance(100);finish(1);advance(100);freshReport(1,2);
+        advance(1800);service(++seq);expectDrive(1);
+    } else expectDrive(2);
+    assert(canBenchSummary()->state==BenchState::Pulsing);
+    // 旧非ゼロ受付中に明示中止。または周期異常による停止。
+    advance(2000);
+    if(faultMode) {
+        const auto calls=operationCalls;
+        operation(seq,true);assert(operationCalls==calls); // 重複番号
+        assert(canBenchSummary()->state==BenchState::Fault);
+    } else {
+        operation(++seq,true,true);
+        assert(!operationAccepted && canBenchSummary()->state==BenchState::Stopping);
+    }
+    assert(regs(bus).TSR.aborts!=0);expectDrive(bus);
+    advance(100);finish(bus,false);advance(1900);service(++seq);expectStop(bus);
+    advance(100);finish(bus);advance(100);freshReport(bus);advance(1800);service(++seq);
+    if(faultMode) {
+        assert(canBenchSummary()->state==BenchState::Fault);
+        if(pending(bus))expectStop(bus);
+        const auto calls=operationCalls;
+        advance(2000);operation(++seq,true);
+        assert(!operationAccepted && operationCalls==calls);
+        if(pending(bus))expectStop(bus);
+        return;
+    }
+    assert(canBenchSummary()->state==BenchState::Idle);
+    // 自動再始動なし、次の明示開始でのみパルスを実行。
+    if(pending(bus)){expectStop(bus);advance(100);finish(bus);advance(1900);}else advance(2000);
+    freshReport(bus);service(++seq);
+    assert(canBenchSummary()->state==BenchState::Idle);
+    if(pending(bus)){expectStop(bus);advance(100);finish(bus);advance(1900);}else advance(2000);
+    // 1周期欠落では既存のFAULT閾値を変えないが操作を通さない。
+    const auto calls=operationCalls;
+    freshReport(bus);seq+=2;operation(seq,true);
+    assert(operationCalls==calls && canBenchSummary()->state==BenchState::Idle);
+    if(pending(bus)){expectStop(bus);advance(100);finish(bus);advance(1900);}else advance(2000);
+    freshReport(bus);operation(++seq,true);
+    assert(operationAccepted);
+    if(bus==1) {
+        expectDrive(1,3);advance(100);finish(1);advance(100);freshReport(1,2);
+        advance(1800);service(++seq);expectDrive(1);
+    } else expectDrive(2);
+    // 8msの既存fixture時間を満了して停止。各周期の受信と終端を回収。
+    for(unsigned i=1;i<=4;++i) {
+        if(pending(bus)){advance(100);finish(bus);advance(1900);}else advance(2000);
+        freshReport(bus,bus==1?2:0);service(++seq);
+        if(i==4)expectStop(bus);
+        else if(pending(bus))expectDrive(bus);
+    }
+    advance(100);finish(bus);advance(100);freshReport(bus);advance(1800);service(++seq);
+    assert(canBenchSummary()->state==BenchState::Idle);
+    if(pending(bus))expectStop(bus);
+    // 未配送の異常がある周期では新規操作を通さない。
+    if(pending(bus)){advance(100);finish(bus);advance(1900);}else advance(2000);
+    regs(bus).RF0R.flags=CAN_RF0R_FOVR0;regs(bus).ESR=CAN_ESR_BOFF;
+    assert(balancing_f446_bench_capture_irq(bus));
+    const auto before=operationCalls;operation(++seq,true);
+    assert(operationCalls==before && canBenchSummary()->state==BenchState::Fault);
+    assert(!pending(3-bus));
 }
 bool accepts(unsigned bank,std::uint32_t word) {
     const auto& f=filters[bank];
@@ -131,8 +254,15 @@ int main(int argc,char** argv) {
     assert(!balancing_f446_bench_start(&h1,&h2));
     assert(!startCanBench(&h2,&h1,rsCfg));
     assert(!canBenchSummary() && !balancing_f446_bench_capture_irq(1));
+    operation(1,true);assert(operationCalls==0);
     service(1);assert(!filterCalls && !startCalls && !pending(1) && !pending(2));
-    if(!std::strcmp(mode,"--iwdg")) {
+    if(!std::strcmp(mode,"--operation-rs") || !std::strcmp(mode,"--operation-wheel") ||
+       !std::strcmp(mode,"--operation-fault")) {
+        testOperation(h1,h2,!std::strcmp(mode,"--operation-rs")?1u:2u,
+                      !std::strcmp(mode,"--operation-fault"));
+        std::puts("PASS: one-shot bench operation after RX/TX collection, stop priority and cycle guards");
+        return 0;
+    } else if(!std::strcmp(mode,"--iwdg")) {
         RCC->CSR=RCC_CSR_IWDGRSTF;
         balancing_f446_watchdog_capture_reset_flags();
         assert(startCanBench(&h1,&h2,wheelCfg));

@@ -285,7 +285,8 @@ for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-saniti
         str(ROOT / "tests/test_f446_bench_runtime.cpp"),
         "-lm",
     ] + flags + ["-o", str(executable)], check=True, cwd=ROOT, timeout=30)
-    for mode in ("--rs","--wheel","--failures","--rollback","--gap","--iwdg"):
+    for mode in ("--rs","--wheel","--failures","--rollback","--gap","--iwdg",
+                 "--operation-rs","--operation-wheel","--operation-fault"):
         subprocess.run([str(executable),mode], check=True, cwd=ROOT, timeout=30)
 
 for test, extra_sources in [

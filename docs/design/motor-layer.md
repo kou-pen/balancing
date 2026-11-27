@@ -1,6 +1,6 @@
 # モータ制御レイヤーと単軸試運転
 
-**更新日：** 2026-11-26。対象仕様：[RS06](../specs/protocols/rs06_can1.md)、[C620](../specs/protocols/c620_can2.md)、[F446](../specs/boards/f446_control.md)、[安全・操作](../specs/behavior/robot_operation.md)。
+**更新日：** 2026-11-27。対象仕様：[RS06](../specs/protocols/rs06_can1.md)、[C620](../specs/protocols/c620_can2.md)、[F446](../specs/boards/f446_control.md)、[安全・操作](../specs/behavior/robot_operation.md)。
 
 ## 通常運転と単軸試運転
 
@@ -24,6 +24,14 @@ CubeIDEのBenchDebugは通常Debug/Releaseとは別のELFを生成する。モ�
 
 試運転ランタイムはTIM7の番号付き2msイベントでMotorBenchを処理する。RS06はType4停止の送達とその後の新規Type2 Resetを確認、C620は0x200全チャネルゼロを送る。受信・送信終端はCanPortで採取する。CAN IRQから状態機械や制御演算を実行せず、同一IRQをHALに重複処理させない。
 
+## 明示操作の接続
+
+番号付き主ループの `serviceCanBench` から、当該周期の一回限りの操作を `MotorBench::poll` に渡せる。受信・送信終端の回収と保護判定を終えた後、次の送信を予約する前に操作を処理する。C620は停止中もゼロを更新するため、この順序で旧ゼロの完了と新規報告を確認してから開始を判断する。
+
+ホスト試験の入力元は開始と停止が同時なら停止を優先する。開始拒否を次周期へ自動繰越ししない。番号欠落・重複・逆行、時計不成立、FAULT中の新規操作は通さない。従来の停止・期限・IWDG処理は継続する。モータ選択は起動固定であり、運転中の軸変更は追加しない。
+
+実機C入口は操作を渡さない。実機用のボタン、USB、CAN入力、モータID・出力設定は未接続・未確定。
+
 ## 仕様上の注意
 
 RS06はCAN1拡張29bit、C620はCAN2標準11bit、各1 Mbps。RS06の角度±4π、速度±50 rad/s、トルク±36 N·m、C620の±16384＝±20 Aは通信表現範囲であり機械的な許容出力ではない。実機FW・主機ID・軸ID・電源・設定値の確認が必要。
@@ -32,6 +40,7 @@ RS06はCAN1拡張29bit、C620はCAN2標準11bit、各1 Mbps。RS06の角度±4π
 
 ## 確認
 
+- [単軸試運転の操作接続](../verification/f446-bench-operation.md)
 - [単軸試運転のC++統合時の検証](../verification/f446-motor-bench-cpp.md)
 - [BenchDebug起動・IRQ分離検証](../verification/f446-bench-startup.md)
 - [モータ通信コーデック](../verification/f446-motor-codecs-cpp.md)

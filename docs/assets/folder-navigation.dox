@@ -183,6 +183,7 @@
 | [f446-attitude-math-cpp.md](../verification/f446-attitude-math-cpp.md) | 姿勢フィルタのC++統合 |
 | [f446-balance-math-cpp.md](../verification/f446-balance-math-cpp.md) | BalanceControlのC++数値演算統合 |
 | [f446-bench-startup.md](../verification/f446-bench-startup.md) | BenchDebug専用起動とCAN IRQの排他検証 |
+| [f446-bench-operation.md](../verification/f446-bench-operation.md) | 単軸試運転の明示操作接続 |
 | [f446-bno055-observation-host.md](../verification/f446-bno055-observation-host.md) | BNO055非同期取得・姿勢フィルタ接続 |
 | [f446-c-scheduler-migration.md](../verification/f446-c-scheduler-migration.md) | 旧C11送信モデルのC++実装への統合 |
 | [f446-c620-continuity-host.md](../verification/f446-c620-continuity-host.md) | C620受信順の累積位置と連続性の検証 |
@@ -380,7 +381,7 @@ ApplicationObservationは周期コピー、ControlCycleは数学と状態判定�
 
 | ファイル・フォルダ | 内容 |
 |---|---|
-| <a href="MotorBench_8hpp_source.html">MotorBench.hpp</a> | 単軸試運転のC++実装。実装: <a href="MotorBench_8cpp_source.html">MotorBench.cpp</a> |
+| <a href="MotorBench_8hpp_source.html">MotorBench.hpp</a> | 単軸試運転の開始・停止・周期内操作。実装: <a href="MotorBench_8cpp_source.html">MotorBench.cpp</a> |
 */
 
 /** @page folder_firmware_f446_balancing_f446_App_Inc_balancing_communication communication/
@@ -474,7 +475,7 @@ ApplicationObservationは周期コピー、ControlCycleは数学と状態判定�
 
 | ファイル・フォルダ | 内容 |
 |---|---|
-| <a href="MotorBench_8cpp_source.html">MotorBench.cpp</a> | 単軸試運転のC++実装 |
+| <a href="MotorBench_8cpp_source.html">MotorBench.cpp</a> | 単軸試運転の開始・停止・周期内操作 |
 | <a href="f446__motor__bench__runtime_8cpp_source.html">f446_motor_bench_runtime.cpp</a> | 試運転専用CANの初期化・フィルタ・周期・IRQ |
 */
 

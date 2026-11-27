@@ -194,7 +194,7 @@ target_compile_definitions(balancing_f446_bench_runtime_tests PRIVATE BALANCING_
 target_include_directories(balancing_f446_bench_runtime_tests PRIVATE tests/stubs_can1)
 target_link_libraries(balancing_f446_bench_runtime_tests PRIVATE balancing_core balancing_motor_codecs m)
 target_compile_options(balancing_f446_bench_runtime_tests PRIVATE -Wall -Wextra -Wpedantic)
-foreach(mode rs wheel failures rollback gap iwdg)
+foreach(mode rs wheel failures rollback gap iwdg operation-rs operation-wheel operation-fault)
     add_test(NAME balancing_f446_bench_runtime_${mode}_tests COMMAND balancing_f446_bench_runtime_tests --${mode})
 endforeach()
 
