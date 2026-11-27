@@ -6,6 +6,7 @@
 |---|---|---|
 | BOARD-F446-001 | [F446メイン基板](specs/boards/f446_control.md) | 500 Hz、CAN、IWDG、ARMの保護 |
 | BOARD-F303-001 | [F303電源基板](specs/boards/f303_power.md) | 12S→24 V、非常停止、電源監視 |
+| BOARD-PI-001 | [Raspberry Piソフトウェア](specs/boards/pi.md) | PI-01〜07 |
 | PROTO-RS06-001 | [RS06 CAN1](specs/protocols/rs06_can1.md) | MOTOR-103／106／108／109／111 |
 | PROTO-C620-001 | [C620 CAN2](specs/protocols/c620_can2.md) | MOTOR-121／142／143／145 |
 | PROTO-PWR-001 | [F303電源CAN](specs/protocols/power_can2.md) | MOTOR-089／092 |

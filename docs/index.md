@@ -6,6 +6,7 @@
 |---|---|
 | [design/](design/public-api.md) | 現行コードの役割・API、数学・通信の設計 |
 | [F303電源基板の仕様](specs/boards/f303_power.md) | 承認済み10項目、回路境界、電源状態と復旧 |
+| [Raspberry Piの仕様](specs/boards/pi.md) | PI-01〜07、ROS 2・Web UI・記録管理 |
 | [specs/](spec-index.md) | 要求仕様の正本。実装済みとは限らない |
 | [todo/](todo/roadmap.md) | 未完了の作業・受入条件 |
 | [verification/](verification/index.md) | 日付・コミット付きの検証証拠。旧実装の記録も保持 |

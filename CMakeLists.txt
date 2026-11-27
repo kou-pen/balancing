@@ -497,3 +497,21 @@ add_executable(balancing_f303_f446_power_sil tests/test_f303_f446_power_sil.cpp
 target_link_libraries(balancing_f303_f446_power_sil PRIVATE balancing_f303_application)
 target_compile_options(balancing_f303_f446_power_sil PRIVATE -Wall -Wextra -Wpedantic -Werror)
 add_test(NAME balancing_f303_f446_power_sil COMMAND balancing_f303_f446_power_sil)
+
+# Pi CAN受信境界：ROS未導入でも同じソースと既存Codecをホスト検証する。
+set(PI_CAN raspberry_pi/src/balancing_can)
+add_library(balancing_pi_can_peer STATIC
+    ${PI_CAN}/src/CanPeer.cpp
+    ${F446_APP}/Src/balancing/communication/can/PowerBoardCodec.cpp
+    ${F446_APP}/Src/balancing/communication/can/RemoteControlCodec.cpp
+    ${F446_APP}/Src/balancing/communication/can/DiagnosticsCodec.cpp
+    ${F446_APP}/Src/balancing/communication/can/ProtocolId.cpp
+    ${F446_APP}/Src/balancing/communication/can/ProtocolPayload.cpp)
+target_include_directories(balancing_pi_can_peer PUBLIC ${PI_CAN}/include ${F446_APP}/Inc)
+target_compile_features(balancing_pi_can_peer PUBLIC cxx_std_17)
+target_compile_options(balancing_pi_can_peer PRIVATE -Wall -Wextra -Wpedantic -Werror)
+
+add_executable(balancing_pi_can_peer_tests tests/test_pi_can_peer.cpp)
+target_link_libraries(balancing_pi_can_peer_tests PRIVATE balancing_pi_can_peer)
+target_compile_options(balancing_pi_can_peer_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
+add_test(NAME balancing_pi_can_peer_tests COMMAND balancing_pi_can_peer_tests)

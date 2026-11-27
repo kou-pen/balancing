@@ -625,4 +625,18 @@ for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-saniti
                     str(ROOT / "tests/test_f303_f446_power_sil.cpp"),
                     *flags, "-o", str(executable)], check=True, cwd=ROOT, timeout=30)
     subprocess.run([str(executable)], check=True, cwd=ROOT, timeout=30)
+
+# Pi向け受信境界。ROS未導入でも同一Codecを使用して検証。
+pi_can = ROOT / "raspberry_pi/src/balancing_can"
+for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"])]:
+    executable = OUT / f"test_pi_can_peer{suffix}"
+    subprocess.run(["g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
+                    "-I", str(pi_can / "include"), "-I", str(F446_APP / "Inc"),
+                    str(pi_can / "src/CanPeer.cpp"),
+                    *[str(app_source / ("communication/can/" + name)) for name in
+                      ("PowerBoardCodec.cpp", "RemoteControlCodec.cpp", "DiagnosticsCodec.cpp",
+                       "ProtocolId.cpp", "ProtocolPayload.cpp")],
+                    str(ROOT / "tests/test_pi_can_peer.cpp"),
+                    *flags, "-o", str(executable)], check=True, cwd=ROOT, timeout=30)
+    subprocess.run([str(executable)], check=True, cwd=ROOT, timeout=30)
 print("ホスト試験：全件合格")

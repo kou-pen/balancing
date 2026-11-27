@@ -20,7 +20,7 @@ CAN2通信と通常運転の周期経路をホストで結合済み。USB Host�
 | センサ・制御 | BNO055非同期取得、状態推定、脚運動学fixture、500 Hz SIL、LQR/VMC・脚PD/Roll・Yaw、6軸指令換算 | CAD定数・実機原点・ゲイン、実機用制御周期 |
 | Application | 非駆動観測、CAN2操作/電源/診断、通常運転SILと6軸模擬送信 | 実USB列挙・操作、実機用モデルと出力許可 |
 | 自作CAN2 | 35 ID codec、12受信ID、電源・操作・診断のApplication結合、明示フィルタ、背景送信をホスト検証 | 実機起動設定、通常モータ送信との実時間計測、F303/Pi互換性。追加診断値は必要になるまで保留 |
-| F303・Pi | F446側通信仕様・Codec、F303 PowerController論理コア（#103統合済み）、PowerMonitor（#104統合済み）、PowerCan（#105統合済み）、BoardIO論理出力・LED（#106統合済み）、CubeF3導入・ARMリンク試験（#107統合済み）、application論理統合（#108統合済み）、電源連携SIL（レビュー版） | CubeMX生成（保留）、実GPIO/HAL接続、Pi対向ソフト、実機検証 |
+| F303・Pi | F446側通信仕様・Codec、F303 PowerController論理コア（#103統合済み）、PowerMonitor（#104統合済み）、PowerCan（#105統合済み）、BoardIO論理出力・LED（#106統合済み）、CubeF3導入・ARMリンク試験（#107統合済み）、application論理統合（#108統合済み）、電源連携SIL（#109統合済み）、Pi全7設計承認・CAN受信境界（レビュー版） | CubeMX生成（保留）、実GPIO/HAL接続、Pi対向ソフト、実機検証 |
 
 根拠: [検証記録一覧](../verification/index.md)、[公開API](../design/public-api.md)。#95までの最新ホスト検証はCTest 79/79、通常/UBSan合格、ARM Debug/Release/BenchDebug合格（[単軸試運転の検証](../verification/f446-bench-operation.md)）。実機運転は未検証。
 
@@ -54,7 +54,7 @@ CAN2通信、DualSense論理操作、表示・安全監視の既存ホスト検�
 
 ### F446からF303への移行（2026-11-27）
 
-#97起動処理、#98立ち上げ文書、#99数学LQR、#100補償IFを統合。IMUと電源状態の期限切れ独立SILをレビュー版で追加し、CTest 81/81。実機・CAD・計測依存の残件はチェック欄を維持したまま保留する。F303全10設計と電源論理コアを#103で統合し、PowerMonitorの換算・状態別保護を#104で統合し、既存電源Codec共用のPowerCan・F446対向試験を#105で統合し、BoardIO論理出力とLEDを#106で統合し、CubeF3 ARMリンク試験を#107で統合し、applicationの論理統合を#108で統合し、F303/F446電源連携SILをレビュー版で追加。CubeMX自動生成はユーザー指示で保留。次はPi対向ソフトの設計・実装を実機非依存で進める。実機の電源制御・閾値は別承認。
+#97起動処理、#98立ち上げ文書、#99数学LQR、#100補償IFを統合。IMUと電源状態の期限切れ独立SILをレビュー版で追加し、CTest 81/81。実機・CAD・計測依存の残件はチェック欄を維持したまま保留する。F303全10設計と電源論理コアを#103で統合し、PowerMonitorの換算・状態別保護を#104で統合し、既存電源Codec共用のPowerCan・F446対向試験を#105で統合し、BoardIO論理出力とLEDを#106で統合し、CubeF3 ARMリンク試験を#107で統合し、applicationの論理統合を#108で統合し、F303/F446電源連携SILを#109で統合。CubeMX自動生成はユーザー指示で保留。Pi全7設計を承認（[仕様](../specs/boards/pi.md)）、初期CAN受信境界をレビュー版で追加。次は時刻付き状態・要求照合を実装する。実機の電源制御・閾値は別承認。
 
 ## 次の段階と前提
 
