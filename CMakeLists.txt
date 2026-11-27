@@ -93,6 +93,7 @@ add_executable(balancing_cpp_app_tests
     ${F446_APP}/Src/balancing/communication/can/CanPort.cpp
     ${F446_APP}/Src/balancing/communication/can/CanTxScheduler.cpp
     ${F446_APP}/Src/balancing/app/DriveRuntime.cpp
+    ${F446_APP}/Src/balancing/app/DriveExecution.cpp
     ${BALANCING_CONTROL_MATH_SOURCES}
     ${F446_APP}/Src/balancing/app/RobotSequence.cpp
     ${F446_APP}/Src/balancing/app/application.cpp
@@ -199,6 +200,7 @@ endforeach()
 
 # Startup, RX observation and IRQ ownership at both STM32F446 CAN buses.
 set(BALANCING_CAN_RUNTIME_SOURCES
+    ${F446_APP}/Src/balancing/app/DriveExecution.cpp
     ${BALANCING_CONTROL_MATH_SOURCES}
     ${BALANCING_RS06_SERVICE_SOURCES}
     ${F446_APP}/Src/balancing/app/MotorCanLink.cpp
@@ -233,7 +235,6 @@ foreach(mode default collision normal timing faults retry readiness)
 endforeach()
 add_executable(balancing_f446_can1_runtime_tests
     tests/test_f446_can1_runtime.cpp
-    tests/sil/DriveCycle.cpp
     tests/sil/DriveRuntime.cpp
     ${F446_APP}/Src/balancing/communication/can/MotorFramePlan.cpp
     ${BALANCING_CAN_RUNTIME_SOURCES}
@@ -266,6 +267,8 @@ add_test(NAME balancing_f446_drive_sil_wheel_reference_active_tests COMMAND bala
 add_test(NAME balancing_f446_drive_sil_wheel_reference_disabled_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-wheel-reference-disabled)
 add_test(NAME balancing_f446_drive_sil_gap_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-gap)
 add_test(NAME balancing_f446_drive_sil_rx_loss_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-rx-loss)
+add_test(NAME balancing_f446_drive_sil_invalid_rs_deadline_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-invalid-rs-deadline)
+add_test(NAME balancing_f446_drive_sil_invalid_wheel_deadline_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-invalid-wheel-deadline)
 add_test(NAME balancing_f446_drive_sil_invalid_model_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-invalid-model)
 add_test(NAME balancing_f446_drive_sil_estop_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-estop)
 add_test(NAME balancing_f446_drive_sil_tx_error_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-tx-error)

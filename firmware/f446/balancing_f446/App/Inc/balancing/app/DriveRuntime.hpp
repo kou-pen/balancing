@@ -34,8 +34,8 @@ ArmReadinessIssue inspectArmObservations(const ApplicationObservation&) noexcept
  */
 void recordApplicationMotorConfiguration(const MotorObservationConfig&,bool can2Configured) noexcept;
 
-/** @brief 制御周期の実行境界。リンクする実装をビルド対象ごとに選ぶ。
- * @note 本番側は非駆動のControlCycleと明示設定済みの停止専用送信を実行。実装は静的に一つ。
+/** @brief 制御周期の起動・出力境界。リンクするアダプタをビルド対象ごとに選ぶ。
+ * @note 明示設定時は共通DriveExecutionを使う。本番側に数学フレーム生成関数を渡さない。
  * @spec{BOARD-F446-001}
  */
 namespace drive_runtime {

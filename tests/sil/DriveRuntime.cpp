@@ -5,7 +5,12 @@ namespace {
 // 試験バイナリだけが人工設定と実際の模擬CAN送信所有者を保持する。
 // 初期化前の構築失敗では設定を破棄し、次の呼出しに持ち越さない。
 std::optional<DriveSilProfile> profile;
-std::optional<DriveCycle> drive;
+std::optional<DriveExecution> drive;
+std::optional<MotorFramePlan> framePlan;
+MotorFramePreview composeFixture(const RobotSequenceResult& seq,const MotorCommandPreview& command) noexcept
+{
+    return framePlan->compose(seq,command);
+}
 std::optional<DriveSilResult> result;
 }
 bool initializeDriveSil(const DriveSilProfile& p) noexcept
@@ -46,7 +51,7 @@ ControlTickResult step(ControlCycle& cycle,RobotSequence& sequence,RemoteControl
     const auto now=observation.motors->motors.sampledAtUs;
     observation.operatorTarget=remote.update(sequence.state(),now);
     input.movingTarget=observation.operatorTarget.value_or(OperatorTarget{});
-    result=drive->step(input);
+    result=drive->step(cycle,observation,input);
     // 同一時刻のモード切替だけでゼロを確定。変化率処理は二度進めない。
     if (sequence.state()!=RobotState::Balancing)
         observation.operatorTarget=remote.update(sequence.state(),now);
@@ -58,10 +63,13 @@ void finishCycle(RobotSequence& sequence,RemoteControlService& remote,
     if (!drive) observation.operatorTarget=remote.update(sequence.state(),nowUs);
 }
 bool validateStopOutput(const MotorObservationConfig& c,bool,std::uint32_t) noexcept { return !c.stopOutput.enabled; }
-void bind(ControlCycle& cycle,RobotSequence& sequence,MotorService& motors,MotorCanLink& link,
+void bind(ControlCycle&,RobotSequence& sequence,MotorService& motors,MotorCanLink& link,
           CanTxScheduler& tx1,CanTxScheduler& tx2,StopOutputConfig) noexcept
 {
-    if (profile && !drive) drive.emplace(cycle,sequence,motors,link,tx1,tx2,profile->tx);
+    if (profile && !drive) {
+        framePlan.emplace(motors.rs06BusConfig().motorIds);
+        drive.emplace(sequence,motors,link,tx1,tx2,profile->tx,composeFixture);
+    }
 }
 void poll() noexcept
 {
