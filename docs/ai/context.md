@@ -7,6 +7,7 @@ schema: balancing.ai-doc-router/v1
 audience: agent_only
 entrypoint: AGENTS.md
 authority:
+  implementation_priority: docs/todo/roadmap.md
   requirements: docs/specs/
   spec_id_registry: docs/spec-index.md
   protocol_payloads: docs/specs/protocols/
