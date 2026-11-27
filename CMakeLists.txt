@@ -489,3 +489,11 @@ add_executable(balancing_f303_application_tests tests/test_f303_application.cpp
 target_link_libraries(balancing_f303_application_tests PRIVATE balancing_f303_application)
 target_compile_options(balancing_f303_application_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
 add_test(NAME balancing_f303_application_tests COMMAND balancing_f303_application_tests)
+
+# F303実applicationとF446実状態機械の独立周期を仮想時計で接続する。
+add_executable(balancing_f303_f446_power_sil tests/test_f303_f446_power_sil.cpp
+    ${F446_APP}/Src/balancing/app/PowerBoardService.cpp
+    ${F446_APP}/Src/balancing/app/RobotSequence.cpp)
+target_link_libraries(balancing_f303_f446_power_sil PRIVATE balancing_f303_application)
+target_compile_options(balancing_f303_f446_power_sil PRIVATE -Wall -Wextra -Wpedantic -Werror)
+add_test(NAME balancing_f303_f446_power_sil COMMAND balancing_f303_f446_power_sil)

@@ -610,4 +610,19 @@ for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-saniti
                     str(ROOT / "tests/test_f303_application.cpp"),
                     *flags, "-o", str(executable)], check=True, cwd=ROOT, timeout=30)
     subprocess.run([str(executable)], check=True, cwd=ROOT, timeout=30)
+
+# 独立周期のF303/F446電源連携SIL。物理モータやCANポートは未接続。
+for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"])]:
+    executable = OUT / f"test_f303_f446_power_sil{suffix}"
+    subprocess.run(["g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
+                    "-I", str(f303_app / "Inc"), "-I", str(F446_APP / "Inc"),
+                    *[str(f303_app / ("Src/balancing/power/" + name)) for name in
+                      ("PowerController.cpp", "PowerMonitor.cpp", "PowerCan.cpp", "BoardIO.cpp", "application.cpp")],
+                    *[str(app_source / ("communication/can/" + name)) for name in
+                      ("PowerBoardCodec.cpp", "ProtocolId.cpp", "ProtocolPayload.cpp")],
+                    *[str(app_source / ("app/" + name)) for name in
+                      ("PowerBoardService.cpp", "RobotSequence.cpp")],
+                    str(ROOT / "tests/test_f303_f446_power_sil.cpp"),
+                    *flags, "-o", str(executable)], check=True, cwd=ROOT, timeout=30)
+    subprocess.run([str(executable)], check=True, cwd=ROOT, timeout=30)
 print("ホスト試験：全件合格")
