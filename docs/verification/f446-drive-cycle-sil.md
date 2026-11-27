@@ -58,3 +58,16 @@ TODO: T-F446-03/04/08〜11、T-CTRL-11。基準: master `8629cf1ebf3bc66246f7963
 ## 後続の構造整理
 
 上記は #71 時点の検証記録。実装配置とビルド選択を変更する後続作業は [Application実行境界の分離](f446-application-runtime-refactor.md) を参照。過去のPASSを新構成のPASSとして扱わない。
+
+## 2026-11-27：IMU / F303通信途絶の独立統合試験
+
+基準 master d88735f、Issue #11、T-VERIFY-07。製品ソース・設定・閾値は変更せず、既存test_f446_can1_runtime.cppの模擬IRQ/CAN/送信終端/通常運転SILに2ケース追加した。
+
+| 試験 | 入力の停止 | 評価結果 |
+|---|---|---|
+| --drive-sil-imu-expiry | 最後の姿勢採取時刻を固定、50 msまで新規姿勢なし | 期限前はBALANCING、期限ちょうどはImuUnavailable・InterlockLost・FAULT |
+| --drive-sil-power-expiry | POWER_STATUSだけを停止、最後のCAN採取時刻から500 ms | 期限前はBALANCING、期限ちょうどは電源ready/fresh=false、推定成立のままInterlockLost・FAULT |
+
+両ケースとも他のセンサ・モータRX/TX終端・操作・制御周期を維持。期限到達時に新規非ゼロ指令なし、RS06 Type4 4軸とC620 0x200ゼロ1件を模擬送信終端まで確認。復旧後もFAULTを保持し自動ARMしない。電源報告は周期の20us前に採取されるため最後の周期だけ20us短縮して期限ちょうどに合わせた。IMUは姿勢供給境界の模擬であり、50ms鮮度評価を模擬側で実装しており、BNO055実機の取得/新規性検証ではない（実装の鮮度判定は別のIMU単体試験で確認）。電源期限は実製品PowerBoardServiceを経由。
+
+CTest 81/81（bac38e5e08b54de2）、通常/UBSan全件PASS（786ec183a7c64625）、CubeIDE設定25/25、CAN監査19/19。仕様参照532件、Doxygen生成（既知の日本語翻訳警告）・diff check合格。新規2ケースをCMakeと通常/UBSanホスト実行器へ登録。製品ソース変更なしのためARMビルドは再実行していない。物理通信・停止・WCETは未実施。実機用パラメータと運転許可を変更しない。

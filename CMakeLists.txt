@@ -266,6 +266,8 @@ add_test(NAME balancing_f446_drive_sil_wheel_reference_tests COMMAND balancing_f
 add_test(NAME balancing_f446_drive_sil_wheel_reference_active_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-wheel-reference-active)
 add_test(NAME balancing_f446_drive_sil_wheel_reference_disabled_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-wheel-reference-disabled)
 add_test(NAME balancing_f446_drive_sil_gap_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-gap)
+add_test(NAME balancing_f446_drive_sil_imu_expiry_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-imu-expiry)
+add_test(NAME balancing_f446_drive_sil_power_expiry_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-power-expiry)
 add_test(NAME balancing_f446_drive_sil_rx_loss_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-rx-loss)
 add_test(NAME balancing_f446_drive_sil_invalid_rs_deadline_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-invalid-rs-deadline)
 add_test(NAME balancing_f446_drive_sil_invalid_wheel_deadline_tests COMMAND balancing_f446_can1_runtime_tests --drive-sil-invalid-wheel-deadline)

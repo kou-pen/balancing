@@ -212,9 +212,17 @@ void __HAL_CAN_DISABLE_IT(CAN_HandleTypeDef* handle, std::uint32_t value)
     enabledNotifications[busIndex(handle)] &= ~value;
 }
 
-namespace { bool silImu=false; }
+namespace {
+bool silImu=false;
+// 模擬姿勢の採取時刻を固定する。評価時刻を新規測定として扱わない。
+std::optional<std::uint64_t> frozenImuAt;
+}
 balancing::ImuAttitude balancing::imuAttitude(std::uint64_t atUs) noexcept
-{ return silImu ? ImuAttitude{atUs,0.1f,0,0,0,0,true,true}:ImuAttitude{}; }
+{
+    if (!silImu) return {};
+    const auto stamp=frozenImuAt.value_or(atUs);
+    return ImuAttitude{stamp,0.1f,0,0,0,0,true,stamp<=atUs && atUs-stamp<50000u};
+}
 
 int main(int argc, char** argv)
 {
@@ -428,6 +436,8 @@ int main(int argc, char** argv)
         const bool invalidWheelDeadline=std::strcmp(argv[1],"--drive-sil-invalid-wheel-deadline")==0;
         const bool invalidModel=std::strcmp(argv[1],"--drive-sil-invalid-model")==0;
         const bool rxLoss=std::strcmp(argv[1],"--drive-sil-rx-loss")==0;
+        const bool imuExpiry=std::strcmp(argv[1],"--drive-sil-imu-expiry")==0;
+        const bool powerExpiry=std::strcmp(argv[1],"--drive-sil-power-expiry")==0;
         const bool gap=std::strcmp(argv[1],"--drive-sil-gap")==0;
         const bool reference=std::strcmp(argv[1],"--drive-sil-wheel-reference")==0;
         const bool referenceActive=std::strcmp(argv[1],"--drive-sil-wheel-reference-active")==0;
@@ -485,6 +495,7 @@ int main(int argc, char** argv)
                                std::optional<WireInputSource> source=std::nullopt) {
             rx(*encodeRemoteRequest({kind,id,source}));
         };
+        bool suppressPower=false;
         const auto feedback=[&](bool running,unsigned wheel=1000) {
             // Type2角度=-pi/2付近、速度・トルク中心。4軸の新規報告をIRQ経由で供給。
             for (unsigned id=11;id<=14;++id) {
@@ -495,7 +506,7 @@ int main(int argc, char** argv)
             }
             pushWheel(0x201,8,wheel); assert(balancing_f446_can2_capture_irq());
             pushWheel(0x202,8,1000); assert(balancing_f446_can2_capture_irq());
-            rx(*encodePowerStatus({WirePowerState::On,0,0,1}));
+            if (!suppressPower) rx(*encodePowerStatus({WirePowerState::On,0,0,1}));
         };
         const auto pre=[&](std::uint64_t at,bool running,unsigned wheel=1000) {
             DWT->CYCCNT=static_cast<std::uint32_t>((at-20)*168u);
@@ -740,6 +751,57 @@ int main(int argc, char** argv)
             DWT->CYCCNT+=168u;
             assert(!resetApplicationWheelReference());
             assert(motorObservation()->motors.c620[0].generation==1);
+        }
+        if (imuExpiry || powerExpiry) {
+            // 直前まで通常の非ゼロ模擬送信。対象だけ新規報告を止める。
+            // 電源報告はtickの20us前に採取するため境界の評価は別途明示する。
+            const auto before=*applicationObservation();
+            assert(before.imu.fresh && before.power.ready && before.power.latest);
+            const auto stamp=imuExpiry ? before.imu.receivedAtUs :
+                before.power.latest->receivedAtUs;
+            const auto deadline=stamp+(imuExpiry?50000u:500000u);
+            if (imuExpiry) frozenImuAt=stamp;
+            else suppressPower=true;
+            assert(deadline>24000u);
+            // 2ms制御を維持し、最後の周期だけ採取時刻に合わせる。
+            // 電源の期限ちょうどに合わせる20us調整は周期欠落ではない。
+            auto at=26000u;
+            for (; at<deadline; at+=2000u) {
+                // 境界の20us直前に通常tickを重ねない。
+                if (deadline-at<1000u) break;
+                pre(at,true);
+                rx(*encodeMotionCommand({0.3f,0.1f}));
+                res=tick(at);
+                const auto obs=*applicationObservation();
+                assert(obs.imu.fresh && obs.power.ready);
+                assert((imuExpiry?obs.imu.receivedAtUs:obs.power.latest->receivedAtUs)==stamp);
+                assert(res.control.sequence.state==RobotState::Balancing && !res.outputInhibited);
+                c=drain(); assert(c.current==1 && c.zero==0);
+            }
+            pre(deadline,true); rx(*encodeMotionCommand({0.3f,0.1f}));
+            res=tick(deadline);
+            const auto expired=*applicationObservation();
+            assert(expired.timing.sampled_at_us==deadline);
+            assert((imuExpiry?expired.imu.receivedAtUs:expired.power.latest->receivedAtUs)==stamp);
+            assert(expired.imu.fresh==!imuExpiry && expired.power.ready==!powerExpiry);
+            assert(expired.power.fresh==!powerExpiry);
+            assert(res.control.sequence.state==RobotState::Fault && res.outputInhibited);
+            assert(!res.control.mathematicalTorques && !res.control.motorCommandPreview);
+            assert(expired.fault && expired.fault->primaryCause==FaultFlags::InterlockLost);
+            if (imuExpiry) assert(res.control.estimateError==StateEstimateError::ImuUnavailable);
+            else assert(res.control.estimate); // 推定値は有効、電源条件だけが不成立
+            c=drain(); assert(c.torque==0 && c.current==0 && c.stop==4 && c.zero==1);
+            // 新規観測が戻ってもFAULTを保持し、別の明示解除/ARMなしに再開しない。
+            frozenImuAt.reset(); suppressPower=false;
+            pre(deadline+2000u,true); rx(*encodeMotionCommand({0.3f,0.1f}));
+            res=tick(deadline+2000u);
+            const auto recovered=*applicationObservation();
+            assert(recovered.imu.fresh && recovered.power.ready);
+            assert(res.control.sequence.state==RobotState::Fault && res.outputInhibited);
+            c=drain(); assert(c.enable==0 && c.torque==0 && c.current==0 && c.zero==1);
+            std::puts(imuExpiry ? "PASS: IMU 50ms expiry and no automatic restart" :
+                "PASS: F303 POWER_STATUS 500ms expiry and no automatic restart");
+            return 0;
         }
         if (rxLoss || gap) {
             if (rxLoss) {
