@@ -176,7 +176,7 @@ IWDGのC ABIはF446Watchdog.hppに同居。GPIOアダプタの宣言はStatusInd
 
 ## 6. F303電源基板（実装開始）
 
-`firmware/f303/balancing_f303/App/{Inc,Src}/balancing/power/` に次の4ファイルを収録。
+`firmware/f303/balancing_f303/App/{Inc,Src}/balancing/power/` に次の6ファイルを収録。
 
 | ファイル | 責務 |
 |---|---|
@@ -184,5 +184,7 @@ IWDGのC ABIはF446Watchdog.hppに同居。GPIOアダプタの宣言はStatusInd
 | [PowerController.cpp](../../firmware/f303/balancing_f303/App/Src/balancing/power/PowerController.cpp) | 電源状態、充電判定、切替、停止・復帰 |
 | [PowerMonitor.hpp](../../firmware/f303/balancing_f303/App/Inc/balancing/power/PowerMonitor.hpp) | ADC生値、校正・保護設定、観測出力の契約 |
 | [PowerMonitor.cpp](../../firmware/f303/balancing_f303/App/Src/balancing/power/PowerMonitor.cpp) | ADC換算、観測期限、電圧・持続過電流判定 |
+| [PowerCan.hpp](../../firmware/f303/balancing_f303/App/Inc/balancing/power/PowerCan.hpp) | 周期受信バッチ、操作応答・状態報告候補、公開API |
+| [PowerCan.cpp](../../firmware/f303/balancing_f303/App/Src/balancing/power/PowerCan.cpp) | 要求優先順位、既存Codec共用、状態報告の生成 |
 
-PowerCan、BoardIO、applicationおよびCubeMX生成コードは未実装。将来構成と決定理由は[F303仕様](../specs/boards/f303_power.md)、試験は[Controller](../verification/f303-power-controller-host.md)・[Monitor](../verification/f303-power-monitor-host.md)の検証記録を参照。
+BoardIO、applicationおよびCubeMX生成コードは未実装。将来構成と決定理由は[F303仕様](../specs/boards/f303_power.md)、試験は[Controller](../verification/f303-power-controller-host.md)・[Monitor](../verification/f303-power-monitor-host.md)・[PowerCan](../verification/f303-power-can-host.md)の検証記録を参照。

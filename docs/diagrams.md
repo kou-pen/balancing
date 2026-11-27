@@ -254,3 +254,19 @@ flowchart LR
 </pre>
 
 Monitorは電源状態を変更せず、Controllerが唯一の状態所有者。観測と保護判定の境界を実際のControllerへ渡すホスト結合試験を追加した。GPIO/ADC/周期処理への接続は未実装。
+
+## F303電源CANの論理対向（ホスト）
+
+<pre class="mermaid">
+flowchart LR
+    RX["F446/Pi要求フレーム"] --> PC["PowerCan"]
+    CODEC["既存PowerBoardCodec"] <--> PC
+    OBS["PowerInputs"] --> PC
+    PC -->|1周期1回| CTRL["PowerController"]
+    CTRL --> PC
+    PC --> TX["論理出力・送信候補"]
+    TX -->|POWER_STATUS| F446["F446 PowerBoardService"]
+    TX -.-> IO["GPIO適用・実CAN送信（未接続）"]
+</pre>
+
+同周期の要求はESTOP、OFF、ONの優先順。状態報告と応答の符号化は既存Codecを使用する。F446の受信サービスには実フレーム形式の候補を直接渡して検証した。実バスでの送信完了を確認したものではない。

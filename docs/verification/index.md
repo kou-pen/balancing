@@ -17,6 +17,7 @@
 
 - [PowerControllerの論理境界試験](f303-power-controller-host.md)（実機未接続）
 - [PowerMonitorの換算・保護とController結合試験](f303-power-monitor-host.md)（人工fixture）
+- [PowerCanの要求処理とF446対向試験](f303-power-can-host.md)（ホストフレーム接続）
 
 ## 機能別の記録
 
