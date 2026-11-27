@@ -437,3 +437,10 @@ add_executable(balancing_f446_diagnostics_codec_tests tests/test_f446_diagnostic
 target_include_directories(balancing_f446_diagnostics_codec_tests PRIVATE ${F446_APP}/Inc)
 target_compile_options(balancing_f446_diagnostics_codec_tests PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME balancing_f446_diagnostics_codec_tests COMMAND balancing_f446_diagnostics_codec_tests)
+
+# F303 HAL非依存の電源論理。実回路・CubeMXには未接続。
+set(F303_APP firmware/f303/balancing_f303/App)
+add_library(balancing_f303_power STATIC
+    ${F303_APP}/Src/balancing/power/PowerController.cpp)
+target_include_directories(balancing_f303_power PUBLIC ${F303_APP}/Inc)
+target_compile_options(balancing_f303_power PRIVATE -Wall -Wextra -Wpedantic -Werror)
