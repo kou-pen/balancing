@@ -21,9 +21,14 @@ Can2ServiceLink::Can2ServiceLink(PowerBoardService& power,RemoteControlService& 
     : power_{power},remote_{remote},diagnostics_{diagnostics},config_{config}
 {
     // 数値候補を実機値として固定しない。外部が全条件を与えた非駆動試験のみ有効。
-    enabled_=config_.requestLifetimeUs && config_.basePeriodUs && config_.telemetryLifetimeUs &&
-        config_.minimumDetailPeriodMs && config_.maximumLeaseMs &&
-        config_.responseCapacity && config_.responseCapacity<=responses_.size() && config_.tokenOrigin;
+    enabled_=validConfig(config_);
+}
+bool Can2ServiceLink::validConfig(const Can2ServiceConfig& config) noexcept
+{
+    // Applicationの構築前と通信オブジェクト内で同じ条件を用いる。
+    return config.requestLifetimeUs && config.basePeriodUs && config.telemetryLifetimeUs &&
+        config.minimumDetailPeriodMs && config.maximumLeaseMs &&
+        config.responseCapacity && config.responseCapacity<=responseLimit && config.tokenOrigin;
 }
 bool Can2ServiceLink::recent(std::uint64_t atUs,std::uint64_t nowUs) const noexcept
 {

@@ -125,7 +125,11 @@ int main(void)
     Error_Handler();
   }
 #else
-  balancing_app_init();
+  /* Applicationの初期化失敗時はCAN・周期・IWDGを開始しない。 */
+  if (!balancing_app_init())
+  {
+    Error_Handler();
+  }
   /* CAN1/2を開始してRS06/C620の受信とバス異常を観測する。
    * 駆動設定の照合と状態機械の接続は後続のため、指令は送信しない。 */
   if (!balancing_f446_can_start(&hcan1, &hcan2))
