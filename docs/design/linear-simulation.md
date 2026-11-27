@@ -1,53 +1,74 @@
-# 実機非依存の離散線形シミュレーション
+# 実機非依存の線形モデルと離散LQR
 
-**状態：** 行列演算とCSV出力のホスト試験が成功。**ロボットの物理モデルや倒立安定性を再現したものではない。**（方針更新：2026-11-09）
+関連：CTRL-LQR-001、T-CTRL-06/07、Issue #8。[状態推定](../specs/control/state_estimation.md)、[LQR/VMC](../specs/control/balance_vmc.md)。
 
-**関連仕様：** [状態推定](../specs/control/state_estimation.md)、[LQR/VMC](../specs/control/balance_vmc.md)、[共通C11コア](../software-core.md)。
+**数学fixtureのみ。実機CADから導出した力学モデル、K_300、実機安定性は未検証。** 既存の一定入力モードとCSVの形式は維持する。
 
-## 数学モデル
+## 数学モデルと入力形式
 
-6状態・2入力の離散モデルを外部JSONで指定する。
+共通状態順：仮想脚傾斜[rad]、その速度[rad/s]、車輪位置[m]、速度[m/s]、Pitch[rad]、Pitch速度[rad/s]。入力順：左右車輪合計トルク、左右仮想股関節合計トルク[N m]。制御周期2 ms。
 
-\[
-x_{k+1} = A_d x_k + B_d u_k
-\]
+従来モードは離散A_d/B_dとinitial_state、constant_inputをJSONで渡す。LQRモードは `tests/fixtures/math_lqr_model.json` を例とする。
 
-- 状態順序：`[仮想脚傾斜 rad, 角速度 rad/s, 車輪位置 m, 速度 m/s, Pitch rad, Pitch速度 rad/s]`。
-- 入力：`[左右車輪合計トルク N·m, 左右仮想股関節合計トルク N·m]`。
-- 計算周期：`dt_s = 0.002`（2 ms）。
-- `A_d`は6×6、`B_d`は6×2。各要素は有限数のみ有効。
-- `constant_input`は全周期で一定。制御コアのLQRとの閉ループ接続は**まだ実装していない**。
+| JSONキー | 意味 |
+|---|---|
+| mode / model_kind | lqr / math_fixture固定 |
+| name / provenance | モデル名と出典、人工モデルである根拠 |
+| state_order / input_order | 単位付きの固定順序 |
+| A / B | 平衡点周りの連続偏差系、6×6 / 6×2 |
+| Q / R | 離散LQRの対称半正定値6×6 / 正定値2×2 |
+| x_ref / u_eq / initial_state | 固定平衡状態、平衡入力、初期状態 |
+| torque_limits | 2入力それぞれの人工絶対値上限 |
+| delay_ticks | 2入力それぞれの整数tick遅延、1 tick=2 ms |
+| dt_s / ticks | 0.002 s / 1〜100000 |
 
-### モデルファイルの扱い
+平衡点周りの偏差をZOH（零次保持）の拡大行列指数で離散化し、SciPyの離散代数リカッチ方程式からKを計算する。x_refは固定平衡状態であり、移動目標ではない。u_eq - K(x - x_ref)を要求し、状態偏差の更新では適用入力からu_eqを差し引く。対称性、重みの定値性、有限値、正規化DARE残差、理想閉ループ固有値の絶対値1未満を検査する。
 
-サンプル`tests/fixtures/math_linear_model.json`は数学検証専用。位置について`x[k+1] = x[k] + 0.002 v[k]`を確認する**簡易テスト**で、車体質量・慣性・倒立運動・ガスシリンダ特性を再現しない。
+## 比較条件
 
-実機用`A_d/B_d`は、CAD・質量・慣性・タイヤ・駆動・リンク・重力のモデルから別途導出する。実機値がない状態でその行列を捏造しない。
+| scenario | 制御 | トルク制限 | 発行周期 | 遅延 |
+|---|---|---|---|---|
+| open-loop | 平衡入力固定 | なし | — | なし |
+| ideal | LQR | なし | 両方500 Hz | なし |
+| limited | LQR | あり | 両方500 Hz | なし |
+| held | LQR | あり | 車輪500 Hz / 脚250 Hz | なし |
+| delayed | LQR | あり | 車輪500 Hz / 脚250 Hz | 指定tick |
 
-## 再現実行
+250 Hz脚入力は偶数tickで更新し、次の発行まで保持する。発行時に制限した値を遅延キューへ渡し、初期履歴は平衡入力とする。CSVのrequested/held/appliedは各時刻から次時刻までの区間について要求・保持・適用を区別する。limit_requiredはそのtickの要求が上限を超えるかを示し、保持中に新たな指令を発行したことを意味しない。終端行の入力欄は空白。
+
+## 再現
+
+Python 3.12.3、NumPy 2.2.6、SciPy 1.15.3で実施。専用venvをbuild下に置く（製品FWや標準ライブラリの一定入力モードには不要）。
 
 ```sh
-cd ~/chatgpt-workspace/balancing
-python3 -m unittest discover -s tests -p test_linear_sim.py -v
-python3 tools/linear_sim.py tests/fixtures/math_linear_model.json --output build/host/math_linear.csv
+python3 -m venv build/lqr-venv
+build/lqr-venv/bin/python -m pip install -r requirements-lqr.txt
+build/lqr-venv/bin/python -m unittest discover -s tests -p test_linear_sim.py -v
+for scenario in open-loop ideal limited held delayed; do
+  build/lqr-venv/bin/python tools/linear_sim.py tests/fixtures/math_lqr_model.json \
+    --scenario "$scenario" --output "build/lqr-results/$scenario.csv"
+done
+python3 tools/linear_sim.py tests/fixtures/math_linear_model.json --output build/lqr-results/legacy.csv
 ```
 
-出力列：`time_s,theta_rad,theta_rate_rad_s,position_m,velocity_m_s,pitch_rad,pitch_rate_rad_s`。
+CSVと同名の.lqr.jsonに入力行列・出典・数学用K・理想閉ループ極・残差を保存する。physical_verified=false固定。依存なし環境では旧7試験と入力2試験を実行、数値7試験は明示skip。LQR検証時は専用venvで16/16（skipなし）を確認する。
 
-現行サンプルは`v=0.5 m/s`、`1000周期=2秒`なので`position=1.0 m`になる計算。これは**数学的な基準値**であり、実機の走行精度や安定性を表す測定値ではない。
+## 実測した数学結果（2026-11-27）
 
-## MOTOR-214〜224に基づく物理モデル作成方針
+人工モデルは不安定脚角成分、車輪の二重積分、安定な自律Pitchを組み合わせたもの。実ロボットの相互作用を再現しない。初期脚角0.05 rad、位置0.3 m、Pitch 0.08 rad、人工トルク上限各0.4 N m、遅延車輪2 tick/脚3 tick、3000周期（6 s）。
 
-- まず固定脚長・2次元・等価剛体脚の6状態・2入力モデルを構築し、CADの質量・重心・慣性から平衡点を計算する。
-- 連続時間モデルを2 msで離散化し、Pythonで離散LQRのゲインを計算する。STM32では計算済みゲイン行列のみ使用する。
-- 500 Hz演算、500 Hz M3508指令、250 Hz RS06指令のサンプルホールドと個別トルク制限を模擬し、**姿勢安定を優先して**Q/Rを調整する。
-- **現在ある数学テスト用シミュレータは、この物理モデル・閉ループ検証をまだ実装していない。** 新規実装は[制御TODO](../todo/control.md)T-CTRL-06/07で管理する。
+| 比較 | 最終脚角[rad] | 最終位置[m] | 制限要否tick数 |
+|---|---:|---:|---:|
+| open-loop | 4068.8698 | 0.3 | 0 |
+| ideal | -1.00434e-7 | -8.81708e-6 | 0 |
+| limited | -1.06518e-7 | -3.58957e-5 | 129 |
+| held | -1.02396e-7 | -3.58957e-5 | 129 |
+| delayed | -8.35506e-8 | -2.95119e-5 | 131 |
 
-## 後続の実機非依存開発
+理想閉ループ最大固有値絶対値0.9976634748188532、正規化DARE残差9.60597261125959e-16。16/16数値/入力/旧モード回帰PASS、Ruffチェック・整形PASS、CLI全5比較＋旧モード実行PASS。旧モードの位置積分は2秒後1 m。出力はVM build/lqr-results/。人工モデルの発散値は線形数学モデルの範囲内の計算値にすぎない。制限・保持・遅延下の安定性は固有値では保証せず、この初期値の軌道比較のみ。
 
-1. `A_d/B_d`の物理単位・状態の符号・基準姿勢の整合性を検証するモデルローダーを拡張。
-2. 共通C++演算の`balance_math::computeLqr`をホストモデルへ接続し、ゲイン注入による閉ループ挙動を数値比較。
-3. 飽和、遅延、観測ノイズ、操作断、周期欠落を再現可能な入力シナリオとして追加。
-4. ヤコビアンとVMCの数学的検証を、CADに依存しないテスト関数から開始。
+## 実機物理モデルの残件
 
-このツールは実機の安全許可や駆動指令生成には使用しない。
+CADの節構成・寸法・質量・重心・慣性、車輪半径/減速比、平衡姿勢と入力、ガスシリンダ荷重、摩擦・効率、各モータ実トルク/電流限界、測定した遅延・制御周期を根拠付きで確定する。これらから連続モデルと線形化の妥当性を検証してA/Bを導出する。現行入力形式の状態順と単位は維持するが、人工モデルの行列・ゲイン・制限値を実機認定しない。
+
+この比較は2つの合計入力の制限のみで、6軸の実トルク配分・個別クリップ、移動位置基準・FWの位置誤差クリップ、観測ノイズ、物理モデルやF446のC++制御との閉ループ接続は未実装。STM32へのゲイン転記・実機駆動を行わない。実機モデルと性能の検証は[制御TODO](../todo/control.md)で継続する。
