@@ -21,6 +21,7 @@
 - [BoardIOの論理出力境界・LED表示](f303-board-io-host.md)（実GPIO未接続）
 - [CubeF3開発環境とARMリンク検証](f303-cube-environment.md)（試験ELFのみ・書き込み禁止）
 - [applicationの全論理モジュール統合](f303-application-host.md)（模擬基板）
+- [F303・F446独立周期の電源連携SIL](f303-f446-power-sil.md)（電源状態と運転状態の接続）
 
 ## 機能別の記録
 
