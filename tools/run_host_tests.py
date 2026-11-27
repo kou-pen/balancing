@@ -324,7 +324,9 @@ for test, extra_sources in [
             subprocess.run([str(path), "--watchdog"], check=True, cwd=ROOT, timeout=30)
             for mode in ("--usb-input", "--drive-sil-usb", "--drive-sil", "--drive-sil-timeout", "--drive-sil-short-deadline", "--drive-sil-long-deadline", "--drive-sil-invalid",
                          "--drive-sil-stale", "--drive-sil-rs-timeout", "--drive-sil-tx-error", "--drive-sil-estop",
-                         "--drive-sil-invalid-model", "--drive-sil-rx-loss", "--drive-sil-gap"):
+                         "--drive-sil-invalid-model", "--drive-sil-rx-loss", "--drive-sil-gap",
+                         "--drive-sil-wheel-reference", "--drive-sil-wheel-reference-disabled",
+                         "--drive-sil-wheel-reference-active"):
                 subprocess.run([str(path), mode], check=True, cwd=ROOT, timeout=30)
 
 

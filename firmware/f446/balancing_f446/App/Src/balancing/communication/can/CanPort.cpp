@@ -216,6 +216,20 @@ void CanPort::captureRx(std::uint64_t atUs) noexcept
     }
 }
 
+bool CanPort::referenceResetReady() const noexcept
+{
+    if (!__get_PRIMASK() || !handle_.Instance ||
+        HAL_CAN_GetState(&handle_)!=HAL_CAN_STATE_LISTENING ||
+        size_ || pendingBusOff_ || busOff_ || busOffDelivered_ || rxLostAtUs_) return false;
+    for (const auto& box:mailboxes_) if (box.token) return false;
+    // IRQ禁止はハードウェア受信停止ではない。FIFOの最後の空確認が
+    // ローカル境界で、以降の新規採取を次世代に渡す。FOV/BOFFを消さない。
+    const auto& can=*handle_.Instance;
+    return !(can.ESR&CAN_ESR_BOFF) &&
+        !(can.TSR&(CAN_TSR_RQCP0|(CAN_TSR_RQCP0<<8u)|(CAN_TSR_RQCP0<<16u))) &&
+        !(can.RF0R&(CAN_RF0R_FMP0|CAN_RF0R_FOVR0));
+}
+
 bool CanPort::popEvent(CanEvent& event) noexcept
 {
     InterruptGuard lock;

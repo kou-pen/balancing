@@ -40,6 +40,8 @@ balancing::ImuAttitude balancing::imuAttitude(std::uint64_t nowUs) noexcept
 }
 
 void balancing::serviceCan2ApplicationTx() noexcept {}
+std::optional<std::uint64_t> balancing::resetMotorWheelReference(std::uint64_t) noexcept
+{ return std::nullopt; } // この単体試験はCAN未起動。原点更新は統合試験で検証。
 std::optional<std::uint64_t> balancing::observationClockUs() noexcept
 { return available ? std::optional<std::uint64_t>{observed.motors.sampledAtUs} : std::nullopt; }
 

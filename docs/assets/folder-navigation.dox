@@ -171,6 +171,7 @@
 | [index.md](../verification/index.md) | 最新基準・機能別の全記録 |
 | [f446-arm-readiness.md](../verification/f446-arm-readiness.md) | ARM準備の設定・観測診断 |
 | [f446-motor-periodic-tx.md](../verification/f446-motor-periodic-tx.md) | 通常とSILの周期送信管理共通化 |
+| [f446-wheel-reference.md](../verification/f446-wheel-reference.md) | 車輪原点の明示再設定と世代同期 |
 | [can-contract-audit.md](../verification/can-contract-audit.md) | CAN通信契約の静的照合（Issue #6） |
 | [core-mode-contract-audit.md](../verification/core-mode-contract-audit.md) | 制御コア状態機械の仕様差分監査 |
 | [cpp17-migration-preflight-20261112.md](../verification/cpp17-migration-preflight-20261112.md) | C++17集中移植前のmaster基準検証（2026-11-12） |
@@ -354,7 +355,7 @@ ApplicationObservationは周期コピー、ControlCycleは数学と状態判定�
 
 | ファイル・フォルダ | 内容 |
 |---|---|
-| <a href="ApplicationObservation_8hpp_source.html">ApplicationObservation.hpp</a> | 非駆動周期の入力・状態・停止送信・診断コピー。実装: <a href="application_8cpp_source.html">application.cpp</a> |
+| <a href="ApplicationObservation_8hpp_source.html">ApplicationObservation.hpp</a> | 非駆動周期の入力・状態・停止送信・診断コピー、明示原点再設定。実装: <a href="application_8cpp_source.html">application.cpp</a> |
 | <a href="Can2ServiceLink_8hpp_source.html">Can2ServiceLink.hpp</a> | 自作CAN2の受信・周期入力・応答・配信契約。実装: <a href="Can2ServiceLink_8cpp_source.html">Can2ServiceLink.cpp</a> |
 | <a href="ControlCycle_8hpp_source.html">ControlCycle.hpp</a> | 時刻付き観測・状態機械・数学制御を1周期で処理する契約。実装: <a href="ControlCycle_8cpp_source.html">ControlCycle.cpp</a> |
 | <a href="CycleHealthMonitor_8hpp_source.html">CycleHealthMonitor.hpp</a> | 開始番号・完了証跡の照合、IWDG更新境界。実装: <a href="CycleHealthMonitor_8cpp_source.html">CycleHealthMonitor.cpp</a> |
@@ -431,7 +432,7 @@ ApplicationObservationは周期コピー、ControlCycleは数学と状態判定�
 | <a href="I2cPort_8hpp_source.html">I2cPort.hpp</a> | 非同期I2C転送の契約。実装: <a href="I2cPort_8cpp_source.html">I2cPort.cpp</a> |
 | <a href="ImuObservation_8hpp_source.html">ImuObservation.hpp</a> | 姿勢の周期読取API。実装: <a href="f446__imu__runtime_8cpp_source.html">f446_imu_runtime.cpp</a> |
 | <a href="IndicatorOutput_8hpp_source.html">IndicatorOutput.hpp</a> | GPIO極性、LED・RGB・ブザー出力 |
-| <a href="MotorObservation_8hpp_source.html">MotorObservation.hpp</a> | 6軸観測コピー・回収番号・故障保持・停止専用設定。実装: <a href="f446__can1__runtime_8cpp_source.html">f446_can1_runtime.cpp</a> |
+| <a href="MotorObservation_8hpp_source.html">MotorObservation.hpp</a> | 6軸観測コピー・回収番号・故障保持・停止専用設定、原点切替境界。実装: <a href="f446__can1__runtime_8cpp_source.html">f446_can1_runtime.cpp</a> |
 | <a href="Rs06Motor_8hpp_source.html">Rs06Motor.hpp</a> | RS06 1軸の有効化、停止、状態報告のAPI。実装: <a href="Rs06Motor_8cpp_source.html">Rs06Motor.cpp</a> |
 | <a href="StatusIndicatorPort_8hpp_source.html">StatusIndicatorPort.hpp</a> | RGB・ブザー出力と出力失敗診断。実装: <a href="StatusIndicatorPort_8cpp_source.html">StatusIndicatorPort.cpp</a> |
 | <a href="UsbHostPort_8hpp_source.html">UsbHostPort.hpp</a> | 接続世代・転送連番・期限の契約。実装: <a href="UsbHostPort_8cpp_source.html">UsbHostPort.cpp</a> |

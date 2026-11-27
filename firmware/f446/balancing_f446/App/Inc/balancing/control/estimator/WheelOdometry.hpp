@@ -86,6 +86,10 @@ public:
      *  @spec{CTRL-EST-001}
      */
     void reset() noexcept;
+    /** @brief 両輪校正と次世代更新余裕が成立する場合のみ現在世代を返す。
+     * @spec{CTRL-EST-001}
+     */
+    std::optional<std::uint64_t> resettableGeneration() const noexcept;
 
     /** @brief 起動時の校正形式検査。実測妥当性とは別。
      * @spec{CTRL-EST-001}

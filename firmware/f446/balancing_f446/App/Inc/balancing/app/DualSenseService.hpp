@@ -60,6 +60,10 @@ public:
      */
     bool selectSource(OperatorSource target,RobotState state,std::uint64_t nowUs) noexcept;
     bool enabled() const noexcept { return input_.enabled() && config_.armHoldUs && config_.disarmHoldUs; }
+    /** @brief 未消費の明示操作を原点変更で追い越さない。
+     * @spec{BEHAV-001}
+     */
+    bool referenceResetIdle() const noexcept { return !pendingArm_ && !pendingDisarm_; }
 private:
     struct Hold {
         bool released{}, fired{};

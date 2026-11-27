@@ -115,6 +115,13 @@ WheelOdometrySnapshot WheelOdometry::snapshot() const noexcept
     return {sampledAtUs_, {{{last_[0], fresh_[0]}, {last_[1], fresh_[1]}}}};
 }
 
+std::optional<std::uint64_t> WheelOdometry::resettableGeneration() const noexcept
+{
+    if (!configValid_[0] || !configValid_[1] || generationExhausted_ ||
+        generation_==std::numeric_limits<std::uint64_t>::max()) return std::nullopt;
+    return generation_;
+}
+
 void WheelOdometry::reset() noexcept
 {
     if (generation_ == std::numeric_limits<std::uint64_t>::max()) {

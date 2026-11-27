@@ -427,6 +427,9 @@ int main(int argc, char** argv)
         const bool invalidModel=std::strcmp(argv[1],"--drive-sil-invalid-model")==0;
         const bool rxLoss=std::strcmp(argv[1],"--drive-sil-rx-loss")==0;
         const bool gap=std::strcmp(argv[1],"--drive-sil-gap")==0;
+        const bool reference=std::strcmp(argv[1],"--drive-sil-wheel-reference")==0;
+        const bool referenceActive=std::strcmp(argv[1],"--drive-sil-wheel-reference-active")==0;
+        const bool referenceDisabled=std::strcmp(argv[1],"--drive-sil-wheel-reference-disabled")==0;
         std::array<DiagnosticSlot,4> faults{};
         DriveSilProfile p{};
         // これらは人工fixture。現物のCADやゲイン、送信期限、モータIDではない。
@@ -456,7 +459,10 @@ int main(int argc, char** argv)
         // 旧Cモデルの注入期限試験を実際のC++送信経路へ移す。
         // 人工値であり本番の送信期限を決めない。
         p.tx={12000,shortDeadline?4000u:(longDeadline?10000u:6000u)};
+        p.communication.allowWheelReferenceReset=reference || referenceActive;
+        assert(!resetApplicationWheelReference());
         assert(initializeDriveSil(p));
+        assert(!resetApplicationWheelReference());
         expectSelfDefinedCan2=true;
         silImu=true;
         MotorObservationConfig mc{{{11,12,13,14},0x5a},true,{{{4000,true},{4000,true}}}};
@@ -534,6 +540,83 @@ int main(int argc, char** argv)
             }
             return counts;
         };
+        if (reference || referenceDisabled) {
+            // Normal position accumulation before the explicit operation.
+            pre(2000,false);tick(2000);drain();
+            pre(4000,false,1200);auto res=tick(4000);drain();
+            assert(res.control.estimate && res.control.estimate->wheels[0].motion.positionM>0);
+            auto old=*motorObservation();
+            const auto generation=old.motors.c620[0].generation;
+            DWT->CYCCNT=4100u*168u;
+            if (referenceDisabled) {
+                assert(!resetApplicationWheelReference());
+                assert(motorObservation()->motors.c620[0].generation==generation);
+                return 0;
+            }
+            // Hardware bus-off not yet delivered by IRQ must reject without clearing it.
+            can2.ESR=CAN_ESR_BOFF;
+            assert(!resetApplicationWheelReference() && can2.ESR==CAN_ESR_BOFF);
+            can2.ESR=0;
+            // Both hardware FIFO and captured IRQ queue must be empty; rejection
+            // must preserve the queued frame, old generation and current estimate.
+            pushWheel(0x201,8,1300);
+            assert(!resetApplicationWheelReference());
+            assert(can2.RF0R.count==1);
+            assert(balancing_f446_can2_capture_irq());
+            assert(!resetApplicationWheelReference());
+            balancing_f446_can_service();
+            assert(motorObservation()->motors.c620[0].latest->report.encoderRaw==1300);
+            // A loss is retained by the motor even when newer frames arrive.
+            can2.RF0R.flags=CAN_RF0R_FOVR0;
+            assert(!resetApplicationWheelReference());
+            assert(balancing_f446_can2_capture_irq());
+            assert(!resetApplicationWheelReference());
+            balancing_f446_can_service();
+            assert(!motorObservation()->motors.c620[0].position);
+            assert(!motorObservation()->motors.c620[1].position);
+            // A scheduled cycle is not an operation boundary.
+            DWT->CYCCNT=4200u*168u;
+            balancing_app_begin_control_tick(1);
+            assert(!resetApplicationWheelReference());
+            balancing_f446_can_service();balancing_app_control_tick();drain();
+            // The same operation succeeds only after the cycle and all TX terminals.
+            DWT->CYCCNT=4300u*168u;
+            assert(resetApplicationWheelReference());
+            assert(!motorObservation() && !applicationObservation()->motors &&
+                   !applicationObservation()->cycle && !driveSilObservation());
+            assert(!resetApplicationWheelReference()); // same timestamp
+            pushWheel(0x201,8,8000);assert(balancing_f446_can2_capture_irq());
+            balancing_f446_can_service();
+            assert(!motorObservation()->motors.c620[0].latest);
+            assert(motorObservation()->motors.c620[0].generation==generation+1);
+            DWT->CYCCNT=4400u*168u;
+            pushWheel(0x201,8,1400);assert(balancing_f446_can2_capture_irq());
+            balancing_f446_can_service();
+            assert(motorObservation()->motors.c620[0].position->counts==0);
+            assert(!motorObservation()->motors.c620[1].position);
+            // Only when both fresh reports arrive can the estimate be reconstructed.
+            pre(6000,false,1400);res=tick(6000);drain();
+            assert(res.control.estimate && res.control.estimate->chassis.positionM==0);
+            assert(motorObservation()->motors.c620[1].generation==generation+1);
+            pre(8000,false,1600);res=tick(8000);drain();
+            assert(res.control.estimate && res.control.estimate->wheels[0].motion.positionM>0);
+            DWT->CYCCNT=8100u*168u;
+            assert(resetApplicationWheelReference());
+            pre(10000,false,1700);res=tick(10000);drain();
+            assert(res.control.estimate && res.control.estimate->chassis.positionM==0);
+            assert(motorObservation()->motors.c620[0].generation==generation+2);
+            // A delivered but unconsumed E-STOP cannot be bypassed by a reset.
+            DWT->CYCCNT=10100u*168u;
+            rx(CanFrame{0x0004fc01u,{},0,true});
+            balancing_f446_can_service();
+            assert(!resetApplicationWheelReference());
+            pre(12000,false);res=tick(12000);drain();
+            assert(res.control.sequence.state==RobotState::Fault);
+            DWT->CYCCNT=12100u*168u;
+            assert(!resetApplicationWheelReference());
+            std::puts("PASS: coordinated wheel reference reset, FIFO/IRQ boundaries, generation and fault");
+            return 0;
+        }
         if (usbMode) {
             auto* usb=applicationDualSense();
             assert(usb);
@@ -621,6 +704,10 @@ int main(int argc, char** argv)
         }
         assert(res.control.sequence.state==RobotState::Arming && res.outputInhibited);
         c=drain(); assert(c.enable==3 && c.zero==1 && c.torque==0);
+        if (referenceActive) {
+            DWT->CYCCNT+=168u;
+            assert(!resetApplicationWheelReference()); // ARMING even when queues drain
+        }
         // 先に3軸だけの送信が終わる。第4軸の旧RXで確認を成立させない。
         pre(10000,true);
         res=tick(10000); assert(res.control.sequence.state==RobotState::Arming);
@@ -645,6 +732,11 @@ int main(int argc, char** argv)
             rsCount+=c.torque; wheelCount+=c.current;
         }
         assert(rsCount==12 && wheelCount==6);
+        if (referenceActive) {
+            DWT->CYCCNT+=168u;
+            assert(!resetApplicationWheelReference());
+            assert(motorObservation()->motors.c620[0].generation==1);
+        }
         if (rxLoss || gap) {
             if (rxLoss) {
                 pre(26000,true);
@@ -756,6 +848,10 @@ int main(int argc, char** argv)
         res=tick(76000);
         assert(res.control.sequence.state==RobotState::Disarmed && res.outputInhibited);
         assert(can1.TSR.aborts!=0u && can2.TSR.aborts!=0u);
+        if (referenceActive) {
+            DWT->CYCCNT+=168u;
+            assert(!resetApplicationWheelReference()); // old accepted torque / stops
+        }
         for (auto* bus:{CAN1,CAN2}) for (unsigned i=0;i<3;++i) {
             auto& m=bus->sTxMailBox[i];
             if (!(m.TIR&CAN_TI0R_TXRQ)) continue;
@@ -771,6 +867,14 @@ int main(int argc, char** argv)
         c=drain(); assert(c.torque==0 && c.current==0 && c.zero==1 && c.stop==4);
         pre(78000,false); res=tick(78000); c=drain();
         assert(res.control.sequence.state==RobotState::Disarmed && c.zero==1 && c.torque==0);
+        if (referenceActive) {
+            DWT->CYCCNT+=168u;
+            assert(resetApplicationWheelReference()); // only after stop terminals
+            pre(80000,false); res=tick(80000);drain();
+            assert(res.control.sequence.state==RobotState::Disarmed);
+            assert(res.control.estimate && res.control.estimate->chassis.positionM==0);
+            assert(motorObservation()->motors.c620[0].generation==2);
+        }
         std::puts("PASS: Application full SIL ARM, 250/500Hz, operation reference, abort/stop");
         return 0;
     }

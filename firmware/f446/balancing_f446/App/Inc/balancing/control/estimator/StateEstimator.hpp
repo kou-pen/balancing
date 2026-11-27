@@ -117,6 +117,11 @@ public:
      *  @spec{CTRL-EST-001}
      */
     void reset() noexcept;
+    /** @brief 受信側と照合する原点世代。校正未成立・更新余裕なしなら空。
+     * @spec{CTRL-EST-001}
+     */
+    std::optional<std::uint64_t> resettableWheelGeneration() const noexcept
+    { return odometry_.resettableGeneration(); }
 
 private:
     StateEstimatorConfig config_;

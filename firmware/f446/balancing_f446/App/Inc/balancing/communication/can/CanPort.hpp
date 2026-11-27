@@ -88,6 +88,12 @@ public:
      *  @spec{BOARD-F446-001}
      */
     bool popEvent(CanEvent& event) noexcept;
+    /** @brief 原点更新のため、未配送イベント・FIFO0・異常・受付済みTXがないか確認。
+     * @pre 主ループ、呼出側がIRQを禁止した短い排他区間内。
+     * @note キューもレジスタも消去しない。空でなければ操作を拒否する。
+     * @spec{BOARD-F446-001}
+     */
+    bool referenceResetReady() const noexcept;
 
 private:
     static constexpr std::size_t kMailboxCount = 3;

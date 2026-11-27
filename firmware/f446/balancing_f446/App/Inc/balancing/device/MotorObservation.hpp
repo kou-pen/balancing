@@ -51,5 +51,10 @@ bool acknowledgeMotorObservation(std::uint64_t generation) noexcept;
  *  @spec{BOARD-F446-001}
  */
 std::optional<std::uint64_t> observationClockUs() noexcept;
+/** @brief Applicationの原点再設定専用。両輪更新成功時の採取境界を返す。
+ * @pre DISARMED・周期外・推定器世代検査済み。成功後は必ず推定器も同期する。
+ * @spec{CTRL-EST-001}
+ */
+std::optional<std::uint64_t> resetMotorWheelReference(std::uint64_t expectedGeneration) noexcept;
 
 } // namespace balancing

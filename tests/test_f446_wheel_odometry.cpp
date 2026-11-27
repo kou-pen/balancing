@@ -136,6 +136,37 @@ void testLossAndExplicitReference()
     assert(!motors.feedback(5000).c620[0].position);
 }
 
+void testAtomicReferencePreflight()
+{
+    auto bad=continuity;
+    bad[1].verified=false;
+    MotorService rejected{{{11,12,13,14},0xa6},bad};
+    rejected.onC620Frame(frame(0,100),1000);
+    assert(!rejected.resetWheelReference(1,2000));
+    const auto unchanged=rejected.feedback(2000);
+    assert(unchanged.c620[0].generation==1 && unchanged.c620[1].generation==1);
+    assert(unchanged.c620[0].latest && unchanged.c620[0].position);
+    MotorService motors{{{11,12,13,14},0xa6},continuity};
+    motors.onC620Frame(frame(0,100),1000);
+    motors.onC620Frame(frame(1,200),1200);
+    assert(!motors.resetWheelReference(2,2000)); // wrong estimator generation
+    assert(!motors.resetWheelReference(1,1100)); // right sample is newer
+    assert(motors.feedback(2000).c620[0].generation==1);
+    assert(motors.resetWheelReference(1,2000));
+    assert(!motors.resetWheelReference(2,2000)); // same boundary
+    motors.onC620Frame(frame(0,999),1999);
+    motors.onC620Frame(frame(0,999),2000);
+    assert(!motors.feedback(2000).c620[0].latest);
+    motors.onC620Frame(frame(0,101),2001);
+    motors.onC620Frame(frame(1,201),2001);
+    assert(motors.feedback(2001).c620[0].position->counts==0);
+    assert(motors.feedback(2001).c620[1].position->counts==0);
+    auto cfg=config();cfg[1].verified=false;
+    WheelOdometry invalid{cfg}; assert(!invalid.resettableGeneration());
+    WheelOdometry valid{config()}; assert(valid.resettableGeneration()==1);
+    valid.reset();assert(valid.resettableGeneration()==2);
+}
+
 void testConfigurationGapAndInvalidInput()
 {
     C620Motor absent{};
@@ -197,5 +228,6 @@ int main()
     testLossAndExplicitReference();
     testSingleAxisAndSymmetricWrap();
     testConfigurationGapAndInvalidInput();
+    testAtomicReferencePreflight();
     std::puts("PASS: C620 receive-order accumulation, continuity, generations and wheel conversion");
 }

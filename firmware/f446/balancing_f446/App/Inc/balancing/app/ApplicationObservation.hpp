@@ -103,6 +103,7 @@ struct Can2ObservationProfile {
     IndicatorConfig indicator{};
     IndicatorOutputConfig indicatorOutput{};
     WatchdogConfig watchdog{};
+    bool allowWheelReferenceReset{}; // 起動時の明示許可。操作入力とは未接続
 };
 /** @brief 起動前にだけ非駆動試験設定を注入する。実機電源要求は常に無効。
  * @spec{BOARD-F446-001}
@@ -112,6 +113,12 @@ bool initializeCan2Observation(const Can2ObservationProfile&) noexcept;
  * @spec{BOARD-F446-001}
  */
 bool bindApplicationWatchdog(WatchdogConfig) noexcept;
+/** @brief 明示の車輪相対位置原点変更。既定無効、DISARMED・周期外限定。
+ * @note 成功後は次の左右報告を待つ。操作ボタン・CAN要求には未接続。
+ * @spec{CTRL-EST-001}
+ * @spec{BEHAV-001}
+ */
+bool resetApplicationWheelReference() noexcept;
 /** @brief 主ループ専用。無効設定・未初期化では空。
  * @spec{BOARD-F446-001}
  */
