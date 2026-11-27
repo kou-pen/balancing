@@ -143,6 +143,128 @@ void testControllerMathAndReset()
     assert(!unverified.compute(snapshot, reference)); // ゲイン未検証なら数学出力なし
 }
 
+// 数学試験専用。実機の力曲線・取付点を意味しない。
+bool fixtureAssist(const ControlSnapshot& state, std::array<float,4>& torque) noexcept
+{
+    if (state.sampledAtUs == 8000) return false;
+    torque = {0.2f, -0.3f, state.body.pitchRad, -10.0f};
+    return true;
+}
+
+bool incompleteAssist(const ControlSnapshot&, std::array<float,4>& torque) noexcept
+{
+    torque[0] = 0.0f;
+    return true; // 残り3軸を書き忘れる異常
+}
+
+bool invalidAssist(const ControlSnapshot&, std::array<float,4>& torque) noexcept
+{
+    torque = {0.0f, 0.0f, 0.0f, std::numeric_limits<float>::infinity()};
+    return true;
+}
+
+bool overflowAssist(const ControlSnapshot&, std::array<float,4>& torque) noexcept
+{
+    torque = {-std::numeric_limits<float>::max(), 0.0f, 0.0f, 0.0f};
+    return true;
+}
+
+void testGasCylinderCompensation()
+{
+    ObservationFixture samples;
+    StateEstimator estimator{estimatorFixture()};
+    const auto snapshot = std::get<ControlSnapshot>(
+        estimator.update(samples.observation(2000), 2000us));
+    BalanceControl baseline{controlFixture()};
+    assert(baseline.initialize(snapshot));
+    const auto expected = baseline.compute(snapshot, {});
+    assert(expected);
+
+    // 未装着では不正な関数を指定しても呼ばず、従来値を完全に保持する。
+    auto cfg = controlFixture();
+    cfg.gasCylinder = {false, false, invalidAssist};
+    BalanceControl absent{cfg};
+    assert(absent.initialize(snapshot));
+    const auto unchanged = absent.compute(snapshot, {});
+    assert(unchanged && unchanged->jointTorqueNm == expected->jointTorqueNm);
+    assert(unchanged->wheelTorqueNm == expected->wheelTorqueNm);
+
+    cfg.gasCylinder = {true, false, fixtureAssist};
+    BalanceControl unverified{cfg};
+    assert(!unverified.initialize(snapshot));
+    assert(!unverified.compute(snapshot, {}));
+    cfg.gasCylinder = {true, true, nullptr};
+    BalanceControl missing{cfg};
+    assert(!missing.initialize(snapshot));
+    assert(!missing.compute(snapshot, {}));
+
+    cfg.gasCylinder = {true, true, fixtureAssist};
+    BalanceControl installed{cfg};
+    assert(installed.initialize(snapshot));
+    const auto actual = installed.compute(snapshot, {});
+    assert(actual && actual->fixtureOnly);
+    std::array<float,4> assistance{};
+    assert(fixtureAssist(snapshot, assistance));
+    for (std::size_t axis = 0; axis < 4; ++axis) {
+        assert(std::fabs(actual->jointTorqueNm[axis] -
+                         (expected->jointTorqueNm[axis] - assistance[axis])) < 1e-6f);
+    }
+    assert(actual->wheelTorqueNm == expected->wheelTorqueNm);
+    MotorCommand converter{motorFixture()};
+    const auto limited = converter.evaluate(*actual);
+    assert(limited.status == CommandStatus::Saturated);
+    assert(limited.rs06[3].saturated);
+    assert(std::fabs(limited.rs06[3].limitedMotorTorqueNm) == 4.0f);
+
+    // 不完全な出力、非有限値、有限値同士の差引オーバーフローは全出力拒否。
+    for (auto model : {incompleteAssist, invalidAssist, overflowAssist}) {
+        cfg.gasCylinder = {true, true, model};
+        BalanceControl invalid{cfg};
+        auto artificial = snapshot;
+        artificial.legs[0].mechanism.lengthJacobianM[0] = 1e37f;
+        assert(invalid.initialize(artificial));
+        assert(!invalid.compute(artificial, {}));
+        assert(!invalid.compute(snapshot, {})); // 失敗後は再初期化が必要
+    }
+}
+
+void testGasCylinderFailureStopsCurrentCycle()
+{
+    ObservationFixture samples;
+    StateEstimator estimator{estimatorFixture()};
+    auto cfg = controlFixture();
+    cfg.gasCylinder = {true, true, fixtureAssist};
+    BalanceControl control{cfg};
+    RobotSequence sequence{{2000000, true}};
+    MotorCommand converter{motorFixture()};
+    ControlCycle cycle{estimator, sequence, control, converter};
+    ControlTickInput tick{};
+    tick.firstElapsed = 2000us;
+    tick.interlocks = simulatedInterlocks().interlocks;
+    tick.operations.arm = true;
+    tick.observations = samples.observation(2000);
+    auto result = cycle.step(tick);
+    assert(result.sequence.state == RobotState::Arming);
+    tick.operations.arm = false;
+    tick.armFeedback.session = result.sequence.armSession;
+    tick.armFeedback.axes.fill(Rs06ArmStatus::Confirmed);
+    tick.observations = samples.observation(4000);
+    assert(cycle.step(tick).sequence.state == RobotState::Balancing);
+    tick.observations = samples.observation(6000);
+    result = cycle.step(tick);
+    assert(result.mathematicalTorques && result.motorCommandPreview);
+    tick.observations = samples.observation(8000); // モデル失敗
+    result = cycle.step(tick);
+    assert(result.sequence.state == RobotState::Fault);
+    assert(result.sequence.desiredMotorState == DesiredMotorState::StopAll);
+    assert(!result.mathematicalTorques && !result.motorCommandPreview);
+    assert(sequence.currentFault()->primaryCause == FaultFlags::ExternalFault);
+    tick.observations = samples.observation(10000);
+    result = cycle.step(tick);
+    assert(result.sequence.state == RobotState::Fault);
+    assert(!result.mathematicalTorques && !result.motorCommandPreview);
+}
+
 void testHostOnly500HzPipeline()
 {
     ObservationFixture samples;
@@ -509,6 +631,8 @@ void testWheelContinuityLossStopsSil()
 int main()
 {
     testControllerMathAndReset();
+    testGasCylinderCompensation();
+    testGasCylinderFailureStopsCurrentCycle();
     testHostOnly500HzPipeline();
     testEstimatorFailurePreventsControl();
     testEndToEnd500HzSilRunner();
