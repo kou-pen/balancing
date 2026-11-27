@@ -40,10 +40,10 @@ HAL GPIO/ADC/DMA/CAN/TIM/IWDG等をコンパイルし、代表関数をリンク
 
 - 27ソース（C、C++、公式startup）コンパイル合格。ELF32 ARM、hard-float、実行形式のリンク合格。4コアの実装シンボルとHALの代表関数を確認。
 - ベクタ位置0x08000000、初期SP 0x20008000、Reset_Handler 0x080019b1（Thumb）をELFから照合。
-- size結果：text 9836、data 12、bss 4 bytes。スタック・最終FWの使用量や実行時間ではない。
-- CubeMX同梱jarの起動を試したところ、Java 21.0.3でHeadlessException。VMにXvfbなし。CubeMXによる実プロジェクト生成は未実施。ユーザー領域のSDK cloneはGUIパッケージマネージャの導入成功とは同義ではない。
+- size結果：text 9836、data 12、bss 4 bytes（Flash相当9848 bytes、ELFファイル28344 bytes）。スタック・最終FWの使用量や実行時間ではない。
+- CubeMX同梱jarの起動を試したところ、Java 21.0.3でHeadlessException。VMのMCP実行環境ではDISPLAY未設定、Xvfbコマンドなし。CubeMXによる実プロジェクト生成は未実施。ユーザー領域のSDK cloneはGUIパッケージマネージャの導入成功とは同義ではない。
 
-CMake Debug全CTest 85/85 PASS（job 8baa6b49f32f4b18）。仕様整合・Doxygen生成・差分検査PASS（既知の日本語翻訳警告のみ）。
+CMake Debug全CTest 85/85 PASS（job 8baa6b49f32f4b18）。全通常/UBSan回帰試験PASS（job 6f5650e87d824d82、CubeIDE設定25/25、CAN監査19/19）。仕様整合・Doxygen生成・差分検査PASS（既知の日本語翻訳警告のみ）。
 
 ## 次段階
 
