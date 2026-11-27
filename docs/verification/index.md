@@ -13,6 +13,10 @@
 
 出典：[F446起動処理統合](f446-startup-integration.md)。レビュー版とmasterを区別する。#88〜#95はmaster反映済み。
 
+## F303電源基板
+
+- [PowerControllerの論理境界試験](f303-power-controller-host.md)（実機未接続）
+
 ## 機能別の記録
 
 ### 最新の統合・起動・停止

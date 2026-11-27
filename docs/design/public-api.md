@@ -173,3 +173,14 @@ IWDGのC ABIはF446Watchdog.hppに同居。GPIOアダプタの宣言はStatusInd
 [データ所有権](data-model.md) ／ [観測](observation-snapshot.md) ／ [CAN送信調停](can-scheduler.md) ／ [モータ・試運転](motor-layer.md) ／ [制御数学](../software-core.md)。
 
 整理前の全API設計記録は [Git履歴の固定版](https://github.com/kou-pen/balancing/blob/cb3abeda89acdbcb08fd9890735f2b8c95ed9d83/docs/design/public-api.md) に残しています。過去の受入・検証記録は [verification/](../verification/index.md) から参照できます。
+
+## 6. F303電源基板（実装開始）
+
+`firmware/f303/balancing_f303/App/{Inc,Src}/balancing/power/` に次の2ファイルを収録。
+
+| ファイル | 責務 |
+|---|---|
+| [PowerController.hpp](../../firmware/f303/balancing_f303/App/Inc/balancing/power/PowerController.hpp) | 論理入力・設定・出力・公開API |
+| [PowerController.cpp](../../firmware/f303/balancing_f303/App/Src/balancing/power/PowerController.cpp) | 電源状態、充電判定、切替、停止・復帰 |
+
+PowerMonitor、PowerCan、BoardIO、applicationおよびCubeMX生成コードは未実装。将来構成と決定理由は[F303仕様](../specs/boards/f303_power.md)、試験は[検証記録](../verification/f303-power-controller-host.md)を参照。

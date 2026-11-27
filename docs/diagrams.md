@@ -217,3 +217,24 @@ flowchart TB
 - [検証記録](verification/index.md)
 
 整理前の詳細図（旧C11、SILの各段階、ジャンプ等）は [整理前の全文（Git履歴）](https://github.com/kou-pen/balancing/blob/cb3abeda89acdbcb08fd9890735f2b8c95ed9d83/docs/diagrams.md) に保存されています。ジャンプは [後続仕様](specs/behavior/jump.md) です。
+
+## F303 PowerController（論理実装・レビュー版）
+
+<pre class="mermaid">
+stateDiagram-v2
+    [*] --> OFF: バッテリー接続
+    [*] --> FAULT: 異常または未判別リセット
+    OFF --> Charging: 投入意図と新規正常観測
+    Charging --> Overlap: 電圧差の連続成立
+    Overlap --> ON: 新規主電源成立確認
+    Charging --> FAULT: 保護異常または期限
+    Overlap --> FAULT: 保護異常または期限
+    ON --> FAULT: 保護異常
+    Charging --> OFF: 通常OFFまたは物理ESTOP
+    Overlap --> OFF: 通常OFFまたは物理ESTOP
+    ON --> OFF: 通常OFFまたは物理ESTOP
+    OFF --> FAULT: CAN ESTOPまたは保護異常
+    FAULT --> Charging: 明示POWER_ONと新規正常観測
+</pre>
+
+ChargingとOverlapは外部へPRECHARGEと報告する。CAN ESTOP/保護異常は全段階でFAULT。物理ESTOPによるOFFでは投入意図を維持し、CAN OFFでは消去する。実際のGPIO駆動は未接続。
