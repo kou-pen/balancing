@@ -450,3 +450,8 @@ add_executable(balancing_f303_power_tests tests/test_f303_power_controller.cpp)
 target_link_libraries(balancing_f303_power_tests PRIVATE balancing_f303_power)
 target_compile_options(balancing_f303_power_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
 add_test(NAME balancing_f303_power_tests COMMAND balancing_f303_power_tests)
+
+add_executable(balancing_f303_monitor_tests tests/test_f303_power_monitor.cpp)
+target_link_libraries(balancing_f303_monitor_tests PRIVATE balancing_f303_power)
+target_compile_options(balancing_f303_monitor_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
+add_test(NAME balancing_f303_monitor_tests COMMAND balancing_f303_monitor_tests)
