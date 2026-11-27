@@ -22,6 +22,23 @@ class CubeIdeMetadataTests(unittest.TestCase):
         cls.project = (PROJECT / ".project").read_text(encoding="utf-8")
         cls.cproject = (PROJECT / ".cproject").read_text(encoding="utf-8")
 
+    def test_main_startup_failure_guards_and_order(self) -> None:
+        # 静的確認：CubeMXのUSER CODEに失敗分岐と起動順が残る。
+        # 実機mainやHALの実行試験ではない。
+        main = (PROJECT / "Core/Src/main.c").read_text(encoding="utf-8")
+        startup = main.split("/* USER CODE BEGIN 2 */", 1)[1].split("/* USER CODE END 2 */", 1)[0]
+        for call in ("!balancing_app_init()", "!balancing_f446_can_start(&hcan1, &hcan2)",
+                     "!balancing_f446_bench_start(&hcan1, &hcan2)",
+                     "HAL_TIM_Base_Start_IT(&htim7) != HAL_OK",
+                     "balancing_f446_watchdog_start() == BF446_WATCHDOG_FAILED"):
+            self.assertIn("if (" + call + ")", startup)
+            self.assertRegex(startup, re.escape("if (" + call + ")") + r"\s*\{\s*Error_Handler\(\);\s*\}")
+        order = [startup.index(x) for x in ("balancing_app_init()", "balancing_f446_can_start(",
+                  "balancing_f446_imu_start(", "HAL_TIM_Base_Start_IT(", "balancing_f446_watchdog_start(")]
+        self.assertEqual(order, sorted(order))
+        self.assertIn("#ifdef BALANCING_BENCH_BUILD", startup)
+        self.assertNotIn("startF446UsbHost", startup)
+
     def test_both_configurations_explicitly_select_gnupp17(self) -> None:
         self.assertEqual(
             self.cproject.count(

@@ -55,12 +55,15 @@ int main()
     BF446AppTimingSnapshot timing{};
     assert(!balancing_app_timing_snapshot(&timing));
     assert(!balancing::applicationObservation());
+    // 不正な明示設定では未初期化状態を公開しない。
+    assert(!balancing::initializeCan2Observation({}));
+    assert(!balancing::applicationObservation());
     // 呼び出し前も非駆動かつ未初期化で安全。
     assert(balancing_app_control_tick_count() == 0u);
     balancing_app_control_tick();
     assert(balancing_app_control_tick_count() == 0u);
 
-    balancing_app_init();
+    assert(balancing_app_init());
     for (std::uint32_t i = 0; i < 500u; ++i) {
         balancing_app_control_tick();
         balancing_app_poll();
@@ -69,6 +72,9 @@ int main()
     assert(balancing_app_timing_snapshot(&timing));
     assert(!timing.sample_valid && !timing.elapsed_valid);
     assert(timing.control_ticks == 500u);
+    // 初期化の拒否で既存の周期証跡を破棄しない。
+    assert(!balancing::initializeCan2Observation({}));
+    assert(balancing_app_control_tick_count()==500u);
     assert(!balancing_app_timing_snapshot(nullptr));
 
     // CAN1起動直後の未採取と時刻0の有効な初回採取は別状態。
@@ -137,7 +143,7 @@ int main()
     assert(balancing::applicationObservation()->cycle->sequence.state == balancing::RobotState::Fault);
 
 
-    balancing_app_init();
+    assert(balancing_app_init());
     assert(balancing_app_control_tick_count() == 0u);
     assert(balancing_app_timing_snapshot(&timing));
     assert(!timing.sample_valid && !timing.elapsed_valid);
@@ -153,7 +159,15 @@ int main()
     profile.indicatorOutput.verified=true;
     for (unsigned i=0;i<4;++i)
         profile.indicatorOutput.pins[i]={nullptr,&gpio[i],true,true,gpioWrite};
+    auto invalid=profile;
+    invalid.communication.responseCapacity=9; // 固定長8枠を超えた設定は拒否
+    assert(!initializeCan2Observation(invalid));
+    assert(!applicationCan2Link());
     assert(initializeCan2Observation(profile));
+    auto* link=applicationCan2Link();
+    assert(link && balancing_app_init()); // 既存明示設定は再構築しない
+    assert(applicationCan2Link()==link);
+    assert(!initializeCan2Observation(profile));
     for (const auto& p:gpio) assert(!p.calls);
     observed.observedFaults=FaultFlags::None;
     observed.motors.sampledAtUs=30000;
