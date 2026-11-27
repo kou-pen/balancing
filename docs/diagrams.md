@@ -190,7 +190,22 @@ flowchart TB
 
 原点更新は受信復旧やARM/DISARMでは自動実行しません。旧イベントを廃棄して強制的に空にしない設計です。現在はSILで明示APIを検証し、実機の操作経路には接続していません。
 
-## 11. 詳細資料
+## 11. 単軸試運転の明示操作
+
+<pre class="mermaid">
+flowchart TB
+    T["TIM7 番号付き周期"] --> S["serviceCanBench"]
+    S --> B["MotorBench.poll: CAN回収・保護・停止確認"]
+    B --> O{"正常周期・FAULTなし・明示操作あり"}
+    O -->|あり、ホストのみ| A["STARTまたはSTOP: 同時ならSTOP"]
+    O -->|なし| TX["既存状態に従い送信"]
+    A --> TX
+    TX --> C["選択した1バスのCAN送信"]
+</pre>
+
+実機C入口は操作なし固定。既定の起動設定は無効。操作は再試行しない。既存の停止・期限・IWDG監視を維持する。
+
+## 12. 詳細資料
 
 - [CAN送信調停](design/can-scheduler.md)
 - [観測データの流れ](design/observation-snapshot.md)
