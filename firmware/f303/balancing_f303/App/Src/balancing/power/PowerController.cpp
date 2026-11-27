@@ -64,7 +64,8 @@ PowerOutput PowerController::output() const noexcept {
 
 PowerOutput PowerController::step(const PowerInputs& in, std::uint64_t nowUs) noexcept {
     const bool onRequest = in.command == PowerCommand::On;
-    const auto rejected = onRequest ? PowerCommandResult::SafetyRejected : PowerCommandResult::None;
+    const auto rejected = onRequest ? PowerCommandResult::SafetyRejected :
+        (in.command == PowerCommand::Off ? PowerCommandResult::Accepted : PowerCommandResult::None);
     if (stepped_ && nowUs < lastStepUs_) {
         enterFault();
         return result(rejected);
@@ -151,7 +152,9 @@ PowerOutput PowerController::step(const PowerInputs& in, std::uint64_t nowUs) no
             }
         }
     } else if (stage_ == Stage::Overlap) {
-        if (nowUs - stageStartedUs_ >= config_.overlapTimeoutUs) {
+        // 重複区間中に電圧差が再拡大した場合も主電源成立とみなさない。
+        if (nowUs - stageStartedUs_ >= config_.overlapTimeoutUs ||
+            std::fabs(in.batteryVoltageV - in.driveBusVoltageV) > config_.maxVoltageDifferenceV) {
             enterFault();
             return result(rejected);
         }
