@@ -16,6 +16,7 @@
 ## F303電源基板
 
 - [PowerControllerの論理境界試験](f303-power-controller-host.md)（実機未接続）
+- [PowerMonitorの換算・保護とController結合試験](f303-power-monitor-host.md)（人工fixture）
 
 ## 機能別の記録
 

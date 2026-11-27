@@ -550,7 +550,6 @@ subprocess.run(
     timeout=30,
 )
 subprocess.run([sys.executable, str(ROOT / "tests/test_drive_runtime_boundary.py")], check=True, cwd=ROOT, timeout=30)
-print("ホスト試験：全件合格")
 
 # F303論理状態のホスト試験。実機電源出力に接続しない。
 f303_app = ROOT / "firmware/f303/balancing_f303/App"
@@ -562,3 +561,15 @@ for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-saniti
                     str(ROOT / "tests/test_f303_power_controller.cpp"),
                     *flags, "-o", str(executable)], check=True, cwd=ROOT, timeout=30)
     subprocess.run([str(executable)], check=True, cwd=ROOT, timeout=30)
+
+# F303の換算・保護判定とController接続を人工観測で試験。
+for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"])]:
+    executable = OUT / f"test_f303_power_monitor{suffix}"
+    subprocess.run(["g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
+                    "-I", str(f303_app / "Inc"),
+                    str(f303_app / "Src/balancing/power/PowerController.cpp"),
+                    str(f303_app / "Src/balancing/power/PowerMonitor.cpp"),
+                    str(ROOT / "tests/test_f303_power_monitor.cpp"),
+                    *flags, "-o", str(executable)], check=True, cwd=ROOT, timeout=30)
+    subprocess.run([str(executable)], check=True, cwd=ROOT, timeout=30)
+print("ホスト試験：全件合格")
