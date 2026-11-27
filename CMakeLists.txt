@@ -510,3 +510,8 @@ add_library(balancing_pi_can_peer STATIC
 target_include_directories(balancing_pi_can_peer PUBLIC ${PI_CAN}/include ${F446_APP}/Inc)
 target_compile_features(balancing_pi_can_peer PUBLIC cxx_std_17)
 target_compile_options(balancing_pi_can_peer PRIVATE -Wall -Wextra -Wpedantic -Werror)
+
+add_executable(balancing_pi_can_peer_tests tests/test_pi_can_peer.cpp)
+target_link_libraries(balancing_pi_can_peer_tests PRIVATE balancing_pi_can_peer)
+target_compile_options(balancing_pi_can_peer_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
+add_test(NAME balancing_pi_can_peer_tests COMMAND balancing_pi_can_peer_tests)
