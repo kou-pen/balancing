@@ -205,6 +205,7 @@
 | [f303-power-monitor-host.md](../verification/f303-power-monitor-host.md) | F303のADC換算と電源保護判定 |
 | [f303-power-can-host.md](../verification/f303-power-can-host.md) | F303電源CANとF446対向検証 |
 | [f303-board-io-host.md](../verification/f303-board-io-host.md) | F303論理出力境界・LED表示とARMオブジェクト検証 |
+| [f303-cube-environment.md](../verification/f303-cube-environment.md) | CubeF3導入・公式HALとC++コアのARMリンク検証 |
 | [f446-drive-cycle-sil.md](../verification/f446-drive-cycle-sil.md) | F446 Application通常運転のSIL統合 |
 | [f446-dual-can-runtime-host.md](../verification/f446-dual-can-runtime-host.md) | F446 CAN1/CAN2共通受信ランタイムのホスト検証 |
 | [f446-dualsense-input-host.md](../verification/f446-dualsense-input-host.md) | F446 DualSense USB入力境界 |
