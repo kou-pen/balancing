@@ -112,28 +112,35 @@ extern "C" bool balancing_f446_bench_capture_irq(std::uint8_t bus)
     runtime->port.captureInterrupt(runtime->clock.sample());
     return true;
 }
-extern "C" void balancing_f446_bench_service(std::uint32_t sequence)
+void balancing::serviceCanBench(std::uint32_t sequence,MotorBench::Operation operation) noexcept
 {
-    using namespace balancing;
     if (!started) return;
     auto& r=*runtime;
     const auto now=r.clock.sample();
     // 周期番号とDWT進行を別に確認する。停止処理は故障後も継続する。
+    bool operationAllowed=true;
     if (r.sequence) {
         const auto delta=static_cast<std::uint32_t>(sequence-*r.sequence);
         // 既存6ms契約: 1回取りこぼしても6ms未満の処理は許容する。
         // 重複、逆順（unsignedで大差）、3周期以上、時計停止を故障とする。
-        if (delta==0u || delta>=3u ||
-            (r.lastUs && (now<=*r.lastUs || now-*r.lastUs>=6000u))) r.bench.fault();
+        const bool badClock=r.lastUs && (now<=*r.lastUs || now-*r.lastUs>=6000u);
+        if (delta==0u || delta>=3u || badClock) r.bench.fault();
+        // 欠落1回は従来通り停止/送信処理を継続できるが、新規操作は
+        // 連続した番号の周期に限る。取りこぼした操作を再生しない。
+        operationAllowed=delta==1u && !badClock;
     }
     const CycleTicket ticket{sequence,now};
     const bool begun=r.health.begin(ticket);
     r.sequence=sequence;r.lastUs=now;
-    r.bench.poll(now);
+    r.bench.poll(now,begun && operationAllowed?operation:nullptr);
     // CAN回収・停止処理を終えた周期のみ。FAULT中でも処理継続は健全。
     if (begun) {
         if (const auto proof=r.health.complete(ticket,r.clock.sample(),true))
             (void)r.watchdog.refresh(*proof);
     }
 }
+
+// 実機の入力割当は未確定。通常のC入口から操作を渡さない。
+extern "C" void balancing_f446_bench_service(std::uint32_t sequence)
+{ balancing::serviceCanBench(sequence,nullptr); }
 #endif

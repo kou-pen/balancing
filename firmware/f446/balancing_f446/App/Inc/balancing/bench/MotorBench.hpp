@@ -55,7 +55,12 @@ public:
     /** @brief CAN回収・期限確認・最大1件の送信を主ループで進める。
      * @spec{BOARD-F446-001}
      */
-    void poll(std::uint64_t nowUs) noexcept;
+    using Operation=void(*)(MotorBench&,std::uint64_t) noexcept;
+    /** @brief 回収・保護判定後、送信前にその周期の明示操作を一度だけ渡す。
+     * @note 既定nullptr。呼出側は新規操作のみ渡し、停止を開始より優先する。
+     * @spec{BEHAV-001}
+     */
+    void poll(std::uint64_t nowUs,Operation operation=nullptr) noexcept;
     /** @brief 旧非ゼロの終端を待ち、Type4または電流ゼロを優先する。FAULTは解除しない。
      * @spec{BEHAV-001}
      */
@@ -111,6 +116,11 @@ bool startCanBench(CAN_HandleTypeDef* can1,CAN_HandleTypeDef* can2,
  * @spec{BOARD-F446-001}
  */
 bool bindBenchWatchdog(WatchdogConfig) noexcept;
+/** @brief 番号付き主ループ処理。操作は当該周期だけ、実機C ABIはnullptr固定。
+ * @spec{BOARD-F446-001}
+ * @spec{BEHAV-001}
+ */
+void serviceCanBench(std::uint32_t sequence,MotorBench::Operation operation=nullptr) noexcept;
 /** @brief 試運転の状態コピー。起動失敗時は空。主ループのみ。
  * @spec{BOARD-F446-001}
  */

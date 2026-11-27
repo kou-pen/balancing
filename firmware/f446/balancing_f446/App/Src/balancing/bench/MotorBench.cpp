@@ -117,7 +117,7 @@ void MotorBench::submitDrive(const CanFrame& raw,TxKind kind,
     } else if (result==CanTxSubmitResult::Invalid) stop(true);
 }
 
-void MotorBench::poll(std::uint64_t now) noexcept
+void MotorBench::poll(std::uint64_t now,Operation operation) noexcept
 {
     if (state_==BenchState::Disabled) return;
     const bool backwards=lastPoll_ && now<*lastPoll_;
@@ -156,6 +156,11 @@ void MotorBench::poll(std::uint64_t now) noexcept
     if (state_==BenchState::Stopping && stopSent_ &&
         (bus()==CanBus::Can2 || rs06_.status(now).disableConfirmed))
         state_=BenchState::Idle;
+
+    // 旧ゼロや停止の終端、新規報告、故障を先に回収する。
+    // 特にC620のIdle中は2msゼロ送信があるため、次のゼロを予約する
+    // 前に一度だけ操作を受ける。拒否された開始を内部に保存しない。
+    if (operation && !backwards && state_!=BenchState::Fault) operation(*this,now);
 
     const auto period=bus()==CanBus::Can1?4000u:2000u;
     const bool due=!lastDue_ || elapsed(now,*lastDue_,period);
