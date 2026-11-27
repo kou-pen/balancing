@@ -137,16 +137,16 @@ void MotorService::reportCan2RxLost() noexcept
     }
 }
 
-bool MotorService::resetWheelReference() noexcept
+bool MotorService::resetWheelReference(std::optional<std::uint64_t> expectedGeneration,
+                                       std::optional<std::uint64_t> boundaryUs) noexcept
 {
-    if (can2BusOff_) return false;
-    const bool left = c620_[0].resetReference();
-    const bool right = c620_[1].resetReference();
-    if (!left || !right) {
-        // 片側だけ原点が更新された場合も通常観測を成立させない。
-        reportCan2RxLost();
-        return false;
-    }
+    if (can2BusOff_ || armActive_) return false;
+    const auto generation=expectedGeneration.value_or(c620_[0].feedback(0).generation);
+    // 主ループが排他的に所有する。両輪の検査が終わるまでどちらも変更しない。
+    if (!c620_[0].canResetReference(generation,boundaryUs) ||
+        !c620_[1].canResetReference(generation,boundaryUs)) return false;
+    (void)c620_[0].resetReference(boundaryUs);
+    (void)c620_[1].resetReference(boundaryUs);
     return true;
 }
 

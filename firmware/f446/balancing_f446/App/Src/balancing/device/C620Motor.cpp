@@ -51,6 +51,9 @@ void C620Motor::invalidateContinuity() noexcept
 
 void C620Motor::onFeedback(const C620Feedback& report, std::uint64_t receivedAtUs) noexcept
 {
+    // 原点境界以前の採取値は旧世代。壊れた値でも新世代の連続性を
+    // 汚染しない。同じµsは順序を証明できないので保守的に除外する。
+    if (referenceBoundaryUs_ && receivedAtUs <= *referenceBoundaryUs_) return;
     if (report.encoderRaw >= encoderCounts) {
         lose(C620ContinuityStatus::InvalidValue);
         return;
@@ -107,13 +110,21 @@ C620AxisFeedback C620Motor::feedback(std::uint64_t nowUs) const noexcept
     return result;
 }
 
-bool C620Motor::resetReference() noexcept
+bool C620Motor::canResetReference(std::uint64_t generation,
+                                 std::optional<std::uint64_t> boundaryUs) const noexcept
 {
-    if (generation_ == std::numeric_limits<std::uint64_t>::max() ||
-        sequence_ == std::numeric_limits<std::uint64_t>::max()) {
-        lose(C620ContinuityStatus::CounterOverflow);
-        return false;
-    }
+    return configValid_ && generation==generation_ &&
+        generation_!=std::numeric_limits<std::uint64_t>::max() &&
+        sequence_!=std::numeric_limits<std::uint64_t>::max() &&
+        (!boundaryUs || !lastTimestamp_ || *boundaryUs>=*lastTimestamp_) &&
+        (!referenceBoundaryUs_ || !boundaryUs || *boundaryUs>*referenceBoundaryUs_);
+}
+
+bool C620Motor::resetReference(std::optional<std::uint64_t> boundaryUs) noexcept
+{
+    // 片側だけ世代を進めないため、失敗時は状態を変更しない。
+    if (!canResetReference(generation_,boundaryUs)) return false;
+    if (boundaryUs) referenceBoundaryUs_=boundaryUs;
     ++generation_;
     latest_.reset();
     counts_ = 0;

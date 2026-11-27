@@ -109,6 +109,27 @@ public:
     {
         if (selfDefinedCan2_) balancing::bindApplicationRuntime(motors_,link_,tx1_,tx2_,stopOutput_);
     }
+    std::optional<std::uint64_t> resetWheelReference(std::uint64_t generation) noexcept
+    {
+        // 主ループの所有状態とIRQキューを同時に確認。旧イベントを捨てて
+        // 空に見せない。未配送の故障やTX終端があれば通常回収を優先する。
+        const auto mask=__get_PRIMASK();
+        if (mask) return std::nullopt;
+        __disable_irq();
+        const auto boundary=sampleClock();
+        bool ok=pendingFaults_==balancing::FaultFlags::None &&
+            !snapshot1.bus_off && !snapshot2.bus_off &&
+            !motors_.rs06ArmFeedback(boundary).stopPending;
+        if (ok) for (const auto& axis:motors_.rs06Status(boundary))
+            if (axis.motorFault || axis.stopTxFailed) ok=false;
+        ok=ok && port1.referenceResetReady() && port2.referenceResetReady();
+        if (ok) ok=motors_.resetWheelReference(generation,boundary);
+        // 回収番号・故障ラッチは維持。成功直後に旧コピーを取り出せないようにする。
+        if (ok) observation.reset();
+        __set_PRIMASK(mask);
+        return ok?std::optional<std::uint64_t>{boundary}:std::nullopt;
+    }
+
     bool selfDefinedCan2() const noexcept { return selfDefinedCan2_; }
     bool stopOutputEnabled() const noexcept { return stopOutput_.enabled; }
 
@@ -350,6 +371,11 @@ std::optional<std::uint64_t> balancing::observationClockUs() noexcept
 {
     if (!started) return std::nullopt;
     return runtime->sampleClock();
+}
+
+std::optional<std::uint64_t> balancing::resetMotorWheelReference(std::uint64_t generation) noexcept
+{
+    return started?runtime->resetWheelReference(generation):std::nullopt;
 }
 
 void balancing::serviceCan2ApplicationTx() noexcept

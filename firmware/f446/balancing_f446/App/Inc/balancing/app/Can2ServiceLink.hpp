@@ -44,6 +44,11 @@ public:
      * @spec{BOARD-F446-001}
      */
     bool enabled() const noexcept { return enabled_; }
+    /** @brief 保留中の運転操作・非常停止を消費せず検査する。
+     * @spec{BEHAV-001}
+     */
+    bool referenceResetIdle() const noexcept
+    { return !emergencyPending_ && !pending_ && !disarm_ && !executing_ && !executingDisarm_; }
     /** @brief CAN2内部送信トークンの発行元。ワイヤIDではない。
      * @spec{BOARD-F446-001}
      */

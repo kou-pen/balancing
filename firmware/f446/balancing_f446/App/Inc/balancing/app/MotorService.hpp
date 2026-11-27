@@ -108,10 +108,11 @@ public:
     /** @brief 両車輪の原点世代を明示的に更新する。
      *  @return bus-off中または世代更新失敗ならfalse。
      *  @pre DISARMED、旧受信キュー排除済み、StateEstimator::reset()と同期。
-     *  @warning 本番呼出はまだ接続しない。
+     *  @warning 実機の操作入力には接続しない。
      *  @spec{CTRL-EST-001}
      */
-    bool resetWheelReference() noexcept;
+    bool resetWheelReference(std::optional<std::uint64_t> expectedGeneration={},
+                             std::optional<std::uint64_t> boundaryUs={}) noexcept;
 
     /** @brief 軸別の安全判断を順序固定のコピーで返す。
      *  @param[in] nowUs 制御周期の単調時刻 [us]。

@@ -79,7 +79,12 @@ public:
      *  @warning 運用中の自動回復には使わない。
      *  @spec{CTRL-EST-001}
      */
-    bool resetReference() noexcept;
+    bool resetReference(std::optional<std::uint64_t> boundaryUs={}) noexcept;
+    /** @brief 原点更新前の形式・世代・時刻検査。更新は行わない。
+     * @spec{CTRL-EST-001}
+     */
+    bool canResetReference(std::uint64_t generation,
+                           std::optional<std::uint64_t> boundaryUs={}) const noexcept;
 
     /** @brief 受信連続性設定の形式検査。半周未満の実測条件は別。
      * @spec{PROTO-C620-001}
@@ -93,7 +98,7 @@ private:
     bool configValid_;
     C620ContinuityStatus continuity_;
     std::optional<C620FeedbackSample> latest_{};
-    std::optional<std::uint64_t> lastTimestamp_{};
+    std::optional<std::uint64_t> lastTimestamp_{}, referenceBoundaryUs_{};
     std::int64_t counts_{0};
     std::uint64_t sequence_{0};
     std::uint64_t generation_{1};

@@ -155,6 +155,7 @@ public:
         previousUs_.reset();
         health_={};
         cycleStarted_=false;
+        allowWheelReferenceReset_=profile.allowWheelReferenceReset;
         ticket_.reset();
         watchdog_=WatchdogPort{profile.watchdog};
         observation_.watchdog=watchdog_.summary();
@@ -175,6 +176,33 @@ public:
         // CANが成功した起動の固定値だけを保存。拒否した設定で診断を上書きしない。
         motorIssues_=inspectArmMotorConfiguration(cfg,can2Configured);
         observation_.armReadiness.configuration=driveIssues_|motorIssues_;
+    }
+
+    bool resetWheelReference() noexcept
+    {
+        // 診断値から運転許可を作らない。状態機械の現在状態と未消費操作を
+        // 直接確認し、FAULT解除・ARM・DISARMと原点更新を混同しない。
+        if (!initialized_ || !control_ || !allowWheelReferenceReset_ || ticket_ ||
+            health_.summary().inProgress || control_->sequence.state()!=RobotState::Disarmed ||
+            control_->sequence.currentFault() || !control_->can2.referenceResetIdle() ||
+            !control_->usb.referenceResetIdle()) return false;
+        const auto now=observationClockUs();
+        if (!now || (previousUs_ && *now<=*previousUs_) ||
+            control_->power.snapshot(*now).faultObserved) return false;
+        const auto generation=control_->estimator.resettableWheelGeneration();
+        if (!generation) return false;
+        const auto boundary=resetMotorWheelReference(*generation);
+        if (!boundary) return false;
+        // 受信側が両輪の同一世代を更新した場合だけ進める。
+        // 主ループ内なので次回CAN配送/推定はこの同期完了後に行われる。
+        control_->estimator.reset();
+        observation_.motors.reset();
+        observation_.cycle.reset();
+        observation_.operatorTarget.reset();
+        drive_runtime::beginCycle();
+        control_->can2.publishTelemetry({},*boundary);
+        observation_.armReadiness.observation=inspectArmObservations(observation_);
+        return true;
     }
 
     bool bindWatchdog(WatchdogConfig config) noexcept
@@ -447,6 +475,7 @@ private:
     std::optional<std::uint64_t> previousUs_{};
     bool initialized_{false};
     bool cycleStarted_{false};
+    bool allowWheelReferenceReset_{false};
 };
 
 // 静的に一つだけ保持。malloc/newも静的初期化時のHAL利用も行わない。
@@ -478,6 +507,8 @@ bool initializeCan2Observation(const Can2ObservationProfile& profile) noexcept
 
 void recordApplicationMotorConfiguration(const MotorObservationConfig& cfg,bool can2Configured) noexcept
 { application.recordMotorConfiguration(cfg,can2Configured); }
+
+bool resetApplicationWheelReference() noexcept { return application.resetWheelReference(); }
 
 bool bindApplicationWatchdog(WatchdogConfig config) noexcept { return application.bindWatchdog(config); }
 
