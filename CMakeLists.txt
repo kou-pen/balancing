@@ -442,7 +442,8 @@ add_test(NAME balancing_f446_diagnostics_codec_tests COMMAND balancing_f446_diag
 set(F303_APP firmware/f303/balancing_f303/App)
 add_library(balancing_f303_power STATIC
     ${F303_APP}/Src/balancing/power/PowerController.cpp
-    ${F303_APP}/Src/balancing/power/PowerMonitor.cpp)
+    ${F303_APP}/Src/balancing/power/PowerMonitor.cpp
+    ${F303_APP}/Src/balancing/power/BoardIO.cpp)
 target_include_directories(balancing_f303_power PUBLIC ${F303_APP}/Inc)
 target_compile_options(balancing_f303_power PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
