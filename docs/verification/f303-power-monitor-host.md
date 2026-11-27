@@ -18,7 +18,7 @@ OFF/PRECHARGE/ON/FAULTの全状態でバッテリー上下限とバス上限を�
 
 ## 検証
 
-通常・UBSanのF303単体/結合試験PASS。CMake Debug全CTest 83/83 PASS（job 1241b521b3984c5a）。仕様整合・Doxygen生成・差分検査PASS（既知の日本語翻訳警告のみ）。校正の異常、上下限等号、負電流、過電流の継続・解除、ADC期限、時刻逆行・改変、物理値不正を確認。Monitorの結果を実PowerControllerへ渡し、自動プリチャージ→重複→ON→持続過電流によるFAULT→異常中のPOWER_ON拒否→正常化後の明示ONによる再充電→ADC欠測によるFAULTを確認した。
+通常・UBSanのF303単体/結合試験PASS。CMake Debug全CTest 83/83 PASS（job 1241b521b3984c5a）。全通常/UBSan回帰試験PASS（job 49452c18f7654ef9、CubeIDE設定25/25、CAN監査19/19）。仕様整合・Doxygen生成・差分検査PASS（既知の日本語翻訳警告のみ）。校正の異常、上下限等号、負電流、過電流の継続・解除、ADC期限、時刻逆行・改変、物理値不正を確認。Monitorの結果を実PowerControllerへ渡し、自動プリチャージ→重複→ON→持続過電流によるFAULT→異常中のPOWER_ON拒否→正常化後の明示ONによる再充電→ADC欠測によるFAULTを確認した。
 
 ## 未確定
 
