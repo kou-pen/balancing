@@ -20,7 +20,7 @@
 
 ## 試験
 
-F446の実PowerBoardServiceにF303のPOWER_STATUS候補を渡してFAULT/PRECHARGE/ON、500 ms鮮度境界、FAULT通知を確認。F446/Pi要求の応答照合、ON/OFF同時受信の順序入替、CAN ESTOP優先、不正ID/DLC/IDE、自己反射、受信欠落、物理ESTOP、100 ms生成周期、連番周回を試験した。F303単体・F446論理対向は通常/UBSanともPASS。CMake Debug全CTest 84/84 PASS（job c4c37ccef562428e）。仕様整合・Doxygen生成とソースページ・差分検査PASS（既知の日本語翻訳警告のみ）。
+F446の実PowerBoardServiceにF303のPOWER_STATUS候補を渡してFAULT/PRECHARGE/ON、500 ms鮮度境界、FAULT通知を確認。F446/Pi要求の応答照合、ON/OFF同時受信の順序入替、CAN ESTOP優先、不正ID/DLC/IDE、自己反射、受信欠落、物理ESTOP、100 ms生成周期、連番周回を試験した。F303単体・F446論理対向は通常/UBSanともPASS。CMake Debug全CTest 84/84 PASS（job c4c37ccef562428e）。全通常/UBSan回帰試験PASS（job 565efd3407854e5e、CubeIDE設定25/25、CAN監査19/19）。仕様整合・Doxygen生成とソースページ・差分検査PASS（既知の日本語翻訳警告のみ）。
 
 ## 未検証・実装上の選択
 
