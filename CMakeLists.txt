@@ -472,3 +472,8 @@ add_executable(balancing_f303_can_tests tests/test_f303_power_can.cpp
 target_link_libraries(balancing_f303_can_tests PRIVATE balancing_f303_can)
 target_compile_options(balancing_f303_can_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
 add_test(NAME balancing_f303_can_tests COMMAND balancing_f303_can_tests)
+
+add_executable(balancing_f303_board_io_tests tests/test_f303_board_io.cpp)
+target_link_libraries(balancing_f303_board_io_tests PRIVATE balancing_f303_power)
+target_compile_options(balancing_f303_board_io_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
+add_test(NAME balancing_f303_board_io_tests COMMAND balancing_f303_board_io_tests)

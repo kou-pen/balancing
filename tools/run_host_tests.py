@@ -586,4 +586,14 @@ for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-saniti
                     str(ROOT / "tests/test_f303_power_can.cpp"),
                     *flags, "-o", str(executable)], check=True, cwd=ROOT, timeout=30)
     subprocess.run([str(executable)], check=True, cwd=ROOT, timeout=30)
+
+# BoardIOの論理出力境界とLED表示。実GPIOに接続しない。
+for suffix, flags in [("", []), ("_ubsan", ["-fsanitize=undefined", "-fno-sanitize-recover=all"])]:
+    executable = OUT / f"test_f303_board_io{suffix}"
+    subprocess.run(["g++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-pedantic",
+                    "-I", str(f303_app / "Inc"),
+                    str(f303_app / "Src/balancing/power/BoardIO.cpp"),
+                    str(ROOT / "tests/test_f303_board_io.cpp"),
+                    *flags, "-o", str(executable)], check=True, cwd=ROOT, timeout=30)
+    subprocess.run([str(executable)], check=True, cwd=ROOT, timeout=30)
 print("ホスト試験：全件合格")
