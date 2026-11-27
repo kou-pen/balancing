@@ -455,3 +455,13 @@ add_executable(balancing_f303_monitor_tests tests/test_f303_power_monitor.cpp)
 target_link_libraries(balancing_f303_monitor_tests PRIVATE balancing_f303_power)
 target_compile_options(balancing_f303_monitor_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
 add_test(NAME balancing_f303_monitor_tests COMMAND balancing_f303_monitor_tests)
+
+# F303は既存F446のHAL非依存Codecを直接共用する。コピー/移動なし。
+add_library(balancing_f303_can STATIC
+    ${F303_APP}/Src/balancing/power/PowerCan.cpp
+    ${F446_APP}/Src/balancing/communication/can/PowerBoardCodec.cpp
+    ${F446_APP}/Src/balancing/communication/can/ProtocolId.cpp
+    ${F446_APP}/Src/balancing/communication/can/ProtocolPayload.cpp)
+target_include_directories(balancing_f303_can PUBLIC ${F303_APP}/Inc ${F446_APP}/Inc)
+target_link_libraries(balancing_f303_can PUBLIC balancing_f303_power)
+target_compile_options(balancing_f303_can PRIVATE -Wall -Wextra -Wpedantic -Werror)
