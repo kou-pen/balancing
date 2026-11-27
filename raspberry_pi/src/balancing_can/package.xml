@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>balancing_can</name>
+  <version>0.0.1</version>
+  <description>Balancing robot CAN v1 peer and ROS 2 integration.</description>
+  <maintainer email="kou-pen@users.noreply.github.com">kou-pen</maintainer>
+  <license>License not yet specified</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>
