@@ -6,6 +6,7 @@
 |---|---|
 | @subpage folder_docs "docs/" | 設計、仕様、実装予定、検証記録と開発手順 |
 | @subpage folder_firmware "firmware/" | ファームウェアの公開APIと実装ファイル |
+| @subpage folder_raspberry_pi "raspberry_pi/" | PiのROS 2パッケージ・実装 |
 | [README.md](../../README.md) | プロジェクトの目的、現状と最初のビルド手順 |
 | [CONTRIBUTING.md](../../CONTRIBUTING.md) | 変更の進め方、検証、PRとレビュー |
 | [AGENTS.md](../../AGENTS.md) | AI開発時の作業範囲とコード・文書の規約 |
@@ -118,6 +119,7 @@
 | フォルダ・ファイル | 内容 |
 |---|---|
 | [f303_power.md](../specs/boards/f303_power.md) | F303電源基板の機能、信号、安全条件 |
+| [pi.md](../specs/boards/pi.md) | Piの承認済み7設計、ROS 2・UI・記録 |
 | [f446_control.md](../specs/boards/f446_control.md) | F446メイン制御基板の入出力、タスク周期、CAN |
 */
 
@@ -208,6 +210,7 @@
 | [f303-cube-environment.md](../verification/f303-cube-environment.md) | CubeF3導入・公式HALとC++コアのARMリンク検証 |
 | [f303-application-host.md](../verification/f303-application-host.md) | F303全論理モジュールの周期統合とF446対向試験 |
 | [f303-f446-power-sil.md](../verification/f303-f446-power-sil.md) | F303 1 kHz・F446 500 Hzの電源連携SIL |
+| [pi-can-peer-host.md](../verification/pi-can-peer-host.md) | Pi CAN受信境界のホスト検証 |
 | [f446-drive-cycle-sil.md](../verification/f446-drive-cycle-sil.md) | F446 Application通常運転のSIL統合 |
 | [f446-dual-can-runtime-host.md](../verification/f446-dual-can-runtime-host.md) | F446 CAN1/CAN2共通受信ランタイムのホスト検証 |
 | [f446-dualsense-input-host.md](../verification/f446-dualsense-input-host.md) | F446 DualSense USB入力境界 |
@@ -760,4 +763,54 @@ ApplicationObservationは周期コピー、ControlCycleは数学と状態判定�
 | <a href="PowerCan_8cpp_source.html">PowerCan.cpp</a> | CAN要求集約・操作応答・状態報告 |
 | <a href="BoardIO_8cpp_source.html">BoardIO.cpp</a> | 出力要求の整合確認・LED点滅 |
 | <a href="f303_2balancing__f303_2App_2Src_2balancing_2power_2application_8cpp_source.html">application.cpp</a> | 4モジュールの周期統合と完了条件 |
+*/
+
+/** @page folder_raspberry_pi raspberry_pi/
+
+@ref index "リポジトリ" / raspberry_pi/
+
+| フォルダ | 内容 |
+|---|---|
+| @subpage folder_raspberry_pi_src "src/" | ROS 2パッケージ |
+*/
+
+/** @page folder_raspberry_pi_src src/
+
+@ref folder_raspberry_pi "raspberry_pi/" / src/
+
+| フォルダ | 内容 |
+|---|---|
+| @subpage folder_raspberry_pi_src_balancing_can "balancing_can/" | CAN v1受信・送信候補。ROS接続は未実装 |
+*/
+
+/** @page folder_raspberry_pi_src_balancing_can balancing_can/
+
+@ref folder_raspberry_pi_src "src/" / balancing_can/
+
+| ファイル・フォルダ | 内容 |
+|---|---|
+| @subpage folder_pi_can_inc "include/balancing/pi/" | CAN受信境界の公開API |
+| @subpage folder_pi_can_src "src/" | CAN受信境界の実装 |
+| CMakeLists.txt | ament CMakeと既存Codecソース共用 |
+| package.xml | ROS 2パッケージ情報（暫定） |
+
+[Pi仕様](../specs/boards/pi.md)・[検証記録](../verification/pi-can-peer-host.md)
+*/
+
+/** @page folder_pi_can_inc include/balancing/pi/
+
+@ref folder_raspberry_pi_src_balancing_can "balancing_can/" / include/balancing/pi/
+
+| ファイル | 内容 |
+|---|---|
+| <a href="CanPeer_8hpp_source.html">CanPeer.hpp</a> | Pi受信16型と送信候補 |
+*/
+
+/** @page folder_pi_can_src src/
+
+@ref folder_raspberry_pi_src_balancing_can "balancing_can/" / src/
+
+| ファイル | 内容 |
+|---|---|
+| <a href="CanPeer_8cpp_source.html">CanPeer.cpp</a> | Pi宛てフレームの復号・型/宛先検査 |
 */

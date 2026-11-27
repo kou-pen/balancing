@@ -16,6 +16,7 @@ CAN_TABLE = ROOT / "docs" / "can-id-table.md"
 EXPECTED = {
     "BOARD-F446-001",
     "BOARD-F303-001",
+    "BOARD-PI-001",
     "PROTO-RS06-001",
     "PROTO-C620-001",
     "PROTO-PWR-001",
@@ -81,7 +82,7 @@ def main() -> int:
                 record(f"索引に仕様IDがない: {identifier}", errors)
 
     references = 0
-    for source in (ROOT / "firmware").rglob("*"):
+    for source in (*(ROOT / "firmware").rglob("*"), *(ROOT / "raspberry_pi" / "src").rglob("*")):
         if not source.is_file() or source.suffix not in {".c", ".h", ".hpp", ".cpp"}:
             continue
         for identifier in REF_RE.findall(source.read_text(encoding="utf-8")):
