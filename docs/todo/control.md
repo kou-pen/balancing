@@ -50,3 +50,9 @@
 ## Python LQR数学検証（2026-11-27）
 
 Issue #8のレビュー版で、人工連続モデルからZOH離散化・DARE・K計算、開/閉ループ・飽和・500/250 Hz保持・整数tick遅延の比較を実装し、専用venvで16/16 PASS。実機CAD・K_300・軸別限界・物理モデル検証は未完了のためT-CTRL-06/07の実機条件は維持する。詳細は[線形モデルと離散LQR](../design/linear-simulation.md)。
+
+## ガスシリンダ補償の数学境界（2026-11-27）
+
+Issue #9：BalanceControlConfigのGasCylinderCompensationで装着有無を起動時に指定する。未装着は旧演算のまま、装着時は外部検証済みの純粋数学関数を必要とする。同一周期ControlSnapshotから機構軸4軸の補助トルク[N m]を返し、VMC後・MotorCommand前に一度だけ差し引く。関数失敗、出力欠落、非有限、float範囲外は数学結果なし。既存ControlCycleの同周期FAULT/停止経路を用いる。
+
+実機CAD、作用点、力曲線、摩擦、補償モデル本体は未確定。実際の幾何モデルに追加の関節座標等が必要かはCAD確認後に決定する。現在の関数に人工値を本番設定しない。T-CTRL-09の実機条件は維持する。検証は[ガスシリンダ補償IF](../verification/f446-gas-cylinder-compensation.md)。

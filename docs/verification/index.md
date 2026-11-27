@@ -103,3 +103,5 @@
 ## 合否の意味
 
 PASSは記録された条件で試験が成功したこと、FAILは実行後の失敗、NOT RUN / NOT VERIFIEDは未実施・証拠不足です。ホスト・ARMビルド・実機を別々に記録します。[実機受入条件](../todo/verification.md)は変更していません。
+
+- [ガスシリンダ補償IF](f446-gas-cylinder-compensation.md)：VMC後の補償と数値失敗時の停止（Issue #9）。

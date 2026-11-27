@@ -213,15 +213,29 @@ struct BalanceReference {
     float yawRateRadS{0.0f};
 };
 
+/** @brief ガスシリンダ装着状態と補助トルク計算の起動固定設定。
+ *  @note 未装着は常に補償ゼロ。装着時のverifiedは外部検証済みモデルを指す。
+ *  @spec{CTRL-LQR-001}
+ */
+struct GasCylinderCompensation {
+    bool installed{false};
+    bool verified{false};
+    /** 同一周期の観測から機構軸の補助Nm（左A/B、右A/B）を全4軸返す。
+     *  HAL・CAN・内部状態の更新を行わない純粋数学関数。失敗時false。
+     */
+    bool (*evaluate)(const ControlSnapshot&, std::array<float,4>&) noexcept{nullptr};
+};
+
 struct BalanceControlConfig {
     LqrConfig lqr{};
     LegPdGains legPd{};
     YawPiGains yawPi{};
     std::array<float, 2> wheelTorqueLimitNm{};
+    GasCylinderCompensation gasCylinder{};
 };
 
 /** @brief 機構側トルクの純粋な数学計算結果でありCAN指令ではない。
- *  @warning 脚のCAD、摩擦、ガスシリンダ、変速比、電流換算、実機限界は未結合。
+ *  @warning 脚のCAD、摩擦、ガスシリンダの実モデル、変速比、電流換算、実機限界は未結合。
  *           fixtureOnlyの結果をモータへ配送するAPIは存在しない。
  *  @spec{CTRL-LQR-001}
  */
@@ -235,7 +249,7 @@ struct BalanceControlOutput {
     bool fixtureOnly{true};
 };
 
-/** @brief 検証済みのLQR/脚PD/Roll PD/VMC/Yaw PIを順に組み合わせる。
+/** @brief 検証済みのLQR/脚PD/Roll PD/VMC/Yaw PIと任意の補償を組み合わせる。
  *  @note 制御目標の生成や実トルク上限の決定は行わない。
  *  @warning SIL数値比較のみ。MotorCommand、MotorService、CAN/HALへ接続しない。
  *  @spec{CTRL-LQR-001}

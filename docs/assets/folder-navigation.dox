@@ -182,6 +182,7 @@
 | [f446-application-timing-host.md](../verification/f446-application-timing-host.md) | F446 Applicationの共通時計・周期診断 |
 | [f446-attitude-math-cpp.md](../verification/f446-attitude-math-cpp.md) | 姿勢フィルタのC++統合 |
 | [f446-balance-math-cpp.md](../verification/f446-balance-math-cpp.md) | BalanceControlのC++数値演算統合 |
+| [f446-gas-cylinder-compensation.md](../verification/f446-gas-cylinder-compensation.md) | VMC後のガスシリンダ補償IF・数値検証 |
 | [f446-bench-startup.md](../verification/f446-bench-startup.md) | BenchDebug専用起動とCAN IRQの排他検証 |
 | [f446-bench-operation.md](../verification/f446-bench-operation.md) | 単軸試運転の明示操作接続 |
 | [f446-startup-integration.md](../verification/f446-startup-integration.md) | 起動処理の統合と初期化失敗の伝達 |
