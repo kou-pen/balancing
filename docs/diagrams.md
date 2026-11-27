@@ -238,3 +238,19 @@ stateDiagram-v2
 </pre>
 
 ChargingとOverlapは外部へPRECHARGEと報告する。CAN ESTOP/保護異常は全段階でFAULT。物理ESTOPによるOFFでは投入意図を維持し、CAN OFFでは消去する。実際のGPIO駆動は未接続。
+
+## F303 ADC観測から電源状態判定まで（論理コア）
+
+<pre class="mermaid">
+flowchart LR
+    ADC["ADC/DMA（未接続）"] -.-> S["PowerAdcSample 生値と取得時刻"]
+    S --> M["PowerMonitor.evaluate"]
+    C["PowerController"] -->|現在状態| M
+    M --> O["PowerObservation 物理量・valid・protectionOk"]
+    O --> I["PowerInputs（結合試験で接続）"]
+    I --> C
+    C --> R["論理出力要求"]
+    R -.-> GPIO["BoardIO（未実装）"]
+</pre>
+
+Monitorは電源状態を変更せず、Controllerが唯一の状態所有者。観測と保護判定の境界を実際のControllerへ渡すホスト結合試験を追加した。GPIO/ADC/周期処理への接続は未実装。
