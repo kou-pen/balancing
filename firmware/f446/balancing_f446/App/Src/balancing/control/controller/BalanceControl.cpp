@@ -348,6 +348,12 @@ BalanceControl::BalanceControl(const BalanceControlConfig& config) noexcept : co
 bool BalanceControl::initialize(const ControlSnapshot& snapshot) noexcept
 {
     reset();
+    // 装着済みなのに計算モデルが未検証なら、ARM前の初期化を拒否する。
+    // 未装着では関数やverifiedの値に関係なく従来の計算を維持する。
+    const auto& gas = config_.gasCylinder;
+    if (gas.installed && (!gas.verified || !gas.evaluate)) {
+        return false;
+    }
     const auto measured = legFeedback(snapshot);
     // ARM時の固定脚長目標は左右の現測定値から取得する(MOTOR-159)。
     // Roll/脚長PDのD項は実伸縮速度だけを使うので目標の飛びを持ち込まない。
@@ -412,8 +418,8 @@ std::optional<BalanceControlOutput> BalanceControl::compute(
     }
 
     // LQRは両脚合計の仮想トルクを返すので、初期の左右均等配分を適用。
-    // 左右差を生むのは脚長/Rollの支持力だけ。実際の機構軸・モータ軸
-    // 変換、ガスシリンダ、最終モータ制限はここで扱わない。
+    // VMCでは脚長/Roll支持力と均等な仮想トルクを機構軸へ変換する。
+    // モータ軸への変換・最終制限はMotorCommandで行う。
     std::array<float, 4> joints{};
     for (std::size_t leg = 0; leg < 2; ++leg) {
         std::array<float,2> torque{};
@@ -426,6 +432,28 @@ std::optional<BalanceControlOutput> BalanceControl::compute(
         }
         joints[2*leg]=torque[0];
         joints[2*leg+1]=torque[1];
+    }
+    // 補助力は同じ機構座標のトルクへ換算済みで受け取る。
+    // VMC後に一度だけ差し引き、モータ軸変換や最終制限を重複させない。
+    const auto& gas = config_.gasCylinder;
+    if (gas.installed) {
+        // 全軸の明示出力を要求し、書き忘れを補償ゼロと誤認しない。
+        std::array<float,4> assist{};
+        assist.fill(std::numeric_limits<float>::quiet_NaN());
+        if (!gas.evaluate(snapshot, assist)) {
+            reset();
+            return std::nullopt;
+        }
+        for (std::size_t axis = 0; axis < joints.size(); ++axis) {
+            // doubleで差を検査し、float範囲外を飽和として通さない。
+            const double corrected = static_cast<double>(joints[axis]) - assist[axis];
+            if (!std::isfinite(assist[axis]) || !std::isfinite(corrected) ||
+                std::fabs(corrected) > std::numeric_limits<float>::max()) {
+                reset();
+                return std::nullopt;
+            }
+            joints[axis] = static_cast<float>(corrected);
+        }
     }
     // 出力は機構軸の数学値であり、検証済みモータ指令には変換しない。
     return BalanceControlOutput{
