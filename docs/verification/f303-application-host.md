@@ -19,7 +19,9 @@ Controllerが唯一の状態所有者。MonitorでADC評価、Canで要求集約
 
 ## 試験
 
-人工設定で全4モジュールを接続し、通常・UBSanの統合試験PASS。CMake Debug全CTest 86/86 PASS（job 9f9c6ad26c334934）。仕様整合・Doxygen生成とF303固有ソースリンク・差分検査PASS。プリチャージ→重複導通→ON→過電流FAULT→明示ON復旧、F446実PowerBoardServiceへの状態報告、物理停止とCAN停止、複数通知、同一時刻、未処理遮断、ハード異常、未検証既定設定、出力適用失敗時のON報告・応答破棄、次周期のFAULT報告を検証。初回は試験内のF446/F303 PowerState型名が曖昧でコンパイル失敗し、F303型を明記して再試験した。
+人工設定で全4モジュールを接続し、通常・UBSanの統合試験PASS。CMake Debug全CTest 86/86 PASS（job 9f9c6ad26c334934）。全通常/UBSan回帰試験PASS（job fd5b0d629b524eee、CubeIDE設定25/25、CAN監査19/19）。仕様整合・Doxygen生成とF303固有ソースリンク・差分検査PASS。プリチャージ→重複導通→ON→過電流FAULT→明示ON復旧、F446実PowerBoardServiceへの状態報告、物理停止とCAN停止、複数通知、同一時刻、未処理遮断、ハード異常、未検証既定設定、出力適用失敗時のON報告・応答破棄、次周期のFAULT報告を検証。初回は試験内のF446/F303 PowerState型名が曖昧でコンパイル失敗し、F303型を明記して再試験した。
+
+CubeIDE付属ARM GCC 13.3.1で application.cpp のCortex-M4 hard-floatオブジェクト生成もPASS。完全ELFリンク・実行は未実施。
 
 ## 残件
 
