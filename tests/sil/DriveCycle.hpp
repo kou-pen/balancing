@@ -56,14 +56,10 @@ private:
     RobotSequence& sequence_;
     MotorService& motors_;
     MotorCanLink& link_;
-    CanTxScheduler& can1_;
-    CanTxScheduler& can2_;
+    MotorPeriodicTx tx_;
     MotorFramePlan frames_;
     DriveSilConfig config_;
-    std::array<TxToken,5> queued_{}, accepted_{}, latest_{};
-    std::array<std::optional<std::uint64_t>,5> lastSent_{};
     std::optional<std::uint64_t> activeSince_{}, lastRsDue_{}, lastTick_{};
-    std::uint64_t serial_{}, generation1_{},generation2_{};
     FaultFlags pending_{FaultFlags::None};
     bool active_{false};
     bool configured_{false};

@@ -1,23 +1,20 @@
 #include "balancing/app/DriveRuntime.hpp"
 #include "balancing/app/MotorCanLink.hpp"
 #include "balancing/communication/can/CanTxScheduler.hpp"
-#include "balancing/communication/C620Codec.hpp"
-#include <limits>
 
 namespace balancing::drive_runtime {
 namespace {
 constexpr std::uint32_t kZeroOrigin=0xD001u; // 内部照合キー。CAN IDとは無関係。
-constexpr std::uint64_t kWheelPeriodUs=2000u;
 
 struct StopOutput {
+    StopOutput(MotorService& m,MotorCanLink& l,CanTxScheduler& a,CanTxScheduler& b) noexcept
+        :motors{m},link{l},tx{a,b,kZeroOrigin} {}
     MotorService& motors;
     MotorCanLink& link;
-    CanTxScheduler& can1;
-    CanTxScheduler& can2;
+    MotorPeriodicTx tx;
     StopOutputSummary summary{};
     std::optional<CycleTicket> lastTicket{};
     std::optional<std::uint64_t> lastGeneration{},lastClock{};
-    TxToken queued{},accepted{};
     FaultFlags pending{FaultFlags::None};
     bool cycleSeen{};
 
@@ -33,24 +30,15 @@ struct StopOutput {
         motors.applySequence({RobotState::Disarmed,DesiredMotorState::StopAll,0},now);
         link.submitPending(now);
         for (unsigned i=0;i<4;++i) {
-            const auto progress=can1.service(now);
-            link.onScheduledTxProgress(progress,now);
+            const auto progress=tx.service(CanBus::Can1,link,now);
             if (progress.result!=ScheduledTxResult::Accepted) break;
         }
-        // C620共通ゼロの周期枠は一件だけ。古い受付済み世代はSchedulerが終端まで保持する。
-        const auto progress=can2.service(now);
-        if (queued.serial && progress.token==queued) {
-            if (progress.result==ScheduledTxResult::Accepted) {
-                accepted=queued;
-                ++summary.zeroAccepted;
-                queued={};
-            } else if (progress.result==ScheduledTxResult::Expired ||
-                       progress.result==ScheduledTxResult::Invalid) {
-                ++summary.zeroDropped;
-                queued={};
-                if (progress.result==ScheduledTxResult::Invalid) fault(FaultFlags::ExternalFault);
-            }
-        }
+        (void)tx.service(CanBus::Can2,link,now);
+        if (tx.takeFault()) fault(FaultFlags::ExternalFault);
+        const auto& w=tx.summary()[4];
+        summary.zeroQueued=w.queued;summary.zeroAccepted=w.accepted;
+        summary.zeroSent=w.sent;summary.zeroDropped=w.dropped;summary.zeroFailed=w.failed;
+        summary.lastZeroSentUs=w.lastSentUs;
         summary.rs06=motors.rs06Status(now);
     }
 
@@ -70,20 +58,7 @@ struct StopOutput {
         lastGeneration=observation.motors->generation;
         if (!consecutive) return;
         cycleSeen=true;
-        if (queued.serial) { ++summary.zeroDropped;queued={}; }
-        // 期限は既存2msの周期予約枠。実機送達期限を新設しない。
-        if (summary.zeroQueued==std::numeric_limits<std::uint64_t>::max() ||
-            now>std::numeric_limits<std::uint64_t>::max()-kWheelPeriodUs) {
-            fault(FaultFlags::ExternalFault);return;
-        }
-        const auto zero=C620Codec::encodeCurrent({},20.0f);
-        if (!zero) { fault(FaultFlags::ExternalFault);return; }
-        const auto generation=++summary.zeroQueued;
-        PeriodicTxBatch batch{generation,now+kWheelPeriodUs,{}};
-        const TxToken token{generation,kZeroOrigin};
-        batch.requests[0]=PeriodicTxRequest{*zero,token};
-        if (can2.replacePeriodic(batch,now)==PeriodicBatchResult::Queued) queued=token;
-        else { ++summary.zeroDropped;fault(FaultFlags::ExternalFault); }
+        if (!tx.queueZero(now)) fault(FaultFlags::ExternalFault);
     }
 };
 std::optional<StopOutput> stop;
@@ -129,7 +104,7 @@ void bind(ControlCycle&,RobotSequence&,MotorService& motors,MotorCanLink& link,
           CanTxScheduler& can1,CanTxScheduler& can2,StopOutputConfig config) noexcept
 {
     if (config.enabled && config.verified && motors.hasRs06Configuration() && !stop) {
-        stop.emplace(StopOutput{motors,link,can1,can2});
+        stop.emplace(motors,link,can1,can2);
         stop->summary.enabled=true;
     }
 }
@@ -139,15 +114,8 @@ void poll() noexcept
 }
 void onTxTerminal(CanBus bus,TxToken token,CanTxOutcome outcome,std::uint64_t atUs) noexcept
 {
-    // Routerで受付照合した終端のみ。別バス・別発行元・旧世代を数えない。
-    if (!stop || bus!=CanBus::Can2 || !token.serial || !(token==stop->accepted)) return;
-    stop->accepted={};
-    if (outcome==CanTxOutcome::Sent) {
-        ++stop->summary.zeroSent;
-        stop->summary.lastZeroSentUs=atUs;
-    } else {
-        ++stop->summary.zeroFailed;
-        if (outcome==CanTxOutcome::TransmitError) stop->fault(FaultFlags::ExternalFault);
-    }
+    if (!stop) return;
+    stop->tx.onTxTerminal(bus,token,outcome,atUs);
+    if (stop->tx.takeFault()) stop->fault(FaultFlags::ExternalFault);
 }
 }
