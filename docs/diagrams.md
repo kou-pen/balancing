@@ -9,18 +9,21 @@ flowchart TB
     RESET["main: RCCリセット原因取得"] --> HAL["HAL_Init / クロック / 周辺初期化"]
     HAL --> MODE{"ビルド構成"}
     MODE -->|Debug / Release| APP["balancing_app_init"]
-    APP --> CAN["balancing_f446_can_start"]
-    CAN --> IMU["balancing_f446_imu_start"]
+    APP -->|成功| CAN["balancing_f446_can_start"]
+    APP -->|失敗| ERROR["Error_Handler"]
+    CAN -->|成功| IMU["balancing_f446_imu_start"]
+    CAN -->|失敗| ERROR
     MODE -->|BenchDebug| BENCH["balancing_f446_bench_start"]
-    BENCH -->|既定無効| ERROR["Error_Handler"]
+    BENCH -->|既定無効または失敗| ERROR
     BENCH -->|設定成立時| TIMER["HAL_TIM_Base_Start_IT"]
     IMU --> TIMER
-    TIMER --> WDG["balancing_f446_watchdog_start"]
+    TIMER -->|成功| WDG["balancing_f446_watchdog_start"]
+    TIMER -->|失敗| ERROR
     WDG -->|無効または開始成功| LOOP["while 1 主ループ"]
     WDG -->|失敗| ERROR
 </pre>
 
-`Core/Src/main.c` のUSER CODEが入口です。USB Hostは明示起動APIを持ちますが既定mainからは呼びません。IWDGは既定無効。周辺初期化と実際の通信開始は別です。
+`Core/Src/main.c` のUSER CODEが入口です。Application初期化は成否を返し、失敗時にはCAN・TIM7・IWDGに進みません。IMU設定未成立は観測不可として継続します。USB Hostは明示起動APIを持ちますが既定mainからは呼びません。IWDGは既定無効。周辺初期化と実際の通信開始は別です。
 
 ## 2. 割り込みと通常制御周期
 

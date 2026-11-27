@@ -44,6 +44,10 @@ public:
      * @spec{BOARD-F446-001}
      */
     bool enabled() const noexcept { return enabled_; }
+    /** @brief 起動前にCAN2設定の形式を検査。実機設定の認定ではない。
+     * @spec{BOARD-F446-001}
+     */
+    static bool validConfig(const Can2ServiceConfig&) noexcept;
     /** @brief 保留中の運転操作・非常停止を消費せず検査する。
      * @spec{BEHAV-001}
      */
@@ -119,7 +123,8 @@ private:
     std::optional<std::uint64_t> rxBarrier_{}, motionBarrier_{};
     std::optional<Request> pending_{}, disarm_{}, executing_{}, executingDisarm_{};
     RobotState previousState_{RobotState::Disarmed};
-    std::array<Response,8> responses_{};
+    static constexpr std::size_t responseLimit=8;
+    std::array<Response,responseLimit> responses_{};
     std::size_t responseCount_{};
     std::uint32_t droppedResponses_{};
     std::optional<TxToken> responseInFlight_{};

@@ -175,7 +175,7 @@ int main(int argc,char** argv){
     MotorObservationConfig cfg{{{11,12,13,14},0x5a},true,{}, {true,true}};
     if(!std::strcmp(mode,"--default")){
         assert(!resetApplicationWheelReference());
-        balancing_app_init();
+        assert(balancing_app_init());
         assert(balancing_f446_can_start(&h1,&h2));
         for(unsigned i=1;i<10;++i){tick(i);balancing_app_poll();own();}
         assert(!summary().enabled && !pending(1) && !pending(2,false));

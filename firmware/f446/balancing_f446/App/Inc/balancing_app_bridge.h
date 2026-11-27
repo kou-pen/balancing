@@ -12,8 +12,9 @@ extern "C" {
  * @brief CubeMX生成main.cからC++アプリケーションを初期化する。
  * @spec{BOARD-F446-001}
  * @pre MX_GPIO_Init等の生成済み周辺初期化が完了していること。
+ * @return 初期化成功または明示CAN2設定済みならtrue。拒否時はfalse。
  */
-void balancing_app_init(void);
+bool balancing_app_init(void);
 
 /**
  * @brief TIM7の500 Hzイベントをメインループで消費した際に呼ぶ。

@@ -150,6 +150,8 @@ public:
     {
         // 起動済みHostを別のApplicationへ暗黙再結合しない。
         if (watchdog_.summary().configured || (control_ && control_->usbHost.summary().started)) return false;
+        // 明示CAN2設定の拒否は既存状態・参照先の寿命を変えない。
+        if (requireCan2 && !Can2ServiceLink::validConfig(profile.communication)) return false;
         if (control_) control_->indicatorOutput.disable();
         observation_ = {};
         previousUs_.reset();
@@ -163,10 +165,6 @@ public:
         control_.emplace(profile,driveConfig);
         driveIssues_=inspectArmConfiguration(driveConfig);
         observation_.armReadiness={driveIssues_|motorIssues_,missingObservation};
-        if (requireCan2 && !control_->can2.enabled()) {
-            control_.reset();
-            return false;
-        }
         initialized_ = true;
         return true;
     }
@@ -501,8 +499,8 @@ bool initializeCan2Observation(const Can2ObservationProfile& profile) noexcept
     // C ABIの既定起動からは利用しない。模擬電源送信を実ランタイムへ持ち込まない。
     if (profile.communication.allowMockPowerRequests ||
         (profile.faultCapacity && !profile.faultSlots) || application.can2Link()) return false;
-    application.init(profile);
-    return application.can2Link()!=nullptr;
+    // 既存Applicationの初期化拒否・不正設定を成功扱いしない。
+    return application.init(profile,true);
 }
 
 void recordApplicationMotorConfiguration(const MotorObservationConfig& cfg,bool can2Configured) noexcept
@@ -534,9 +532,11 @@ std::optional<ApplicationObservation> applicationObservation() noexcept
 extern "C" {
 
 /* CubeMX CからC++を初期化するブリッジ。リンク境界以外の処理を持たない。 */
-void balancing_app_init(void)
+bool balancing_app_init(void)
 {
-    if (!balancing::applicationCan2Link()) balancing::application.init();
+    // 明示設定済みなら既存構成を保持。既定初期化の拒否はmainへ返す。
+    if (balancing::applicationCan2Link()) return true;
+    return balancing::application.init();
 }
 
 /* タイマ番号をCAN回収前に記録。主ループからだけ呼ぶ。 */

@@ -899,7 +899,7 @@ int main(int argc, char** argv)
         if (!std::strcmp(mode,"frozen")) DBGMCU->APB1FZ=DBGMCU_APB1_FZ_DBG_IWDG_STOP;
         if (!std::strcmp(mode,"initfail")) iwdgInitResult=HAL_TIMEOUT;
         if (std::strcmp(mode,"unbound")!=0) {
-            balancing_app_init();
+            assert(balancing_app_init());
             assert(startCanObservation(&handle,&handle2,{},false));
         }
         if (!std::strcmp(mode,"late")) {
@@ -933,7 +933,10 @@ int main(int argc, char** argv)
         };
         if(success) {
             cycle(1);assert(iwdgRefreshCalls==1);
-            balancing_app_init(); // 既存証跡を初期化で破棄しない
+            assert(!balancing_app_init()); // 既存証跡を初期化で破棄しない
+            Can2ObservationProfile rejected{};
+            rejected.communication={200000,100000,20000,20,1000,4,0xCA2u,false};
+            assert(!initializeCan2Observation(rejected));
             assert(applicationObservation()->watchdog.successes==1);
             cycle(2);assert(iwdgRefreshCalls==2);
             for(unsigned i=0;i<10;++i) balancing_app_poll();
@@ -1278,7 +1281,7 @@ int main(int argc, char** argv)
     assert(balancing_f446_can1_snapshot(&snapshot) && snapshot.rx_frames == 0u);
     assert(!snapshot.sampled);
     assert(balancing_f446_can2_snapshot(&wheels) && !wheels.sampled);
-    balancing_app_init();
+    assert(balancing_app_init());
     balancing_f446_can_service();
     assert(balancing_f446_can1_snapshot(&snapshot) && snapshot.rx_frames == 1u);
     assert(snapshot.last_rx_us == 0u);
