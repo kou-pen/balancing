@@ -22,7 +22,7 @@ OOEDO VMの参照ネットリスト `/home/dev-agent/workspace/balancing-power/p
 
 ## 検証
 
-BoardIO単体通常/UBSan PASS。CMake Debug全CTest 85/85 PASS（job fbe8eb03b9194208）。仕様整合・Doxygen生成とソースページ・差分検査PASS（既知の日本語翻訳警告のみ）。各能動段階の4遮断条件、状態と出力の全組合せ、LED半周期・周期境界、状態遷移、時刻逆行を確認。GNU Tools for STM32 13.3.1でF303の4実装（BoardIO/PowerCan/PowerController/PowerMonitor）と共用Codec 3実装のARMオブジェクト生成7/7 PASS。オプションは `-std=c++17 -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -fno-exceptions -fno-rtti -Wall -Wextra -Werror -pedantic -c`。初回の追加 `-ffreestanding` は既存Controllerのcmathが当該libstdc++で利用できず失敗し、通常のC++コンパイル設定で再試験した。ELF32 ARM relocatableを確認。リンク済みファームウェア・フラッシュ・実機タイミングの証明ではない。
+BoardIO単体通常/UBSan PASS。CMake Debug全CTest 85/85 PASS（job fbe8eb03b9194208）。全通常/UBSan回帰試験PASS（job 9f10d74dace24c72、CubeIDE設定25/25、CAN監査19/19）。仕様整合・Doxygen生成とソースページ・差分検査PASS（既知の日本語翻訳警告のみ）。各能動段階の4遮断条件、状態と出力の全組合せ、LED半周期・周期境界、状態遷移、時刻逆行を確認。GNU Tools for STM32 13.3.1でF303の4実装（BoardIO/PowerCan/PowerController/PowerMonitor）と共用Codec 3実装のARMオブジェクト生成7/7 PASS。オプションは `-std=c++17 -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -fno-exceptions -fno-rtti -Wall -Wextra -Werror -pedantic -c`。初回の追加 `-ffreestanding` は既存Controllerのcmathが当該libstdc++で利用できず失敗し、通常のC++コンパイル設定で再試験した。ELF32 ARM relocatableを確認。リンク済みファームウェア・フラッシュ・実機タイミングの証明ではない。
 
 ## 未完了
 
