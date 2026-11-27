@@ -201,6 +201,7 @@
 | [f446-cycle-watchdog-host.md](../verification/f446-cycle-watchdog-host.md) | 制御周期の完了監視とIWDG更新境界 |
 | [f446-diagnostics-codec-host.md](../verification/f446-diagnostics-codec-host.md) | 診断・設定読み出しコーデックのホスト検証 |
 | [f446-diagnostics-service-host.md](../verification/f446-diagnostics-service-host.md) | 診断イベント管理（論理層） |
+| [f303-power-controller-host.md](../verification/f303-power-controller-host.md) | F303電源論理状態のホスト検証 |
 | [f446-drive-cycle-sil.md](../verification/f446-drive-cycle-sil.md) | F446 Application通常運転のSIL統合 |
 | [f446-dual-can-runtime-host.md](../verification/f446-dual-can-runtime-host.md) | F446 CAN1/CAN2共通受信ランタイムのホスト検証 |
 | [f446-dualsense-input-host.md](../verification/f446-dualsense-input-host.md) | F446 DualSense USB入力境界 |
@@ -246,6 +247,7 @@
 | フォルダ・ファイル | 内容 |
 |---|---|
 | @subpage folder_firmware_f446 "f446/" | STM32F446メイン制御基板 |
+| @subpage folder_firmware_f303 "f303/" | STM32F303電源基板の論理コア |
 */
 
 /** @page folder_firmware_f446 f446/
@@ -662,4 +664,86 @@ ApplicationObservationは周期コピー、ControlCycleは数学と状態判定�
 | ファイル・フォルダ | 内容 |
 |---|---|
 | <a href="ImuAttitudeSource_8cpp_source.html">ImuAttitudeSource.cpp</a> | 静止校正・軸変換・相補フィルタと姿勢出力 |
+*/
+
+/** @page folder_firmware_f303 f303/
+
+@ref folder_firmware "上位フォルダ"
+
+| フォルダ | 内容 |
+|---|---|
+| @subpage folder_firmware_f303_balancing_f303 "balancing_f303/" | F303電源基板 |
+*/
+
+/** @page folder_firmware_f303_balancing_f303 balancing_f303/
+
+@ref folder_firmware_f303 "上位フォルダ"
+
+| フォルダ | 内容 |
+|---|---|
+| @subpage folder_firmware_f303_balancing_f303_App "App/" | 自作C++17 |
+*/
+
+/** @page folder_firmware_f303_balancing_f303_App App/
+
+@ref folder_firmware_f303_balancing_f303 "上位フォルダ"
+
+| フォルダ | 内容 |
+|---|---|
+| @subpage folder_firmware_f303_balancing_f303_App_Inc "Inc/" | 宣言 |
+| @subpage folder_firmware_f303_balancing_f303_App_Src "Src/" | 実装 |
+*/
+
+/** @page folder_firmware_f303_balancing_f303_App_Inc Inc/
+
+@ref folder_firmware_f303_balancing_f303_App "上位フォルダ"
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| @subpage folder_firmware_f303_balancing_f303_App_Inc_balancing "balancing/" | 電源管理 |
+*/
+
+/** @page folder_firmware_f303_balancing_f303_App_Inc_balancing balancing/
+
+@ref folder_firmware_f303_balancing_f303_App_Inc "上位フォルダ"
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| @subpage folder_firmware_f303_balancing_f303_App_Inc_balancing_power "power/" | 電源管理 |
+*/
+
+/** @page folder_firmware_f303_balancing_f303_App_Inc_balancing_power power/
+
+@ref folder_firmware_f303_balancing_f303_App_Inc_balancing "上位フォルダ"
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| <a href="PowerController_8hpp_source.html">PowerController.hpp</a> | 論理入力・設定・状態と公開API |
+*/
+
+/** @page folder_firmware_f303_balancing_f303_App_Src Src/
+
+@ref folder_firmware_f303_balancing_f303_App "上位フォルダ"
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| @subpage folder_firmware_f303_balancing_f303_App_Src_balancing "balancing/" | 電源管理 |
+*/
+
+/** @page folder_firmware_f303_balancing_f303_App_Src_balancing balancing/
+
+@ref folder_firmware_f303_balancing_f303_App_Src "上位フォルダ"
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| @subpage folder_firmware_f303_balancing_f303_App_Src_balancing_power "power/" | 電源管理 |
+*/
+
+/** @page folder_firmware_f303_balancing_f303_App_Src_balancing_power power/
+
+@ref folder_firmware_f303_balancing_f303_App_Src_balancing "上位フォルダ"
+
+| フォルダ・ファイル | 内容 |
+|---|---|
+| <a href="PowerController_8cpp_source.html">PowerController.cpp</a> | 電源状態遷移と保護・期限・復帰 |
 */
