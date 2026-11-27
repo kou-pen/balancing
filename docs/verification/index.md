@@ -2,7 +2,7 @@
 
 各記録は当時のコード・環境・試験結果です。最新の実装説明は[全体構成](../architecture.md)、[フォルダ別コード案内](../design/public-api.md)に置き、過去のPASSを現在の実機動作に読み替えません。
 
-## 最新の基準（単軸試運転操作接続レビュー版 863f985）
+## 最新の基準（起動処理統合レビュー版 e1e279a）
 
 | 項目 | 結果 |
 |---|---|
@@ -11,12 +11,13 @@
 | ARM管理ビルド | Debug / Release / BenchDebug すべて0 error / 0 warning |
 | 実機 | 書込み、実通信、実時間、物理停止、倒立は未検証 |
 
-出典：[単軸試運転操作接続](f446-bench-operation.md)。レビュー版とmasterを区別する。#88〜#94はmaster反映済み。
+出典：[F446起動処理統合](f446-startup-integration.md)。レビュー版とmasterを区別する。#88〜#95はmaster反映済み。
 
 ## 機能別の記録
 
 ### 最新の統合・起動・停止
 
+- [F446起動処理統合と初期化失敗伝達](f446-startup-integration.md)
 - [F446 AppのC++移行統合検証](f446-all-cpp.md)
 - [通常運転の停止専用CAN送信経路](f446-stop-output.md)
 - [F446 IWDG実機用アダプタ](f446-iwdg-adapter.md)

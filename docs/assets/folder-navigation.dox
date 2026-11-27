@@ -184,6 +184,7 @@
 | [f446-balance-math-cpp.md](../verification/f446-balance-math-cpp.md) | BalanceControlのC++数値演算統合 |
 | [f446-bench-startup.md](../verification/f446-bench-startup.md) | BenchDebug専用起動とCAN IRQの排他検証 |
 | [f446-bench-operation.md](../verification/f446-bench-operation.md) | 単軸試運転の明示操作接続 |
+| [f446-startup-integration.md](../verification/f446-startup-integration.md) | 起動処理の統合と初期化失敗の伝達 |
 | [f446-bno055-observation-host.md](../verification/f446-bno055-observation-host.md) | BNO055非同期取得・姿勢フィルタ接続 |
 | [f446-c-scheduler-migration.md](../verification/f446-c-scheduler-migration.md) | 旧C11送信モデルのC++実装への統合 |
 | [f446-c620-continuity-host.md](../verification/f446-c620-continuity-host.md) | C620受信順の累積位置と連続性の検証 |
