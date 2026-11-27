@@ -465,3 +465,9 @@ add_library(balancing_f303_can STATIC
 target_include_directories(balancing_f303_can PUBLIC ${F303_APP}/Inc ${F446_APP}/Inc)
 target_link_libraries(balancing_f303_can PUBLIC balancing_f303_power)
 target_compile_options(balancing_f303_can PRIVATE -Wall -Wextra -Wpedantic -Werror)
+
+add_executable(balancing_f303_can_tests tests/test_f303_power_can.cpp
+    ${F446_APP}/Src/balancing/app/PowerBoardService.cpp)
+target_link_libraries(balancing_f303_can_tests PRIVATE balancing_f303_can)
+target_compile_options(balancing_f303_can_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
+add_test(NAME balancing_f303_can_tests COMMAND balancing_f303_can_tests)
