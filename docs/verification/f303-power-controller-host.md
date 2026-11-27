@@ -18,7 +18,7 @@
 - FAULT保持、通常OFF/物理停止解除による意図の違い、明示ONでの再充電。
 - 主電源成立確認がない状態はONと報告しない。
 
-人工fixtureの値は回路定数ではない。単体試験は通常・UBSanともPASS。CMake Debugの全CTestは82/82 PASS（job 5a402583386444b8）。構成全体の通常/UBSan実行はPRの試験記録を参照。
+人工fixtureの値は回路定数ではない。単体試験は通常・UBSanともPASS。CMake Debugの全CTestは82/82 PASS（job 5a402583386444b8）。構成全体の通常/UBSanも全件PASS（job 8c3bab76af9648db、CubeIDE設定25/25、CAN監査19/19）。仕様整合・Doxygen生成・差分検査PASS（Doxygenの既知日本語翻訳警告のみ）。
 
 ## 実機未検証
 
